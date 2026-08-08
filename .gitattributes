@@ -1,0 +1,19 @@
+# Normaliza quebras de linha: LF no repositório, nativo no working copy.
+# Sem isso, um colaborador em Linux/Mac veria o arquivo inteiro como alterado.
+* text=auto eol=lf
+
+# Binários — nunca normalizar.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.jks binary
+*.keystore binary
+
+# O arquivo do Claude Design é gerado; não conta como código nas estatísticas.
+design/** linguist-generated=true

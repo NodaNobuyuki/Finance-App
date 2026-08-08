@@ -1,0 +1,118 @@
+// Importados por subpath de propósito: o barril do pacote arrasta todos os
+// pesos e itálicos (~4 MB de TTF) para dentro do APK.
+import { IBMPlexMono_400Regular } from '@expo-google-fonts/ibm-plex-mono/400Regular';
+import { IBMPlexMono_500Medium } from '@expo-google-fonts/ibm-plex-mono/500Medium';
+import { IBMPlexMono_600SemiBold } from '@expo-google-fonts/ibm-plex-mono/600SemiBold';
+import { IBMPlexSans_400Regular } from '@expo-google-fonts/ibm-plex-sans/400Regular';
+import { IBMPlexSans_500Medium } from '@expo-google-fonts/ibm-plex-sans/500Medium';
+import { IBMPlexSans_600SemiBold } from '@expo-google-fonts/ibm-plex-sans/600SemiBold';
+import { IBMPlexSans_700Bold } from '@expo-google-fonts/ibm-plex-sans/700Bold';
+import { useFonts } from 'expo-font';
+import { StatusBar } from 'expo-status-bar';
+import React from 'react';
+import { SafeAreaView, ScrollView, View } from 'react-native';
+import { NavInferior } from './componentes/NavInferior';
+import { Toast } from './componentes/Toast';
+import { LojaProvider, useLoja } from './estado/store';
+import { Categorias } from './telas/Categorias';
+import { Extrato } from './telas/Extrato';
+import { FecharSemana } from './telas/FecharSemana';
+import { Habitos } from './telas/Habitos';
+import { Inicio } from './telas/Inicio';
+import { Lote } from './telas/Lote';
+import { Metas } from './telas/Metas';
+import { Resumo } from './telas/Resumo';
+import { Simulador } from './telas/Simulador';
+import { Aporte } from './telas/folhas/Aporte';
+import { NovaTransacao } from './telas/folhas/NovaTransacao';
+import { Ritual } from './telas/folhas/Ritual';
+import { TemaProvider, useTema } from './tema/TemaContext';
+
+function TelaAtual() {
+  const { estado } = useLoja();
+  switch (estado.tela) {
+    case 'extrato':
+      return <Extrato />;
+    case 'metas':
+      return <Metas />;
+    case 'categorias':
+      return <Categorias />;
+    case 'habitos':
+      return <Habitos />;
+    case 'simulador':
+      return <Simulador />;
+    case 'lote':
+      return <Lote />;
+    case 'resumo':
+      return <Resumo />;
+    case 'fechar':
+      return <FecharSemana />;
+    case 'home':
+    default:
+      return <Inicio />;
+  }
+}
+
+function FolhaAtual() {
+  const { estado } = useLoja();
+  if (!estado.folha) return null;
+  switch (estado.folha.tipo) {
+    case 'nova':
+      return <NovaTransacao />;
+    case 'aporte':
+      return <Aporte metaId={estado.folha.metaId} />;
+    case 'ritual':
+      return <Ritual />;
+    default:
+      return null;
+  }
+}
+
+function Casca() {
+  const { estado } = useLoja();
+  const { t, paleta } = useTema();
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.canvas }}>
+      <StatusBar style={paleta.escuro ? 'light' : 'dark'} />
+      <View style={{ flex: 1, backgroundColor: t.canvas }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+          showsVerticalScrollIndicator={false}
+          // Rola até o topo quando a tela muda, senão o usuário cai no meio
+          // do conteúdo anterior.
+          key={estado.tela}
+        >
+          <TelaAtual />
+        </ScrollView>
+
+        <NavInferior />
+        <Toast />
+        <FolhaAtual />
+      </View>
+    </SafeAreaView>
+  );
+}
+
+export default function App() {
+  const [fontesProntas] = useFonts({
+    IBMPlexSans_400Regular,
+    IBMPlexSans_500Medium,
+    IBMPlexSans_600SemiBold,
+    IBMPlexSans_700Bold,
+    IBMPlexMono_400Regular,
+    IBMPlexMono_500Medium,
+    IBMPlexMono_600SemiBold,
+  });
+
+  if (!fontesProntas) return null;
+
+  return (
+    <TemaProvider>
+      <LojaProvider>
+        <Casca />
+      </LojaProvider>
+    </TemaProvider>
+  );
+}

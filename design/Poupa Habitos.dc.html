@@ -1,0 +1,1836 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<script src="_ds/design-system-d99fdf4d-a5dd-43bb-868c-982b8085f024/_ds_bundle.js"></script>
+<template id="__bundler_thumbnail" data-bg-color="#0d0912">
+<svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg"><rect width="1200" height="800" fill="#0d0912"></rect><rect x="470" y="180" width="260" height="440" rx="34" fill="#17111f"></rect><path d="M470 214a34 34 0 0134-34h192a34 34 0 0134 34v102H470z" fill="#2a1740"></path><rect x="505" y="225" width="110" height="14" rx="7" fill="rgba(242,236,247,.5)"></rect><rect x="505" y="255" width="180" height="32" rx="8" fill="#f2ecf7"></rect><rect x="505" y="385" width="190" height="12" rx="6" fill="#241932"></rect><rect x="505" y="420" width="150" height="12" rx="6" fill="#241932"></rect><rect x="505" y="455" width="170" height="12" rx="6" fill="#241932"></rect><circle cx="600" cy="555" r="34" fill="#c9a6f7"></circle><path d="M600 540v30M585 555h30" stroke="#12091b" stroke-width="7" stroke-linecap="round"></path></svg>
+</template>
+<style>
+:root{--canvas:#ffffff;--surface:#ffffff;--surface-muted:#fafaf9;--segment:#f1f0f9;--ink:#17140f;--ink-muted:#77726a;--ink-soft:#8a8a86;--ink-faint:#a09a90;--line:#f2f0eb;--line-soft:#f2f0eb;--line-input:#e6e2db;--up:#0f7a43;--down:#c0392b;--accent:#2b2a66;--accent-hover:#1f1e4d;--accent-soft:#f1f0f9;--on-accent:#ffffff;--toast-bg:#17140f;--toast-ink:#ffffff;--toast-check:#7fd8a4;--accent-shadow:rgba(43,42,102,.35);--hero:#2b2a66;--on-hero:#ffffff;--on-hero-soft:rgba(255,255,255,.64);--hero-line:rgba(255,255,255,.3)}
+body{margin:0;background:var(--canvas);-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}a:hover{color:var(--accent-hover)}
+input{font-family:'IBM Plex Sans',system-ui,sans-serif}
+input:focus{outline:none}
+::-webkit-scrollbar{width:0;height:0}
+@keyframes poupaUp{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes poupaToast{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
+</style>
+</helmet>
+<div style="min-height:100vh;background:var(--canvas);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;gap:20px;padding:36px 16px 56px">
+
+<div style="display:flex;flex-direction:column;gap:5px;align-items:center;text-align:center">
+<div style="font-size:19px;font-weight:600;letter-spacing:-0.01em">Poupa — o hábito de registrar</div>
+<div style="font-size:12.5px;color:var(--ink-soft);max-width:440px;line-height:1.5">Versão focada em constância: estado do registro no topo, meta semanal, lançamento em lote dos dias em aberto e resumo da semana como recompensa.</div>
+</div>
+
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="412px,892px">
+<div style="height:100%;position:relative;display:flex;flex-direction:column;background:var(--canvas);font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--ink);overflow:hidden">
+
+<div style="flex:1;overflow-y:auto;overflow-x:hidden">
+
+<sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column">
+
+<div style="background:var(--hero);color:var(--on-hero);padding:20px 22px 24px;display:flex;flex-direction:column;gap:22px">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<div style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Olá, Marina</div>
+<div style="width:34px;height:34px;border-radius:999px;border:1px solid var(--hero-line);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600">M</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;flex-direction:column;gap:6px">
+<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--on-hero-soft);font-weight:600">Seu registro</span>
+<div style="display:flex;align-items:center;gap:11px">
+<span style="width:11px;height:11px;flex:none;border-radius:999px;background:{{ statusPonto }}"></span>
+<span style="font-size:30px;font-weight:600;letter-spacing:-0.03em;line-height:1.05">{{ statusTitulo }}</span>
+</div>
+<span style="font-size:12px;color:var(--on-hero-soft)">{{ statusSub }}</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="display:flex;gap:6px">
+<sc-for list="{{ semanaDias }}" as="d" hint-placeholder-count="7">
+<div onClick="{{ d.ir }}" style="cursor:pointer;flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;opacity:{{ d.opacidade }}">
+<span style="font-size:10px;letter-spacing:.05em;color:{{ d.letraCor }};font-weight:{{ d.letraPeso }}">{{ d.letra }}</span>
+<span style="width:100%;height:32px;border-radius:10px;border:{{ d.bordaW }} solid {{ d.borda }};background:{{ d.fundo }};display:flex;align-items:center;justify-content:center">
+<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="{{ d.marcaCor }}" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+</span>
+</div>
+</sc-for>
+</div>
+<span style="font-size:11.5px;color:var(--on-hero-soft)">{{ semanaLabel }}</span>
+</div>
+</div>
+
+<sc-if value="{{ mostrarAtalhos }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:10px">
+<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--on-hero-soft);font-weight:600">Registro em um toque</span>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
+<sc-for list="{{ rapidos }}" as="r" hint-placeholder-count="4">
+<div onClick="{{ r.registrar }}" style="cursor:pointer;display:flex;align-items:center;gap:7px;border:1px solid var(--hero-line);border-radius:14px;padding:9px 12px;color:var(--on-hero);min-width:0" style-hover="background:rgba(255,255,255,.12)">
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style="flex:none;opacity:.72"><path d="{{ r.icone }}"></path></svg>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">
+<span style="font-size:12px;font-weight:500;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.nome }}</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;font-weight:600;white-space:nowrap;line-height:1.15">{{ r.valorLabel }}</span>
+</span>
+</div>
+</sc-for>
+<div onClick="{{ abrirOutro }}" style="cursor:pointer;grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:7px;border:1px dashed var(--hero-line);border-radius:14px;padding:9px 14px;color:var(--on-hero-soft)" style-hover="color:var(--on-hero)">
+<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
+<span style="font-size:12.5px;font-weight:500">Outro</span>
+</div>
+</div>
+</div>
+</sc-if>
+</div>
+
+<div style="padding:22px 22px 26px;display:flex;flex-direction:column;gap:26px">
+
+<sc-if value="{{ mostrarInsight }}" hint-placeholder-val="{{ true }}">
+<div onClick="{{ proximoInsight }}" style="cursor:pointer;display:flex;align-items:center;gap:12px;border-radius:18px;padding:14px 16px;background:var(--accent-soft)">
+<span style="width:34px;height:34px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--accent);border:1px solid var(--accent)">
+<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.5.4.8 1 .8 1.6h5.4c0-.6.3-1.2.8-1.6A6 6 0 0012 3z"></path></svg>
+</span>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+<div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:600;color:var(--accent)">{{ insightTag }}</div>
+<div style="font-size:13px;font-weight:500;line-height:1.4;color:var(--ink)">{{ insightTexto }}</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px;flex:none">
+<sc-for list="{{ insightDots }}" as="d" hint-placeholder-count="3">
+<span style="width:5px;height:5px;border-radius:999px;background:{{ d.cor }}"></span>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ mostrarStreak }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:14px;background:{{ acaoFundo }};border-radius:18px;padding:15px 16px">
+<div style="display:flex;align-items:center;gap:12px">
+<span style="width:38px;height:38px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;background:var(--accent);color:var(--on-accent)">
+<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="{{ acaoIcone }}"></path></svg>
+</span>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+<div style="font-size:13.5px;font-weight:600">{{ acaoTitulo }}</div>
+<div style="font-size:11.5px;color:var(--ink-soft);line-height:1.4">{{ acaoSub }}</div>
+</div>
+</div>
+<div onClick="{{ acaoIr }}" style="cursor:pointer;text-align:center;border-radius:12px;padding:12px;font-size:13px;font-weight:600;color:var(--on-accent);background:var(--accent)" style-hover="background:var(--accent-hover)">{{ acaoBotao }}</div>
+</div>
+</sc-if>
+
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<sc-for list="{{ contas }}" as="c" hint-placeholder-count="4">
+<div style="display:flex;align-items:center;gap:6px;background:var(--surface-muted);border-radius:999px;padding:6px 11px">
+<span style="width:7px;height:7px;border-radius:999px;background:{{ c.cor }}"></span>
+<span style="font-size:11.5px;color:var(--ink-muted);font-weight:500">{{ c.nome }}</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11.5px;font-weight:600;white-space:nowrap;color:{{ c.saldoCor }}">{{ c.saldoLabel }}</span>
+</div>
+</sc-for>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:baseline;justify-content:space-between">
+<div style="font-size:15px;font-weight:600">Agosto de 2026</div>
+<div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;font-weight:600;color:var(--up);white-space:nowrap">{{ resultadoLabel }}</div>
+</div>
+
+<sc-if value="{{ resumoBarras }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:13px">
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;align-items:baseline;justify-content:space-between">
+<span style="font-size:12.5px;color:var(--ink-muted)">Receitas</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:14px;font-weight:600;color:var(--up)">{{ receitasLabel }}</span>
+</div>
+<div style="height:8px;border-radius:999px;background:var(--segment);overflow:hidden">
+<div style="height:100%;border-radius:999px;background:var(--up);transition:width .5s cubic-bezier(.2,.8,.2,1);width:{{ pctReceitas }}%"></div>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;align-items:baseline;justify-content:space-between">
+<span style="font-size:12.5px;color:var(--ink-muted)">Despesas</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:14px;font-weight:600;color:var(--down)">{{ despesasLabel }}</span>
+</div>
+<div style="height:8px;border-radius:999px;background:var(--segment);overflow:hidden">
+<div style="height:100%;border-radius:999px;background:var(--down);transition:width .5s cubic-bezier(.2,.8,.2,1);width:{{ pctDespesas }}%"></div>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ resumoRosca }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;gap:20px">
+<div style="width:112px;height:112px;border-radius:999px;flex:none;display:flex;align-items:center;justify-content:center;background:{{ roscaGradient }}">
+<div style="width:76px;height:76px;border-radius:999px;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px">
+<span style="font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint)">Sobra</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:15px;font-weight:600">{{ pctSobraLabel }}</span>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px;flex:1">
+<div style="display:flex;flex-direction:column;gap:2px">
+<span style="font-size:12px;color:var(--ink-muted)">Receitas</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:16px;font-weight:600;color:var(--up)">{{ receitasLabel }}</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:2px">
+<span style="font-size:12px;color:var(--ink-muted)">Despesas</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:16px;font-weight:600;color:var(--down)">{{ despesasLabel }}</span>
+</div>
+</div>
+</div>
+</sc-if>
+
+<div style="display:flex;flex-direction:column;gap:8px;padding-top:2px">
+<div style="display:flex;align-items:baseline;justify-content:space-between">
+<span style="font-size:12.5px;color:var(--ink-muted)">Orçamento do mês</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;font-weight:600;color:{{ orcCor }}">{{ orcPctLabel }}</span>
+</div>
+<div style="height:10px;border-radius:999px;background:var(--segment);overflow:hidden">
+<div style="height:100%;border-radius:999px;transition:width .5s cubic-bezier(.2,.8,.2,1);width:{{ orcPct }}%;background-image:linear-gradient(90deg,var(--up),#d9a13a,var(--down));background-size:{{ orcGrad }}% 100%"></div>
+</div>
+<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;color:var(--ink-muted)">{{ orcGastoLabel }} de {{ orcTotalLabel }}</span>
+<span style="font-size:11.5px;color:var(--ink-soft);white-space:nowrap">{{ orcRestanteLabel }}</span>
+</div>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:4px">
+<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px">
+<div style="font-size:15px;font-weight:600">Últimas transações</div>
+<div onClick="{{ irExtrato }}" style="cursor:pointer;font-size:12.5px;font-weight:600;color:var(--accent);white-space:nowrap" style-hover="color:var(--accent-hover)">Ver tudo</div>
+</div>
+<sc-for list="{{ recentes }}" as="t" hint-placeholder-count="5">
+<div style="display:flex;align-items:center;gap:13px;padding:13px 0;border-bottom:1px solid {{ t.sep }}">
+<span style="width:38px;height:38px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:{{ t.cor }};background:{{ t.corSuave }}">
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="{{ t.icone }}"></path></svg>
+</span>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+<div style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.nome }}</div>
+<div style="font-size:11.5px;color:var(--ink-soft)">{{ t.meta }}</div>
+</div>
+<div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:14px;font-weight:600;white-space:nowrap;color:{{ t.valorCor }}">{{ t.valorLabel }}</div>
+</div>
+</sc-for>
+</div>
+
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isExtrato }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:16px">
+
+<div style="background:var(--hero);color:var(--on-hero);padding:20px 22px 22px;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<div style="display:flex;align-items:center;gap:10px">
+<div style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Extrato</div>
+<div onClick="{{ irCategorias }}" style="cursor:pointer;border:1px solid var(--hero-line);border-radius:999px;padding:4px 10px;font-size:11px;font-weight:600;color:var(--on-hero-soft)" style-hover="color:var(--on-hero)">Categorias</div>
+</div>
+<div style="display:flex;align-items:center;gap:10px;border:1px solid var(--hero-line);border-radius:999px;padding:4px 8px">
+<span style="cursor:pointer;color:var(--on-hero-soft);font-size:13px;padding:0 3px">‹</span>
+<span style="font-size:12px;font-weight:600;white-space:nowrap">Agosto 2026</span>
+<span style="cursor:pointer;color:var(--on-hero-soft);font-size:13px;padding:0 3px">›</span>
+</div>
+</div>
+<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px">
+<div style="display:flex;flex-direction:column;gap:4px">
+<span style="font-size:11.5px;color:var(--on-hero-soft)">Saldo do período</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:26px;font-weight:600;letter-spacing:-0.03em;line-height:1">{{ filtroSaldo }}</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
+<span style="font-size:11.5px;color:var(--on-hero-soft);white-space:nowrap">entradas <span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-weight:600;color:var(--on-hero)">{{ filtroEntradas }}</span></span>
+<span style="font-size:11.5px;color:var(--on-hero-soft);white-space:nowrap">saídas <span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-weight:600;color:var(--on-hero)">{{ filtroSaidas }}</span></span>
+</div>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;gap:7px;overflow-x:auto;padding:0 18px"><div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;gap:7px;overflow-x:auto;padding:0 18px">
+<sc-for list="{{ chipsConta }}" as="c" hint-placeholder-count="5">
+<div onClick="{{ c.sel }}" style="cursor:pointer;flex:none;border-radius:999px;padding:7px 13px;font-size:12.5px;font-weight:{{ c.peso }};border:1px solid {{ c.borda }};background:{{ c.fundo }};color:{{ c.texto }}">{{ c.nome }}</div>
+</sc-for>
+</div>
+<div style="display:flex;gap:7px;overflow-x:auto;padding:0 18px">
+<sc-for list="{{ chipsCategoria }}" as="c" hint-placeholder-count="6">
+<div onClick="{{ c.sel }}" style="cursor:pointer;flex:none;display:flex;align-items:center;gap:6px;border-radius:999px;padding:7px 13px;font-size:12.5px;font-weight:{{ c.peso }};border:1px solid {{ c.borda }};background:{{ c.fundo }};color:{{ c.texto }}">
+<span style="width:7px;height:7px;border-radius:999px;background:{{ c.ponto }}"></span>{{ c.nome }}</div>
+</sc-for>
+</div>
+</div>
+
+<div style="padding:0 18px;display:flex;flex-direction:column;gap:16px">
+<sc-for list="{{ grupos }}" as="g" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column;gap:4px">
+<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:2px">
+<span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint)">{{ g.label }}</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11.5px;font-weight:600;color:var(--ink-faint);white-space:nowrap">{{ g.totalLabel }}</span>
+</div>
+<div>
+<sc-for list="{{ g.itens }}" as="t" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:13px;padding:13px 0;border-bottom:1px solid {{ t.sep }}">
+<span style="width:38px;height:38px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:{{ t.cor }};background:{{ t.corSuave }}">
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="{{ t.icone }}"></path></svg>
+</span>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+<div style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.nome }}</div>
+<div style="font-size:11.5px;color:var(--ink-soft)">{{ t.meta }}</div>
+</div>
+<div style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:14px;font-weight:600;color:{{ t.valorCor }}">{{ t.valorLabel }}</div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-for>
+<sc-if value="{{ semResultados }}" hint-placeholder-val="{{ false }}">
+<div style="padding:34px 0;text-align:center;font-size:13px;color:var(--ink-faint)">Nenhuma transação com esses filtros.</div>
+</sc-if>
+</div>
+
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isMetas }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column">
+<div style="background:var(--hero);color:var(--on-hero);padding:20px 22px 22px;display:flex;flex-direction:column;gap:6px">
+<div style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Metas</div>
+<div style="font-size:12.5px;color:var(--on-hero-soft);white-space:nowrap">{{ metasResumo }}</div>
+</div>
+<div style="padding:22px 22px 26px;display:flex;flex-direction:column;gap:26px">
+
+<sc-for list="{{ metas }}" as="m" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column;gap:13px">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+<div style="display:flex;align-items:center;gap:11px">
+<span style="width:38px;height:38px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--on-accent);background:{{ m.cor }}">
+<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="{{ m.icone }}"></path></svg>
+</span>
+<div style="display:flex;flex-direction:column;gap:2px">
+<span style="font-size:14.5px;font-weight:600">{{ m.nome }}</span>
+<span style="font-size:11.5px;color:var(--ink-soft);white-space:nowrap">{{ m.prazo }}</span>
+</div>
+</div>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:4px 9px">{{ m.pctLabel }}</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:7px">
+<div style="height:8px;border-radius:999px;background:var(--segment);overflow:hidden">
+<div style="height:100%;border-radius:999px;transition:width .55s cubic-bezier(.2,.8,.2,1);background:{{ m.cor }};width:{{ m.pct }}%"></div>
+</div>
+<div style="display:flex;align-items:baseline;justify-content:space-between">
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:15px;font-weight:600">{{ m.atualLabel }}</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;color:var(--ink-soft)">de {{ m.alvoLabel }}</span>
+</div>
+</div>
+<div onClick="{{ m.adicionar }}" style="cursor:pointer;align-self:flex-start;border-radius:999px;padding:9px 16px;font-size:12.5px;font-weight:600;color:var(--accent);background:var(--accent-soft)" style-hover="background:var(--segment)">Adicionar valor</div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isCategorias }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column">
+<div style="background:var(--hero);color:var(--on-hero);padding:20px 22px 22px">
+<div style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Categorias</div>
+</div>
+<div style="padding:20px 22px 26px;display:flex;flex-direction:column;gap:16px">
+<div style="display:inline-flex;gap:2px;border-radius:11px;background:var(--segment);padding:3px">
+<div onClick="{{ verDespesas }}" style="cursor:pointer;flex:1;text-align:center;border-radius:8px;padding:7px 13px;font-size:12.5px;background:{{ tabDespesaBg }};color:{{ tabDespesaCor }};font-weight:600;box-shadow:{{ tabDespesaSombra }}">Despesas</div>
+<div onClick="{{ verReceitas }}" style="cursor:pointer;flex:1;text-align:center;border-radius:8px;padding:7px 13px;font-size:12.5px;background:{{ tabReceitaBg }};color:{{ tabReceitaCor }};font-weight:600;box-shadow:{{ tabReceitaSombra }}">Receitas</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+<sc-for list="{{ gridCategorias }}" as="c" hint-placeholder-count="9">
+<div style="background:var(--surface-muted);border-radius:16px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer" style-hover="background:var(--segment)">
+<span style="width:40px;height:40px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--on-accent);background:{{ c.cor }}">
+<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="{{ c.icone }}"></path></svg>
+</span>
+<span style="font-size:12px;font-weight:600;text-align:center;line-height:1.25">{{ c.nome }}</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;color:var(--ink-soft)">{{ c.totalLabel }}</span>
+</div>
+</sc-for>
+<div style="border:1px dashed var(--line-input);border-radius:16px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;color:var(--ink-soft)" style-hover="border-color:var(--accent);color:var(--accent)">
+<span style="width:40px;height:40px;border-radius:999px;border:1px dashed var(--line-input);display:flex;align-items:center;justify-content:center;font-size:19px;line-height:1">+</span>
+<span style="font-size:12px;font-weight:600;text-align:center;line-height:1.25">Nova categoria</span>
+</div>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isHabitos }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column">
+<div style="background:var(--hero);color:var(--on-hero);padding:20px 22px 24px;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;align-items:center;gap:12px">
+<div onClick="{{ voltarHome }}" style="cursor:pointer;width:32px;height:32px;flex:none;border-radius:999px;border:1px solid var(--hero-line);display:flex;align-items:center;justify-content:center">
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
+</div>
+<div style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Hábitos</div>
+</div>
+<div style="display:flex;align-items:flex-end;gap:10px">
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:48px;font-weight:600;letter-spacing:-0.04em;line-height:.9">{{ semanasEmDia }}</span>
+<span style="font-size:12.5px;color:var(--on-hero-soft);line-height:1.4;padding-bottom:4px">semanas seguidas<br>com registro em dia</span>
+</div>
+<div style="display:flex;justify-content:space-between;gap:6px">
+<sc-for list="{{ streakSemanaHero }}" as="d" hint-placeholder-count="6">
+<div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+<span style="width:38px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;font-weight:600;background:{{ d.fundo }};border:1px solid {{ d.borda }};color:{{ d.cor }}">{{ d.valor }}</span>
+<span style="font-size:10px;color:var(--on-hero-soft);font-weight:600">{{ d.label }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="padding:22px 22px 26px;display:flex;flex-direction:column;gap:26px">
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<div style="background:var(--surface-muted);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:4px">
+<span style="font-size:11.5px;color:var(--ink-soft);line-height:1.3">Registros nesta semana</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:22px;font-weight:600;letter-spacing:-0.02em">{{ registrosSemanaLabel }}</span>
+<span style="font-size:11px;color:var(--ink-faint)">meta: {{ metaSemanalLabel }}</span>
+</div>
+<div style="background:var(--surface-muted);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:4px">
+<span style="font-size:11.5px;color:var(--ink-soft);line-height:1.3">Lançamentos em agosto</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:22px;font-weight:600;letter-spacing:-0.02em;color:var(--up)">{{ lancamentosMes }}</span>
+<span style="font-size:11px;color:var(--ink-faint)">{{ lancamentosSub }}</span>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:2px">
+<div style="font-size:15px;font-weight:600;margin-bottom:8px">Desafios desta semana</div>
+<sc-for list="{{ desafiosAtivos }}" as="d" hint-placeholder-count="2">
+<div style="display:flex;flex-direction:column;gap:12px;padding:14px 0;border-bottom:1px solid {{ d.sep }}">
+<div style="display:flex;align-items:center;gap:11px">
+<span style="width:38px;height:38px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:{{ d.cor }};background:{{ d.corSuave }}">
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="{{ d.icone }}"></path></svg>
+</span>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+<div style="font-size:13.5px;font-weight:600">{{ d.nome }}</div>
+<div style="font-size:11.5px;color:var(--ink-soft)">{{ d.sub }}</div>
+</div>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:4px 9px">{{ d.pctLabel }}</span>
+</div>
+<div style="height:8px;border-radius:999px;background:var(--segment);overflow:hidden">
+<div style="height:100%;border-radius:999px;transition:width .5s cubic-bezier(.2,.8,.2,1);background:{{ d.cor }};width:{{ d.pct }}%"></div>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;color:var(--ink-muted)">{{ d.progressoLabel }}</span>
+<div onClick="{{ d.avancar }}" style="cursor:pointer;border-radius:999px;padding:8px 14px;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft)" style-hover="background:var(--segment)">{{ d.acaoLabel }}</div>
+</div>
+</div>
+</sc-for>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:2px">
+<div style="font-size:15px;font-weight:600;margin-bottom:4px">Desafios opcionais</div>
+<sc-for list="{{ desafiosDisponiveis }}" as="d" hint-placeholder-count="2">
+<div style="display:flex;align-items:center;gap:11px;padding:13px 0;border-bottom:1px solid {{ d.sep }}">
+<span style="width:38px;height:38px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:{{ d.cor }};background:{{ d.corSuave }}">
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="{{ d.icone }}"></path></svg>
+</span>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+<div style="font-size:13.5px;font-weight:600">{{ d.nome }}</div>
+<div style="font-size:11.5px;color:var(--ink-soft)">{{ d.sub }}</div>
+</div>
+<div onClick="{{ d.entrar }}" style="cursor:pointer;flex:none;border-radius:999px;padding:8px 14px;font-size:12px;font-weight:600;color:var(--on-accent);background:var(--accent)" style-hover="background:var(--accent-hover)">Entrar</div>
+</div>
+</sc-for>
+</div>
+
+<div style="display:flex;align-items:center;gap:12px;background:var(--surface-muted);border-radius:16px;padding:15px 16px">
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+<div style="font-size:13.5px;font-weight:600">Seu ritual</div>
+<div style="font-size:12px;color:var(--ink-soft);line-height:1.45">{{ ritualResumo }}</div>
+</div>
+<div onClick="{{ abrirRitual }}" style="cursor:pointer;flex:none;border:1px solid var(--line-input);border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:600;color:var(--ink)" style-hover="border-color:var(--accent);color:var(--accent)">Ajustar</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font-size:15px;font-weight:600">Lembrete de registro</div>
+<div style="font-size:12px;color:var(--ink-soft);line-height:1.45;margin-top:-4px">Escolha quando o app te lembra de colocar os gastos em dia.</div>
+<div style="display:flex;flex-wrap:wrap;gap:7px">
+<sc-for list="{{ lembretes }}" as="l" hint-placeholder-count="4">
+<div onClick="{{ l.sel }}" style="cursor:pointer;border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:{{ l.peso }};border:1px solid {{ l.borda }};background:{{ l.fundo }};color:{{ l.texto }}">{{ l.nome }}</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display:flex;align-items:center;gap:11px">
+<span style="width:32px;height:32px;flex:none;border-radius:999px;display:flex;align-items:center;justify-content:center;color:var(--up);background:var(--segment)">
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+</span>
+<div style="font-size:12.5px;color:var(--ink-muted);line-height:1.4">Julho fechado: 4 semanas seguidas com registro em dia</div>
+</div>
+
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isSimulador }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column">
+<div style="background:var(--hero);color:var(--on-hero);padding:20px 22px 24px;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;align-items:center;gap:12px">
+<div onClick="{{ voltarHome }}" style="cursor:pointer;width:32px;height:32px;flex:none;border-radius:999px;border:1px solid var(--hero-line);display:flex;align-items:center;justify-content:center">
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
+</div>
+<div style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Vale a pena?</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<span style="font-size:11.5px;color:var(--on-hero-soft)">Valor que você deixa de gastar</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:38px;font-weight:600;letter-spacing:-0.03em;line-height:1">{{ simValorLabel }}</span>
+</div>
+</div>
+
+<div style="padding:20px 22px 26px;display:flex;flex-direction:column;gap:24px">
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-faint)">Onde investir</span>
+<div style="display:flex;gap:7px">
+<sc-for list="{{ simTaxas }}" as="t" hint-placeholder-count="3">
+<div onClick="{{ t.sel }}" style="cursor:pointer;flex:1;text-align:center;border-radius:12px;padding:9px 6px;display:flex;flex-direction:column;gap:2px;border:1px solid {{ t.borda }};background:{{ t.fundo }};color:{{ t.texto }}">
+<span style="font-size:12px;font-weight:600">{{ t.nome }}</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;opacity:.75">{{ t.taxaLabel }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;flex-direction:column;gap:5px">
+<span style="font-size:12.5px;color:var(--ink-muted)">Em 5 anos, esse dinheiro investido seria</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:34px;font-weight:600;letter-spacing:-0.03em;line-height:1;color:var(--up)">{{ sim5Label }}</span>
+<span style="font-size:12px;color:var(--ink-soft)">{{ sim5Rendimento }}</span>
+</div>
+<div style="display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--segment)">
+<div style="background:var(--accent);width:{{ simPctPrincipal }}%"></div>
+<div style="background:var(--up);flex:1;transition:width .5s"></div>
+</div>
+<div style="display:flex;gap:16px">
+<span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-soft)"><span style="width:7px;height:7px;border-radius:999px;background:var(--accent)"></span>valor de hoje</span>
+<span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-soft)"><span style="width:7px;height:7px;border-radius:999px;background:var(--up)"></span>rendimento</span>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:2px">
+<sc-for list="{{ simPrazos }}" as="p" hint-placeholder-count="3">
+<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:12px 0;border-bottom:1px solid {{ p.sep }}">
+<span style="font-size:13px;color:var(--ink-muted)">{{ p.label }}</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:14px;font-weight:600">{{ p.valorLabel }}</span>
+</div>
+</sc-for>
+</div>
+
+<div style="font-size:12.5px;color:var(--ink-muted);line-height:1.5">{{ simComparacao }}</div>
+
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px">
+<sc-for list="{{ teclasSim }}" as="k" hint-placeholder-count="12">
+<div onClick="{{ k.press }}" style="cursor:pointer;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:18px;font-weight:600;background:var(--surface-muted);border:1px solid var(--line-soft);color:var(--ink)" style-hover="background:var(--line-soft)">{{ k.label }}</div>
+</sc-for>
+</div>
+
+<div onClick="{{ simGuardar }}" style="cursor:pointer;text-align:center;border-radius:14px;padding:15px;font-size:14.5px;font-weight:600;color:var(--on-accent);background:{{ simGuardarBg }}" style-hover="filter:brightness(.93)">{{ simGuardarLabel }}</div>
+
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isLote }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column">
+<div style="background:var(--hero);color:var(--on-hero);padding:20px 22px 22px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:center;gap:12px">
+<div onClick="{{ voltarHome }}" style="cursor:pointer;width:32px;height:32px;flex:none;border-radius:999px;border:1px solid var(--hero-line);display:flex;align-items:center;justify-content:center">
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
+</div>
+<div style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Colocar em dia</div>
+</div>
+<div style="font-size:12.5px;color:var(--on-hero-soft);line-height:1.5">Lance os dias em aberto de uma vez. Se não gastou nada, marque “não gastei”.</div>
+</div>
+
+<div style="padding:8px 22px 26px;display:flex;flex-direction:column;gap:2px">
+<sc-for list="{{ loteDias }}" as="d" hint-placeholder-count="2">
+<div style="display:flex;flex-direction:column;gap:11px;padding:18px 0;border-bottom:1px solid {{ d.sep }}">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+<span style="font-size:13.5px;font-weight:600">{{ d.label }}</span>
+<div onClick="{{ d.zeroSel }}" style="cursor:pointer;border-radius:999px;padding:6px 12px;font-size:11.5px;font-weight:600;border:1px solid {{ d.zeroBorda }};background:{{ d.zeroFundo }};color:{{ d.zeroTexto }}">Não gastei</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:9px;opacity:{{ d.opacidade }}">
+<input type="text" inputmode="decimal" placeholder="R$ 0,00" value="{{ d.valor }}" onChange="{{ d.setValor }}" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--line-input);border-radius:12px;padding:12px 13px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:15px;font-weight:600;color:var(--ink)">
+<div style="display:flex;gap:6px;overflow-x:auto">
+<sc-for list="{{ d.cats }}" as="c" hint-placeholder-count="5">
+<div onClick="{{ c.sel }}" style="cursor:pointer;flex:none;display:flex;align-items:center;gap:6px;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:600;border:1px solid {{ c.borda }};background:{{ c.fundo }};color:{{ c.texto }}">
+<span style="width:6px;height:6px;border-radius:999px;background:{{ c.ponto }}"></span>{{ c.nome }}</div>
+</sc-for>
+</div>
+</div>
+</div>
+</sc-for>
+
+<div onClick="{{ salvarLote }}" style="cursor:pointer;margin-top:20px;text-align:center;border-radius:14px;padding:15px;font-size:14.5px;font-weight:600;color:var(--on-accent);background:{{ loteBg }}" style-hover="filter:brightness(.93)">{{ loteBotao }}</div>
+<div style="margin-top:12px;font-size:11.5px;color:var(--ink-faint);text-align:center;line-height:1.5">Atrasar acontece. O que conta é voltar.</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isFechar }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column">
+<div style="background:var(--hero);color:var(--on-hero);padding:20px 22px 24px;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;align-items:center;gap:12px">
+<div onClick="{{ voltarHome }}" style="cursor:pointer;width:32px;height:32px;flex:none;border-radius:999px;border:1px solid var(--hero-line);display:flex;align-items:center;justify-content:center">
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
+</div>
+<div style="flex:1;font-size:16px;font-weight:600;letter-spacing:-0.01em">Fechar a semana</div>
+<div style="display:flex;gap:5px;flex:none">
+<sc-for list="{{ passoPontos }}" as="p" hint-placeholder-count="3">
+<span style="width:20px;height:4px;border-radius:999px;background:{{ p.cor }}"></span>
+</sc-for>
+</div>
+</div>
+<sc-if value="{{ fecharP1 }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:7px">
+<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--on-hero-soft);font-weight:600">Passo 1 de 3</span>
+<span style="font-size:26px;font-weight:600;letter-spacing:-0.03em;line-height:1.1">Confira os dias</span>
+<span style="font-size:12.5px;color:var(--on-hero-soft);line-height:1.45">{{ fecharAbertosLabel }}</span>
+</div>
+</sc-if>
+<sc-if value="{{ fecharP3 }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:7px">
+<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--on-hero-soft);font-weight:600">Passo 3 de 3</span>
+<span style="font-size:26px;font-weight:600;letter-spacing:-0.03em;line-height:1.1">Um foco para a próxima</span>
+<span style="font-size:12.5px;color:var(--on-hero-soft);line-height:1.45">Escolher uma coisa só funciona melhor que tentar mudar tudo.</span>
+</div>
+</sc-if>
+</div>
+
+<sc-if value="{{ fecharP1 }}" hint-placeholder-val="{{ true }}">
+<div style="padding:22px 22px 26px;display:flex;flex-direction:column;gap:22px">
+<div style="display:flex;flex-direction:column;gap:2px">
+<sc-for list="{{ fecharDias }}" as="d" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line-soft)">
+<span style="width:24px;height:24px;flex:none;border-radius:8px;border:1px solid {{ d.borda }};display:flex;align-items:center;justify-content:center">
+<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="{{ d.marca }}" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+</span>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">
+<span style="font-size:13.5px;font-weight:500">{{ d.label }}</span>
+<span style="font-size:11px;color:var(--ink-faint)">{{ d.data }}</span>
+</div>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;font-weight:600;white-space:nowrap;color:{{ d.valorCor }}">{{ d.valorLabel }}</span>
+</div>
+</sc-for>
+</div>
+<div onClick="{{ fecharContinuar }}" style="cursor:pointer;text-align:center;border-radius:14px;padding:15px;font-size:14.5px;font-weight:600;color:var(--on-accent);background:var(--accent)" style-hover="background:var(--accent-hover)">{{ fecharBotao }}</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ fecharP3 }}" hint-placeholder-val="{{ false }}">
+<div style="padding:22px 22px 26px;display:flex;flex-direction:column;gap:22px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ intencoes }}" as="i" hint-placeholder-count="4">
+<div onClick="{{ i.sel }}" style="cursor:pointer;border-radius:14px;padding:14px 16px;font-size:13.5px;font-weight:{{ i.peso }};border:1px solid {{ i.borda }};background:{{ i.fundo }};color:{{ i.texto }}">{{ i.nome }}</div>
+</sc-for>
+</div>
+<div onClick="{{ concluirFechamento }}" style="cursor:pointer;text-align:center;border-radius:14px;padding:15px;font-size:14.5px;font-weight:600;color:var(--on-accent);background:var(--accent)" style-hover="background:var(--accent-hover)">Concluir a semana</div>
+<div style="font-size:11.5px;color:var(--ink-faint);text-align:center;line-height:1.5">Você pode fechar sem escolher um foco.</div>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ isResumo }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column">
+<div style="background:var(--hero);color:var(--on-hero);padding:20px 22px 24px;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;align-items:center;gap:12px">
+<div onClick="{{ resumoVoltar }}" style="cursor:pointer;width:32px;height:32px;flex:none;border-radius:999px;border:1px solid var(--hero-line);display:flex;align-items:center;justify-content:center">
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
+</div>
+<div style="flex:1;font-size:16px;font-weight:600;letter-spacing:-0.01em">Resumo da semana</div>
+<sc-if value="{{ fechandoAtivo }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;gap:5px;flex:none">
+<span style="width:20px;height:4px;border-radius:999px;background:var(--on-hero)"></span>
+<span style="width:20px;height:4px;border-radius:999px;background:var(--on-hero)"></span>
+<span style="width:20px;height:4px;border-radius:999px;background:var(--hero-line)"></span>
+</div>
+</sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<sc-if value="{{ fechandoAtivo }}" hint-placeholder-val="{{ false }}">
+<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--on-hero-soft);font-weight:600">Passo 2 de 3</span>
+</sc-if>
+<span style="font-size:11.5px;color:var(--on-hero-soft)">{{ resumoPeriodo }}</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:34px;font-weight:600;letter-spacing:-0.03em;line-height:1">{{ resumoTotal }}</span>
+<span style="font-size:12px;color:var(--on-hero-soft)">{{ resumoDelta }}</span>
+</div>
+</div>
+
+<div style="padding:22px 22px 26px;display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;flex-direction:column;gap:14px">
+<div style="font-size:15px;font-weight:600">Para onde foi</div>
+<sc-for list="{{ resumoCats }}" as="c" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column;gap:7px">
+<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+<span style="font-size:13px;font-weight:500">{{ c.nome }}</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;font-weight:600">{{ c.valorLabel }}</span>
+</div>
+<div style="height:8px;border-radius:999px;background:var(--segment);overflow:hidden">
+<div style="height:100%;border-radius:999px;background:{{ c.cor }};width:{{ c.pct }}%"></div>
+</div>
+<span style="font-size:11px;color:var(--ink-faint)">{{ c.pctLabel }} do que você gastou</span>
+</div>
+</sc-for>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<div style="background:var(--surface-muted);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:4px">
+<span style="font-size:11.5px;color:var(--ink-soft)">Maior gasto</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:18px;font-weight:600;letter-spacing:-0.02em">{{ resumoMaiorValor }}</span>
+<span style="font-size:11px;color:var(--ink-faint)">{{ resumoMaiorNome }}</span>
+</div>
+<div style="background:var(--surface-muted);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:4px">
+<span style="font-size:11.5px;color:var(--ink-soft)">Lançamentos</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:18px;font-weight:600;letter-spacing:-0.02em">{{ resumoQtd }}</span>
+<span style="font-size:11px;color:var(--ink-faint)">{{ resumoMedia }} em média</span>
+</div>
+</div>
+
+<div style="font-size:12.5px;color:var(--ink-muted);line-height:1.5">Você recebe esse resumo sempre que fecha a semana com os registros em dia.</div>
+
+<div onClick="{{ resumoAcao }}" style="cursor:pointer;text-align:center;border-radius:14px;padding:15px;font-size:14.5px;font-weight:600;color:var(--on-accent);background:var(--accent)" style-hover="background:var(--accent-hover)">{{ resumoBotao }}</div>
+</div>
+</div>
+</sc-if>
+
+</div>
+
+<div style="flex:none;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr 76px 1fr 1fr;align-items:center;height:66px;padding:0 4px">
+<sc-for list="{{ abasEsq }}" as="t" hint-placeholder-count="2">
+<div onClick="{{ t.ir }}" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;color:{{ t.cor }}">
+<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="{{ t.icone }}"></path></svg>
+<span style="font-size:10.5px;font-weight:600">{{ t.nome }}</span>
+</div>
+</sc-for>
+<div style="display:flex;align-items:center;justify-content:center">
+<div onClick="{{ abrirNova }}" style="cursor:pointer;width:56px;height:56px;border-radius:999px;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center;margin-top:-26px;box-shadow:0 8px 20px var(--accent-shadow)" style-hover="background:var(--accent-hover)">
+<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+</div>
+</div>
+<sc-for list="{{ abasDir }}" as="t" hint-placeholder-count="2">
+<div onClick="{{ t.ir }}" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;color:{{ t.cor }}">
+<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="{{ t.icone }}"></path></svg>
+<span style="font-size:10.5px;font-weight:600">{{ t.nome }}</span>
+</div>
+</sc-for>
+</div>
+
+<sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;left:18px;right:18px;bottom:82px;background:var(--toast-bg);color:var(--toast-ink);border-radius:14px;padding:13px 16px;display:flex;align-items:center;gap:11px;animation:poupaToast .22s ease-out;box-shadow:0 10px 30px rgba(0,0,0,.25)">
+<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="var(--toast-check)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style="flex:none"><path d="M20 6L9 17l-5-5"></path></svg>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+<div style="font-size:13px;font-weight:500;line-height:1.3">{{ toast }}</div>
+<sc-if value="{{ toastSub }}" hint-placeholder-val="{{ false }}">
+<div style="font-size:11.5px;font-weight:500;opacity:.62;line-height:1.35">{{ toastSub }}</div>
+</sc-if>
+</div>
+<sc-if value="{{ toastFechou }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ irResumo }}" style="cursor:pointer;flex:none;font-size:12px;font-weight:600;color:var(--toast-check)">Ver resumo</div>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ ritualOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:var(--canvas);display:flex;flex-direction:column;animation:poupaUp .24s cubic-bezier(.2,.8,.2,1);z-index:3">
+<div style="flex:none;background:var(--hero);color:var(--on-hero);padding:26px 22px 26px;display:flex;flex-direction:column;gap:9px">
+<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--on-hero-soft);font-weight:600">Poupa</span>
+<span style="font-size:27px;font-weight:600;letter-spacing:-0.03em;line-height:1.1">{{ ritualTitulo }}</span>
+<span style="font-size:13px;color:var(--on-hero-soft);line-height:1.5">Um hábito precisa de um momento fixo. Escolha o dia em que você senta com suas contas e quantas vezes por semana quer registrar.</span>
+</div>
+<div style="flex:1;overflow-y:auto;padding:24px 22px 26px;display:flex;flex-direction:column;gap:26px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;flex-direction:column;gap:3px">
+<div style="font-size:14.5px;font-weight:600">Que dia você fecha a semana?</div>
+<div style="font-size:12px;color:var(--ink-soft);line-height:1.45">Nesse dia o app te convida a revisar e fechar.</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
+<sc-for list="{{ ritualDias }}" as="d" hint-placeholder-count="7">
+<div onClick="{{ d.sel }}" style="cursor:pointer;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11.5px;letter-spacing:-0.01em;font-weight:{{ d.peso }};border:1px solid {{ d.borda }};background:{{ d.fundo }};color:{{ d.texto }}">{{ d.letra }}</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;flex-direction:column;gap:3px">
+<div style="font-size:14.5px;font-weight:600">Quantos registros por semana?</div>
+<div style="font-size:12px;color:var(--ink-soft);line-height:1.45">Escolha o que você consegue manter numa semana ruim, não numa boa.</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+<sc-for list="{{ ritualMetas }}" as="m" hint-placeholder-count="4">
+<div onClick="{{ m.sel }}" style="cursor:pointer;border-radius:14px;padding:13px 6px;display:flex;flex-direction:column;align-items:center;gap:3px;border:1px solid {{ m.borda }};background:{{ m.fundo }}">
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:19px;font-weight:600;color:{{ m.texto }}">{{ m.num }}</span>
+<span style="font-size:9.5px;text-align:center;line-height:1.2;color:{{ m.subCor }}">{{ m.sub }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="font-size:12.5px;color:var(--ink-muted);line-height:1.55;border-top:1px solid var(--line);padding-top:18px">{{ ritualResumo }}</div>
+</div>
+<div style="flex:none;padding:0 22px 24px">
+<div onClick="{{ salvarRitual }}" style="cursor:pointer;text-align:center;border-radius:14px;padding:15px;font-size:14.5px;font-weight:600;color:var(--on-accent);background:var(--accent)" style-hover="background:var(--accent-hover)">{{ ritualBotao }}</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:var(--canvas);display:flex;flex-direction:column;animation:poupaUp .24s cubic-bezier(.2,.8,.2,1)">
+
+<div style="flex:none;display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px">
+<div onClick="{{ fecharNova }}" style="cursor:pointer;width:34px;height:34px;border-radius:999px;background:var(--segment);display:flex;align-items:center;justify-content:center;color:var(--ink)" style-hover="background:var(--line-input)">
+<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+</div>
+<div style="font-size:15px;font-weight:600">Nova transação</div>
+<div style="width:34px"></div>
+</div>
+
+<div style="flex:none;padding:0 16px 12px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;gap:2px;border-radius:12px;background:var(--segment);padding:3px">
+<div onClick="{{ setDespesa }}" style="cursor:pointer;flex:1;text-align:center;border-radius:9px;padding:9px;font-size:13px;font-weight:600;background:{{ tipoDespesaBg }};color:{{ tipoDespesaCor }};box-shadow:{{ tipoDespesaSombra }}">Despesa</div>
+<div onClick="{{ setReceita }}" style="cursor:pointer;flex:1;text-align:center;border-radius:9px;padding:9px;font-size:13px;font-weight:600;background:{{ tipoReceitaBg }};color:{{ tipoReceitaCor }};box-shadow:{{ tipoReceitaSombra }}">Receita</div>
+</div>
+<div style="text-align:center;display:flex;flex-direction:column;gap:3px">
+<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-faint)">Valor</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:42px;font-weight:600;letter-spacing:-0.02em;line-height:1.1;color:{{ valorCorAtual }}">{{ valorDigitado }}</span>
+<sc-if value="{{ mostrarLinkSim }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ simularDoSheet }}" style="cursor:pointer;align-self:center;margin-top:6px;display:flex;align-items:center;gap:6px;border-radius:999px;padding:7px 13px;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft)" style-hover="background:var(--segment)">
+<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17l6-6 4 4 8-8M21 7h-5M21 7v5"></path></svg>Vale a pena? Simular</div>
+</sc-if>
+</div>
+</div>
+
+<div style="flex:1;overflow-y:auto;padding:0 16px 10px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-faint)">Categoria</span>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+<sc-for list="{{ sheetCategorias }}" as="c" hint-placeholder-count="8">
+<div onClick="{{ c.sel }}" style="cursor:pointer;border-radius:14px;padding:9px 4px;display:flex;flex-direction:column;align-items:center;gap:6px;border:1px solid {{ c.borda }};background:{{ c.fundo }}">
+<span style="width:32px;height:32px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:{{ c.iconeCor }};background:{{ c.iconeFundo }}">
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="{{ c.icone }}"></path></svg>
+</span>
+<span style="font-size:10.5px;font-weight:600;text-align:center;line-height:1.2">{{ c.nome }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:8px">
+<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-faint)">Conta</span>
+<div style="display:flex;gap:7px;overflow-x:auto">
+<sc-for list="{{ sheetContas }}" as="c" hint-placeholder-count="4">
+<div onClick="{{ c.sel }}" style="cursor:pointer;flex:none;display:flex;align-items:center;gap:7px;border-radius:999px;padding:8px 13px;font-size:12.5px;font-weight:600;border:1px solid {{ c.borda }};background:{{ c.fundo }};color:{{ c.texto }}">
+<span style="width:7px;height:7px;border-radius:999px;background:{{ c.cor }}"></span>{{ c.nome }}</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display:flex;gap:10px">
+<div style="flex:none;display:flex;flex-direction:column;gap:8px">
+<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-faint)">Data</span>
+<div style="display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line-input);border-radius:12px;padding:11px 13px;font-size:13px;font-weight:600;cursor:pointer">
+<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--ink-soft)" strokeWidth="1.6" strokeLinecap="round"><path d="M4 6h16v15H4zM4 10h16M8 3v4M16 3v4"></path></svg>Hoje</div>
+</div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
+<span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-faint)">Descrição (opcional)</span>
+<input type="text" placeholder="Ex.: mercado da semana" value="{{ descricao }}" onChange="{{ setDescricao }}" style="width:100%;background:var(--surface);border:1px solid var(--line-input);border-radius:12px;padding:11px 13px;font-size:13px;color:var(--ink)">
+</div>
+</div>
+</div>
+
+<div style="flex:none;background:var(--surface);border-top:1px solid var(--line);padding:10px 12px 12px;display:flex;flex-direction:column;gap:9px">
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px">
+<sc-for list="{{ teclas }}" as="k" hint-placeholder-count="12">
+<div onClick="{{ k.press }}" style="cursor:pointer;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:19px;font-weight:600;background:var(--surface-muted);border:1px solid var(--line-soft);color:var(--ink)" style-hover="background:var(--line-soft)">{{ k.label }}</div>
+</sc-for>
+</div>
+<div onClick="{{ salvar }}" style="cursor:pointer;text-align:center;border-radius:14px;padding:15px;font-size:14.5px;font-weight:600;color:var(--on-accent);background:{{ salvarBg }}" style-hover="filter:brightness(.93)">{{ salvarLabel }}</div>
+</div>
+
+</div>
+</sc-if>
+
+<sc-if value="{{ aporteOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:var(--canvas);display:flex;flex-direction:column;animation:poupaUp .24s cubic-bezier(.2,.8,.2,1)">
+
+<div style="flex:none;display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px">
+<div onClick="{{ fecharAporte }}" style="cursor:pointer;width:34px;height:34px;border-radius:999px;background:var(--segment);display:flex;align-items:center;justify-content:center;color:var(--ink)" style-hover="background:var(--line-input)">
+<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+</div>
+<div style="font-size:15px;font-weight:600">Adicionar à meta</div>
+<div style="width:34px"></div>
+</div>
+
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:22px;padding:0 16px">
+<div style="text-align:center;display:flex;flex-direction:column;gap:5px">
+<span style="font-size:13px;color:var(--ink-muted)">{{ metaAtivaNome }}</span>
+<span style="font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:42px;font-weight:600;letter-spacing:-0.02em;line-height:1.1;color:{{ aporteCor }}">{{ valorDigitado }}</span>
+<span style="font-size:11.5px;color:var(--ink-faint)">{{ metaAtivaFalta }}</span>
+</div>
+<div style="display:flex;gap:8px;justify-content:center">
+<sc-for list="{{ aporteAtalhos }}" as="a" hint-placeholder-count="3">
+<div onClick="{{ a.sel }}" style="cursor:pointer;border-radius:999px;padding:8px 15px;font-size:12.5px;font-weight:600;color:var(--accent);background:var(--accent-soft)" style-hover="background:var(--segment)">{{ a.label }}</div>
+</sc-for>
+</div>
+</div>
+
+<div style="flex:none;background:var(--surface);border-top:1px solid var(--line);padding:10px 12px 12px;display:flex;flex-direction:column;gap:9px">
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px">
+<sc-for list="{{ teclas }}" as="k" hint-placeholder-count="12">
+<div onClick="{{ k.press }}" style="cursor:pointer;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:19px;font-weight:600;background:var(--surface-muted);border:1px solid var(--line-soft);color:var(--ink)" style-hover="background:var(--line-soft)">{{ k.label }}</div>
+</sc-for>
+</div>
+<div onClick="{{ confirmarAporte }}" style="cursor:pointer;text-align:center;border-radius:14px;padding:15px;font-size:14.5px;font-weight:600;color:var(--on-accent);background:{{ aporteBg }}" style-hover="filter:brightness(.93)">{{ aporteLabel }}</div>
+</div>
+
+</div>
+</sc-if>
+
+</div>
+</x-import>
+
+<div style="font-size:11.5px;color:var(--ink-faint);max-width:440px;text-align:center;line-height:1.55">Poupa · direção “Bloco” · dados fictícios · paletas do bloco nos Tweaks.</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;paleta&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;bloco&quot;,&quot;marinho&quot;,&quot;ameixa&quot;,&quot;terracota&quot;,&quot;lima&quot;,&quot;verde&quot;,&quot;papel&quot;,&quot;gelo&quot;,&quot;grafite&quot;,&quot;meianoite&quot;,&quot;ameixaNoite&quot;,&quot;floresta&quot;,&quot;oled&quot;],&quot;default&quot;:&quot;ameixaNoite&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Aparência&quot;},&quot;resumoStyle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;barras&quot;,&quot;rosca&quot;],&quot;default&quot;:&quot;barras&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Dashboard&quot;},&quot;atalhosRapidos&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Dashboard&quot;},&quot;mostrarStreak&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Dashboard&quot;},&quot;mostrarInsight&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Dashboard&quot;},&quot;orcamentoMensal&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:5000,&quot;min&quot;:1000,&quot;max&quot;:12000,&quot;step&quot;:250,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Dashboard&quot;},&quot;mostrarOnboarding&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Ritual&quot;},&quot;abaInicial&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;home&quot;,&quot;extrato&quot;,&quot;metas&quot;,&quot;categorias&quot;,&quot;habitos&quot;,&quot;simulador&quot;,&quot;lote&quot;,&quot;resumo&quot;,&quot;fechar&quot;],&quot;default&quot;:&quot;home&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Navegação&quot;}}">
+class Component extends DCLogic {
+  cats = {
+    mercado:{nome:'Mercado',cor:'var(--up)',icone:'M6 6h15l-1.6 9H7.5zM6 6L5.2 3H2M9.5 20a1 1 0 100-2 1 1 0 000 2M18 20a1 1 0 100-2 1 1 0 000 2'},
+    restaurante:{nome:'Restaurante',cor:'#c0562b',icone:'M6 3v7a2 2 0 004 0V3M8 10v11M17 3c-1.4 2-2 4-2 6h4c0-2-.6-4-2-6zM17 9v12'},
+    transporte:{nome:'Transporte',cor:'#2f6f8f',icone:'M5 13l1.6-4.6A2 2 0 018.5 7h7a2 2 0 011.9 1.4L19 13v5h-3v-2H8v2H5zM7.6 15.4h.01M16.4 15.4h.01'},
+    casa:{nome:'Casa',cor:'var(--accent)',icone:'M3 10.5L12 3l9 7.5V21H3zM9.5 21v-6h5v6'},
+    saude:{nome:'Saúde',cor:'#b03a5b',icone:'M12 20s-7-4.4-7-9.4A3.6 3.6 0 0112 8a3.6 3.6 0 017 2.6c0 5-7 9.4-7 9.4z'},
+    lazer:{nome:'Lazer',cor:'#6b4e9e',icone:'M9 18V5l10-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zM19 16a3 3 0 11-6 0 3 3 0 016 0z'},
+    educacao:{nome:'Educação',cor:'#3c6e5b',icone:'M4 4h6.5a2 2 0 012 2v14a2 2 0 00-2-2H4zM20 4h-6.5a2 2 0 00-2 2v14a2 2 0 012-2H20z'},
+    contas:{nome:'Contas',cor:'#8a6d3b',icone:'M6 2h9l4 4v16l-3-2-3 2-3-2-3 2zM9 9h6M9 13h6M9 17h4'},
+    assinaturas:{nome:'Assinaturas',cor:'#4a5f8a',icone:'M4 9a5 5 0 015-5h9M18 4l3 3-3 3M20 15a5 5 0 01-5 5H6M6 20l-3-3 3-3'},
+    salario:{nome:'Salário',cor:'var(--up)',icone:'M3 8h15a3 3 0 013 3v6a3 3 0 01-3 3H6a3 3 0 01-3-3zM3 8V7a2 2 0 012-2h11M17 14h.01'},
+    freela:{nome:'Freela',cor:'#3c6e5b',icone:'M3 8h18v11H3zM8.5 8V5h7v3M3 13h18'},
+    presente:{nome:'Presente',cor:'#b03a5b',icone:'M3 11h18v10H3zM3 7h18v4H3zM12 7v14M12 7S9.6 7 8.6 6s-.4-2.5 1-2.5S12 7 12 7zM12 7s2.4 0 3.4-1 .4-2.5-1-2.5S12 7 12 7z'},
+    investimento:{nome:'Investimento',cor:'#2f6f8f',icone:'M4 19V9M10 19V5M16 19v-6M22 19H2'}
+  };
+  contasBase = [
+    {id:'carteira',nome:'Carteira',cor:'#8a6d3b',saldo:340.5},
+    {id:'corrente',nome:'Conta corrente',cor:'#2f6f8f',saldo:8942.15},
+    {id:'cartao',nome:'Cartão',cor:'var(--down)',saldo:-1420.3},
+    {id:'poupanca',nome:'Poupança',cor:'var(--up)',saldo:4620.0}
+  ];
+  paletas = {
+    bloco: {rotulo:'Bloco indigo', escuro:false, vars:{
+      '--canvas':'#ffffff','--surface':'#ffffff','--surface-muted':'#fafaf9','--segment':'#f1f0f9',
+      '--ink':'#17140f','--ink-muted':'#77726a','--ink-soft':'#8a8a86','--ink-faint':'#a09a90',
+      '--line':'#f2f0eb','--line-soft':'#f2f0eb','--line-input':'#e6e2db',
+      '--up':'#0f7a43','--down':'#c0392b','--accent':'#2b2a66','--accent-hover':'#1f1e4d',
+      '--accent-soft':'#f1f0f9','--on-accent':'#ffffff','--toast-bg':'#17140f','--toast-ink':'#ffffff',
+      '--toast-check':'#7fd8a4','--accent-shadow':'rgba(43,42,102,.35)',
+      '--hero':'#2b2a66','--on-hero':'#ffffff','--on-hero-soft':'rgba(255,255,255,.64)','--hero-line':'rgba(255,255,255,.3)'}},
+    marinho: {rotulo:'Marinho e areia', escuro:false, vars:{
+      '--canvas':'#f7f5f1','--surface':'#ffffff','--surface-muted':'#fbf9f6','--segment':'#eae5dd',
+      '--ink':'#101a26','--ink-muted':'#6a7480','--ink-soft':'#838c97','--ink-faint':'#9aa2ab',
+      '--line':'#e7e2da','--line-soft':'#f1ede6','--line-input':'#d8d2c9',
+      '--up':'#0f7a43','--down':'#c0392b','--accent':'#123055','--accent-hover':'#0c2340',
+      '--accent-soft':'#eaeef4','--on-accent':'#ffffff','--toast-bg':'#101a26','--toast-ink':'#ffffff',
+      '--toast-check':'#7fd8a4','--accent-shadow':'rgba(18,48,85,.35)',
+      '--hero':'#123055','--on-hero':'#ffffff','--on-hero-soft':'rgba(255,255,255,.64)','--hero-line':'rgba(255,255,255,.3)'}},
+    ameixa: {rotulo:'Ameixa', escuro:false, vars:{
+      '--canvas':'#ffffff','--surface':'#ffffff','--surface-muted':'#fbf9fb','--segment':'#f3ecf5',
+      '--ink':'#1b1119','--ink-muted':'#746b76','--ink-soft':'#8a8189','--ink-faint':'#a49ba5',
+      '--line':'#f1ebf2','--line-soft':'#f6f1f7','--line-input':'#e3d9e5',
+      '--up':'#0f7a43','--down':'#c0392b','--accent':'#4a1d52','--accent-hover':'#351239',
+      '--accent-soft':'#f3ecf5','--on-accent':'#ffffff','--toast-bg':'#1b1119','--toast-ink':'#ffffff',
+      '--toast-check':'#7fd8a4','--accent-shadow':'rgba(74,29,82,.33)',
+      '--hero':'#4a1d52','--on-hero':'#ffffff','--on-hero-soft':'rgba(255,255,255,.66)','--hero-line':'rgba(255,255,255,.3)'}},
+    terracota: {rotulo:'Terracota', escuro:false, vars:{
+      '--canvas':'#fdfaf7','--surface':'#ffffff','--surface-muted':'#fdf7f3','--segment':'#f7e9e1',
+      '--ink':'#1f150f','--ink-muted':'#7a6b61','--ink-soft':'#8d7d72','--ink-faint':'#a5968b',
+      '--line':'#f2e7de','--line-soft':'#f8f1eb','--line-input':'#e3d5c9',
+      '--up':'#0f7a43','--down':'#c0392b','--accent':'#b8431f','--accent-hover':'#973516',
+      '--accent-soft':'#fbeae2','--on-accent':'#ffffff','--toast-bg':'#1f150f','--toast-ink':'#ffffff',
+      '--toast-check':'#7fd8a4','--accent-shadow':'rgba(184,67,31,.32)',
+      '--hero':'#b8431f','--on-hero':'#ffffff','--on-hero-soft':'rgba(255,255,255,.7)','--hero-line':'rgba(255,255,255,.32)'}},
+    lima: {rotulo:'Preto e lima', escuro:false, vars:{
+      '--canvas':'#ffffff','--surface':'#ffffff','--surface-muted':'#f9faf4','--segment':'#eef4dc',
+      '--ink':'#14150f','--ink-muted':'#6f7266','--ink-soft':'#85887b','--ink-faint':'#9ea297',
+      '--line':'#eff0e9','--line-soft':'#f5f6f0','--line-input':'#dfe1d6',
+      '--up':'#0f7a43','--down':'#c0392b','--accent':'#14150f','--accent-hover':'#000000',
+      '--accent-soft':'#eef4dc','--on-accent':'#d3f26b','--toast-bg':'#14150f','--toast-ink':'#d3f26b',
+      '--toast-check':'#d3f26b','--accent-shadow':'rgba(20,21,15,.3)',
+      '--hero':'#d3f26b','--on-hero':'#14150f','--on-hero-soft':'rgba(20,21,15,.62)','--hero-line':'rgba(20,21,15,.18)'}},
+    verde: {rotulo:'Bloco verde', escuro:false, vars:{
+      '--canvas':'#ffffff','--surface':'#ffffff','--surface-muted':'#fafaf9','--segment':'#eef4f0',
+      '--ink':'#121a16','--ink-muted':'#6b7570','--ink-soft':'#828b86','--ink-faint':'#9aa29d',
+      '--line':'#f0f2f0','--line-soft':'#f0f2f0','--line-input':'#e0e6e2',
+      '--up':'#0f7a43','--down':'#c0392b','--accent':'#12452f','--accent-hover':'#0c3423',
+      '--accent-soft':'#eef4f0','--on-accent':'#ffffff','--toast-bg':'#12452f','--toast-ink':'#ffffff',
+      '--toast-check':'#7fd8a4','--accent-shadow':'rgba(18,69,47,.35)',
+      '--hero':'#12452f','--on-hero':'#ffffff','--on-hero-soft':'rgba(255,255,255,.64)','--hero-line':'rgba(255,255,255,.3)'}},
+    papel: {rotulo:'Papel quente', escuro:false, vars:{
+      '--canvas':'#f4f2ee','--surface':'#ffffff','--surface-muted':'#faf8f4','--segment':'#eae6de',
+      '--ink':'#17140f','--ink-muted':'#77726a','--ink-soft':'#8a8a86','--ink-faint':'#a09a90',
+      '--line':'#e6e2db','--line-soft':'#f0ece4','--line-input':'#d8d3cb',
+      '--up':'#0f7a43','--down':'#c0392b','--accent':'#7a4a38','--accent-hover':'#5c3729',
+      '--accent-soft':'#f4f0ec','--on-accent':'#ffffff','--toast-bg':'#17140f','--toast-ink':'#ffffff',
+      '--toast-check':'#7fd8a4','--accent-shadow':'rgba(122,74,56,.35)',
+      '--hero':'#17140f','--on-hero':'#ffffff','--on-hero-soft':'rgba(255,255,255,.6)','--hero-line':'rgba(255,255,255,.26)'}},
+    gelo: {rotulo:'Gelo e teal', escuro:false, vars:{
+      '--canvas':'#f4f7f7','--surface':'#ffffff','--surface-muted':'#f7fbfa','--segment':'#e6edec',
+      '--ink':'#0e1a18','--ink-muted':'#5c6a68','--ink-soft':'#7b8785','--ink-faint':'#98a3a1',
+      '--line':'#e1e8e7','--line-soft':'#eef3f2','--line-input':'#ccd6d4',
+      '--up':'#12925c','--down':'#e0523f','--accent':'#0f766e','--accent-hover':'#0b5b55',
+      '--accent-soft':'#e4f1ef','--on-accent':'#ffffff','--toast-bg':'#0e1a18','--toast-ink':'#ffffff',
+      '--toast-check':'#5eead4','--accent-shadow':'rgba(15,118,110,.32)',
+      '--hero':'#0f766e','--on-hero':'#ffffff','--on-hero-soft':'rgba(255,255,255,.66)','--hero-line':'rgba(255,255,255,.3)'}},
+    meianoite: {rotulo:'Meia-noite azul', escuro:true, vars:{
+      '--canvas':'#0a0f16','--surface':'#111823','--surface-muted':'#151d29','--segment':'#1b2431',
+      '--ink':'#eaf0f8','--ink-muted':'#9aa7b8','--ink-soft':'#85919f','--ink-faint':'#6f7b89',
+      '--line':'#232d3b','--line-soft':'#1d2633','--line-input':'#2d3745',
+      '--up':'#34d399','--down':'#fb7185','--accent':'#7fa8ff','--accent-hover':'#9dbcff',
+      '--accent-soft':'#182338','--on-accent':'#0a0f16','--toast-bg':'#eaf0f8','--toast-ink':'#0a0f16',
+      '--toast-check':'#0f7a43','--accent-shadow':'rgba(127,168,255,.28)',
+      '--hero':'#142033','--on-hero':'#eaf0f8','--on-hero-soft':'rgba(234,240,248,.62)','--hero-line':'rgba(234,240,248,.16)'}},
+    ameixaNoite: {rotulo:'Ameixa noturna', escuro:true, vars:{
+      '--canvas':'#0d0912','--surface':'#17111f','--surface-muted':'#1c1526','--segment':'#241b30',
+      '--ink':'#f2ecf7','--ink-muted':'#a79cb3','--ink-soft':'#93889f','--ink-faint':'#7c7188',
+      '--line':'#271f33','--line-soft':'#201929','--line-input':'#322942',
+      '--up':'#34d399','--down':'#fb7185','--accent':'#c9a6f7','--accent-hover':'#dcc2ff',
+      '--accent-soft':'#241932','--on-accent':'#12091b','--toast-bg':'#f2ecf7','--toast-ink':'#12091b',
+      '--toast-check':'#0f7a43','--accent-shadow':'rgba(201,166,247,.28)',
+      '--hero':'#2a1740','--on-hero':'#f2ecf7','--on-hero-soft':'rgba(242,236,247,.62)','--hero-line':'rgba(242,236,247,.16)'}},
+    floresta: {rotulo:'Floresta escura', escuro:true, vars:{
+      '--canvas':'#08110d','--surface':'#0f1a15','--surface-muted':'#13201a','--segment':'#1a2a22',
+      '--ink':'#e9f2ec','--ink-muted':'#94a89d','--ink-soft':'#82958b','--ink-faint':'#6d8077',
+      '--line':'#1f2f27','--line-soft':'#18261f','--line-input':'#283a31',
+      '--up':'#4ade80','--down':'#fb7185','--accent':'#5eead4','--accent-hover':'#8bf3e2',
+      '--accent-soft':'#122a26','--on-accent':'#062018','--toast-bg':'#e9f2ec','--toast-ink':'#062018',
+      '--toast-check':'#0f7a43','--accent-shadow':'rgba(94,234,212,.26)',
+      '--hero':'#0f2b21','--on-hero':'#e9f2ec','--on-hero-soft':'rgba(233,242,236,.62)','--hero-line':'rgba(233,242,236,.16)'}},
+    oled: {rotulo:'Preto e lima escuro', escuro:true, vars:{
+      '--canvas':'#000000','--surface':'#0b0b0b','--surface-muted':'#101010','--segment':'#171717',
+      '--ink':'#f4f4ef','--ink-muted':'#9d9d95','--ink-soft':'#8a8a82','--ink-faint':'#71716a',
+      '--line':'#1e1e1c','--line-soft':'#171716','--line-input':'#2a2a27',
+      '--up':'#a3e635','--down':'#fb7185','--accent':'#d3f26b','--accent-hover':'#e2fa93',
+      '--accent-soft':'#1b2010','--on-accent':'#14150f','--toast-bg':'#d3f26b','--toast-ink':'#14150f',
+      '--toast-check':'#14150f','--accent-shadow':'rgba(211,242,107,.26)',
+      '--hero':'#d3f26b','--on-hero':'#14150f','--on-hero-soft':'rgba(20,21,15,.62)','--hero-line':'rgba(20,21,15,.18)'}},
+    grafite: {rotulo:'Grafite escuro', escuro:true, vars:{
+      '--canvas':'#101215','--surface':'#191c21','--surface-muted':'#1e2228','--segment':'#23272e',
+      '--ink':'#f1f3f6','--ink-muted':'#a6adb6','--ink-soft':'#8c939d','--ink-faint':'#757c86',
+      '--line':'#272c33','--line-soft':'#22262c','--line-input':'#333942',
+      '--up':'#34d399','--down':'#fb7185','--accent':'#e0a45c','--accent-hover':'#c78d47',
+      '--accent-soft':'#2a2318','--on-accent':'#14161a','--toast-bg':'#f1f3f6','--toast-ink':'#14161a',
+      '--toast-check':'#0f7a43','--accent-shadow':'rgba(224,164,92,.3)',
+      '--hero':'#191c21','--on-hero':'#f1f3f6','--on-hero-soft':'rgba(241,243,246,.6)','--hero-line':'rgba(241,243,246,.16)'}}
+  };
+  darkTons = {
+    '#c0562b':'#fb9a6b','#2f6f8f':'#6fc3e8','#b03a5b':'#f88fa8','#6b4e9e':'#b39cf0',
+    '#3c6e5b':'#79d8b4','#8a6d3b':'#e3c07a','#4a5f8a':'#93b0e8'
+  };
+
+  paletaAtual(){ return this.paletas[this.props.paleta] || this.paletas.bloco; }
+  cx(h){ const d = this.darkTons[h]; return (this.paletaAtual().escuro && d) ? d : h; }
+  suave(c, pct){ return 'color-mix(in oklab, ' + c + ' ' + pct + '%, transparent)'; }
+  aplicarTema(){
+    const v = this.paletaAtual().vars;
+    Object.keys(v).forEach(k => document.documentElement.style.setProperty(k, v[k]));
+  }
+
+  despesaCats = ['mercado','restaurante','transporte','casa','saude','lazer','educacao','contas','assinaturas'];
+  receitaCats = ['salario','freela','presente','investimento'];
+
+  state = {
+    screen: this.props.abaInicial || 'home',
+    mostrarSaldo: true,
+    sheetOpen: false,
+    tipo: 'despesa',
+    digitos: '',
+    catSel: 'mercado',
+    contaSel: 'cartao',
+    descricao: '',
+    filtroConta: 'todas',
+    filtroCat: 'todas',
+    catTab: 'despesa',
+    toast: '', toastSub: '', toastFechou: false,
+    extras: [],
+    metasAdd: {},
+    desafioProg: {},
+    insightIdx: 0,
+    diasExtra: [],
+    lote: {},
+    lembrete: 'domingo',
+    ritualOpen: this.props.mostrarOnboarding === true,
+    ritualPrimeira: this.props.mostrarOnboarding === true,
+    diaFechamento: 'domingo',
+    metaEscolhida: 4,
+    fecharPasso: 1,
+    fechando: false,
+    semanaFechada: false,
+    intencao: '',
+    intencaoSel: '',
+    aporteOpen: false,
+    metaAtiva: null,
+    saldoAnim: null,
+    desafiosEntrei: [],
+    simDigitos: '',
+    simTaxa: 'cdi',
+    txs: [
+      {id:1,nome:'Mercado Extra',cat:'mercado',valor:-287.9,dia:'2026-08-03',conta:'cartao'},
+      {id:2,nome:'Café da manhã',cat:'restaurante',valor:-18.5,dia:'2026-08-03',conta:'carteira'},
+      {id:3,nome:'Uber para o centro',cat:'transporte',valor:-24.3,dia:'2026-08-03',conta:'cartao'},
+      {id:4,nome:'Freela — identidade visual',cat:'freela',valor:1620,dia:'2026-08-02',conta:'corrente'},
+      {id:5,nome:'Aluguel',cat:'casa',valor:-1850,dia:'2026-08-02',conta:'corrente'},
+      {id:6,nome:'Conta de luz',cat:'contas',valor:-213.7,dia:'2026-08-02',conta:'corrente'},
+      {id:7,nome:'Netflix',cat:'assinaturas',valor:-44.9,dia:'2026-08-02',conta:'cartao'},
+      {id:8,nome:'Cinema',cat:'lazer',valor:-76,dia:'2026-08-02',conta:'carteira'},
+      {id:9,nome:'Salário de agosto',cat:'salario',valor:6800,dia:'2026-08-01',conta:'corrente'},
+      {id:10,nome:'Posto Shell',cat:'transporte',valor:-220,dia:'2026-08-01',conta:'cartao'},
+      {id:11,nome:'Farmácia São Paulo',cat:'saude',valor:-132.4,dia:'2026-08-01',conta:'cartao'},
+      {id:12,nome:'Mercado Dia',cat:'mercado',valor:-158.2,dia:'2026-08-01',conta:'carteira'},
+      {id:13,nome:'Curso de inglês',cat:'educacao',valor:-89.9,dia:'2026-08-01',conta:'cartao'},
+      {id:14,nome:'Academia',cat:'saude',valor:-119.9,dia:'2026-08-01',conta:'corrente'}
+    ]
+  };
+
+  metasBase = [
+    {id:'chile',nome:'Viagem para o Chile',atual:3200,alvo:8000,prazo:'faltam 134 dias · 15 dez 2026',cor:'#2f6f8f',icone:'M2 12h20M12 2c3 3 3 17 0 20M12 2c-3 3-3 17 0 20'},
+    {id:'reserva',nome:'Reserva de emergência',atual:6400,alvo:12000,prazo:'faltam 11 meses · jun 2027',cor:'var(--up)',icone:'M12 3l8 3v6c0 5-3.4 8.2-8 9-4.6-.8-8-4-8-9V6z'},
+    {id:'note',nome:'Notebook novo',atual:2850,alvo:4500,prazo:'faltam 78 dias · 20 out 2026',cor:'var(--accent)',icone:'M4 5h16v10H4zM2 19h20M9 19l.6-2h4.8l.6 2'}
+  ];
+
+  desafiosBase = [
+    {id:'reg4',nome:'Registrar 4 vezes nesta semana',sub:'a semana fecha domingo',subOff:'',alvo:4,unidade:'registros',tipo:'dias',passo:1,acao:'Registrar agora',atual:0,auto:true,ativo:true,cat:'salario',economia:0},
+    {id:'catg',nome:'Categorizar tudo do mês',sub:'2 lançamentos sem categoria',subOff:'',alvo:14,unidade:'lançamentos',tipo:'dias',passo:1,acao:'Revisar 1',atual:12,ativo:true,cat:'contas',economia:0},
+    {id:'assin',nome:'Revisar as assinaturas',sub:'3 assinaturas ativas',subOff:'',alvo:3,unidade:'assinaturas',tipo:'dias',passo:1,acao:'Revisar 1',atual:1,ativo:true,cat:'assinaturas',economia:0},
+    {id:'delivery',nome:'Semana sem delivery',sub:'termina domingo, 9 de agosto',subOff:'opcional · R$ 312 em julho',alvo:7,unidade:'dias',tipo:'dias',passo:1,acao:'Marcar hoje',atual:0,ativo:false,cat:'restaurante',economia:312},
+    {id:'cafe',nome:'5 dias sem café fora',sub:'termina sexta',subOff:'opcional · R$ 12 por dia',alvo:5,unidade:'dias',tipo:'dias',passo:1,acao:'Marcar hoje',atual:0,ativo:false,cat:'restaurante',economia:60},
+    {id:'uber',nome:'Semana sem app de transporte',sub:'termina domingo',subOff:'opcional · R$ 244 em julho',alvo:7,unidade:'dias',tipo:'dias',passo:1,acao:'Marcar hoje',atual:0,ativo:false,cat:'transporte',economia:244}
+  ];
+
+  taxasBase = [
+    {id:'poupanca',nome:'Poupança',im:0.006,taxaLabel:'0,6% a.m.'},
+    {id:'cdi',nome:'CDI 100%',im:0.0088,taxaLabel:'0,88% a.m.'},
+    {id:'cdi2',nome:'CDI + 2%',im:0.0105,taxaLabel:'1,05% a.m.'}
+  ];
+
+  streakSemanaBase = [
+    {label:'T',on:true},{label:'Q',on:true},{label:'Q',on:true},{label:'S',on:true},
+    {label:'S',on:true},{label:'D',on:true},{label:'S',on:true}
+  ];
+
+  animarSaldo(de, para){
+    cancelAnimationFrame(this._raf);
+    const t0 = performance.now(), dur = 420;
+    const step = (t)=>{
+      const k = Math.min(1, (t-t0)/dur);
+      const e = 1 - Math.pow(1-k, 3);
+      this.setState({saldoAnim: de + (para-de)*e});
+      if (k < 1) this._raf = requestAnimationFrame(step);
+      else this.setState({saldoAnim: null});
+    };
+    this._raf = requestAnimationFrame(step);
+  }
+
+  componentDidMount(){ this.aplicarTema(); }
+
+  componentDidUpdate(prev){
+    if (prev.paleta !== this.props.paleta) this.aplicarTema();
+    if (prev.mostrarOnboarding !== this.props.mostrarOnboarding) {
+      const on = this.props.mostrarOnboarding === true;
+      this.setState({ritualOpen:on, ritualPrimeira:on});
+    }
+    if (prev.abaInicial !== this.props.abaInicial && this.props.abaInicial) {
+      this.setState({screen:this.props.abaInicial, sheetOpen:false});
+    }
+  }
+
+  fmt(v){ return 'R$ ' + Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  sig(v){ return (v<0?'−':'+') + ' ' + this.fmt(v); }
+
+  labelDia(d){
+    if (d==='2026-08-05') return 'Hoje · 5 de agosto';
+    if (d==='2026-08-04') return 'Ontem · 4 de agosto';
+    if (d==='2026-08-03') return 'Segunda · 3 de agosto';
+    if (d==='2026-08-02') return 'Domingo · 2 de agosto';
+    const n = Number(d.slice(8));
+    return n + ' de agosto';
+  }
+  nomeConta(id){ const c = this.contasBase.find(x=>x.id===id); return c?c.nome:''; }
+
+  txView(t, sep){
+    const c = this.cats[t.cat];
+    const cor = this.cx(c.cor);
+    return {
+      nome: t.nome, icone: c.icone, cor,
+      corSuave: this.suave(cor, 14),
+      meta: c.nome + ' · ' + this.nomeConta(t.conta),
+      valorLabel: this.sig(t.valor),
+      valorCor: t.valor < 0 ? 'var(--ink)' : 'var(--up)',
+      sep: sep ? 'var(--line-soft)' : 'transparent'
+    };
+  }
+
+  toastMsg(m, sub, fechou){
+    this.setState({toast:m, toastSub:sub||'', toastFechou:!!fechou});
+    clearTimeout(this._tt);
+    this._tt = setTimeout(()=>this.setState({toast:'', toastSub:'', toastFechou:false}), sub ? 3600 : 2400);
+  }
+
+  valorAtual(){
+    return (parseInt(this.state.digitos||'0',10))/100;
+  }
+
+  renderVals(){
+    const s = this.state;
+    const txs = s.txs;
+    const receitas = txs.filter(t=>t.valor>0).reduce((a,t)=>a+t.valor,0);
+    const despesas = txs.filter(t=>t.valor<0).reduce((a,t)=>a-t.valor,0);
+    const net = receitas - despesas;
+    const maxV = Math.max(receitas, despesas) || 1;
+    const saldoTotal = 7298.05 + net;
+    const pctSobra = receitas>0 ? Math.round(net/receitas*100) : 0;
+
+    const goTo = (k)=>()=>this.setState({screen:k});
+    const cor = (k)=> s.screen===k ? 'var(--accent)' : 'var(--ink-faint)';
+    const abaDef = (k,nome,icone)=>({nome,icone,cor:cor(k),ir:goTo(k)});
+
+    const filtrados = txs.filter(t =>
+      (s.filtroConta==='todas' || t.conta===s.filtroConta) &&
+      (s.filtroCat==='todas' || t.cat===s.filtroCat));
+    const dias = [...new Set(filtrados.map(t=>t.dia))].sort().reverse();
+    const grupos = dias.map(d=>{
+      const itens = filtrados.filter(t=>t.dia===d);
+      const tot = itens.reduce((a,t)=>a+t.valor,0);
+      return {
+        label: this.labelDia(d),
+        totalLabel: this.sig(tot),
+        itens: itens.map((t,i)=>this.txView(t, i<itens.length-1))
+      };
+    });
+    const fIn = filtrados.filter(t=>t.valor>0).reduce((a,t)=>a+t.valor,0);
+    const fOut = filtrados.filter(t=>t.valor<0).reduce((a,t)=>a-t.valor,0);
+
+    const chip = (on)=>({
+      peso: on?600:500,
+      borda: on?'var(--accent)':'var(--line)',
+      fundo: on?'var(--accent)':'var(--surface)',
+      texto: on?'var(--on-accent)':'var(--ink-muted)'
+    });
+    const chipsConta = [{id:'todas',nome:'Todas as contas'}].concat(this.contasBase).map(c=>({
+      nome:c.nome, ...chip(s.filtroConta===c.id), sel:()=>this.setState({filtroConta:c.id})
+    }));
+    const catsUsadas = [...new Set(txs.map(t=>t.cat))];
+    const chipsCategoria = [{id:'todas',nome:'Todas',cor:'var(--ink-faint)'}].concat(
+      catsUsadas.map(k=>({id:k,nome:this.cats[k].nome,cor:this.cx(this.cats[k].cor)}))
+    ).map(c=>{
+      const on = s.filtroCat===c.id;
+      return {nome:c.nome, ponto: on?'var(--on-accent)':c.cor, ...chip(on), sel:()=>this.setState({filtroCat:c.id})};
+    });
+
+    const catList = s.tipo==='despesa' ? this.despesaCats : this.receitaCats;
+    const sheetCategorias = catList.map(k=>{
+      const c = this.cats[k], on = s.catSel===k, cc = this.cx(c.cor);
+      return {
+        nome:c.nome, icone:c.icone,
+        borda: on?cc:'var(--line)', fundo: on?this.suave(cc,10):'var(--surface)',
+        iconeCor: on?'var(--on-accent)':cc, iconeFundo: on?cc:this.suave(cc,14),
+        sel:()=>this.setState({catSel:k})
+      };
+    });
+    const sheetContas = this.contasBase.map(c=>{
+      const on = s.contaSel===c.id;
+      return {nome:c.nome, cor:on?'var(--on-accent)':this.cx(c.cor), ...chip(on), sel:()=>this.setState({contaSel:c.id})};
+    });
+
+    const digit = (d)=>()=>{
+      const nd = (this.state.digitos + d).replace(/^0+/,'').slice(0,9);
+      this.setState({digitos:nd});
+    };
+    const teclas = ['1','2','3','4','5','6','7','8','9','00','0'].map(l=>({label:l,press:digit(l)}));
+    teclas.push({label:'⌫', press:()=>this.setState({digitos:this.state.digitos.slice(0,-1)})});
+
+    const tipoDesp = s.tipo==='despesa';
+    const catTabDesp = s.catTab==='despesa';
+    const gridKeys = catTabDesp ? this.despesaCats : this.receitaCats;
+    const gridCategorias = gridKeys.map(k=>{
+      const tot = txs.filter(t=>t.cat===k).reduce((a,t)=>a+Math.abs(t.valor),0);
+      return {nome:this.cats[k].nome, cor:this.cx(this.cats[k].cor), icone:this.cats[k].icone, totalLabel:this.fmt(tot)};
+    });
+
+    const metas = this.metasBase.map(m=>{
+      const atual = m.atual + (s.metasAdd[m.id]||0);
+      const pct = Math.min(100, Math.round(atual/m.alvo*100));
+      return {
+        nome:m.nome, prazo:m.prazo, cor:this.cx(m.cor), icone:m.icone,
+        pct, pctLabel: pct+'%',
+        atualLabel: this.fmt(atual), alvoLabel: this.fmt(m.alvo),
+        adicionar: ()=>this.setState({aporteOpen:true, metaAtiva:m.id, digitos:''})
+      };
+    });
+    const totalMetas = this.metasBase.reduce((a,m)=>a+m.atual+(s.metasAdd[m.id]||0),0);
+
+    const abrirCom = (tipo,cat)=>()=>this.setState({sheetOpen:true,tipo,catSel:cat,digitos:'',descricao:''});
+    const atalhos = [
+      {nome:'Mercado',cor:this.cx(this.cats.mercado.cor),icone:this.cats.mercado.icone,abrir:abrirCom('despesa','mercado')},
+      {nome:'Transporte',cor:this.cx(this.cats.transporte.cor),icone:this.cats.transporte.icone,abrir:abrirCom('despesa','transporte')},
+      {nome:'Receita',cor:this.cx(this.cats.salario.cor),icone:this.cats.salario.icone,abrir:abrirCom('receita','salario')},
+      {nome:'Simular',cor:'var(--accent)',icone:'M3 17l6-6 4 4 8-8M21 7h-5M21 7v5',abrir:()=>this.setState({screen:'simulador', simDigitos: this.state.simDigitos || '15000'})}
+    ];
+
+    const semanaInicio = '2026-08-03';
+    const diasRegistrados = new Set(txs.map(t=>t.dia).concat(s.diasExtra));
+    const pendentes = ['2026-08-04','2026-08-05'].filter(d=>!diasRegistrados.has(d));
+    const emDia = pendentes.length===0;
+    const registrosSemana = [...diasRegistrados].filter(d=>d>=semanaInicio).length;
+    const metaSemanal = s.metaEscolhida || 4;
+    const semanaSegs = Array.from({length:metaSemanal},(_,i)=>({cor: i<registrosSemana ? 'var(--on-hero)' : 'var(--hero-line)'}));
+    const hoje = '2026-08-05';
+    const letras = ['S','T','Q','Q','S','S','D'];
+    const semanaDias = Array.from({length:7},(_,i)=>{
+      const d = '2026-08-0'+(3+i);
+      const reg = diasRegistrados.has(d);
+      const eHoje = d===hoje, futuro = d>hoje;
+      return {
+        letra: letras[i],
+        letraCor: eHoje ? 'var(--on-hero)' : 'var(--on-hero-soft)',
+        letraPeso: eHoje ? 700 : 500,
+        opacidade: futuro ? 0.42 : 1,
+        fundo: reg ? 'var(--on-hero)' : 'transparent',
+        borda: reg ? 'var(--on-hero)' : (eHoje ? 'var(--on-hero)' : (futuro ? 'var(--hero-line)' : '#d9a13a')),
+        bordaW: (eHoje && !reg) ? '2px' : '1px',
+        marcaCor: reg ? 'var(--hero)' : 'transparent',
+        ir: reg || futuro ? ()=>{} : (eHoje
+          ? ()=>this.setState({sheetOpen:true, tipo:'despesa', digitos:'', descricao:''})
+          : goTo('lote'))
+      };
+    });
+    const confirmar = (msg, dia)=>{
+      const c = [...new Set([...diasRegistrados, dia])].filter(x=>x>=semanaInicio).length;
+      const falta = metaSemanal - c;
+      this.toastMsg(msg, falta<=0
+        ? 'Semana fechada · '+c+' de '+metaSemanal+' registros'
+        : c+' de '+metaSemanal+' nesta semana — falta '+(falta===1?'1 para fechar':falta+' para fechar'),
+        falta<=0);
+    };
+    if (!this._rapidosBase) {
+      const freq = {};
+      txs.filter(t=>t.valor<0).forEach(t=>{ (freq[t.cat]=freq[t.cat]||[]).push(Math.abs(t.valor)); });
+      const valorHabitual = (vs)=>{
+        const modos = {};
+        vs.forEach(v=>{ const r = Math.max(5, Math.round(v/5)*5); modos[r]=(modos[r]||0)+1; });
+        return Object.keys(modos).map(Number).sort((a,b)=> modos[b]-modos[a] || a-b)[0];
+      };
+      const repetidas = Object.keys(freq).filter(k=>freq[k].length>=2)
+        .sort((a,b)=>freq[b].length-freq[a].length);
+      const resto = Object.keys(freq).filter(k=>freq[k].length<2)
+        .sort((a,b)=>Math.min(...freq[a])-Math.min(...freq[b]));
+      this._rapidosBase = repetidas.concat(resto).slice(0,4)
+        .map(k=>({cat:k, val: valorHabitual(freq[k])}));
+    }
+    const rapidos = this._rapidosBase.map(({cat:k, val})=>{
+      return {
+        nome:this.cats[k].nome, icone:this.cats[k].icone,
+        valorLabel:'R$\u00a0'+val.toLocaleString('pt-BR'),
+        registrar: ()=>{
+          const tx = {id:Date.now()+Math.random(), nome:this.cats[k].nome, cat:k, valor:-val, dia:hoje, conta:'cartao'};
+          this.setState(st=>({txs:[tx,...st.txs]}));
+          this.animarSaldo(saldoTotal, saldoTotal - val);
+          confirmar(this.cats[k].nome+' de '+this.fmt(val)+' registrada', hoje);
+        }
+      };
+    });
+    const diasRitual = [
+      {id:'segunda',letra:'Seg',nome:'segunda-feira',prep:'na'},
+      {id:'terca',letra:'Ter',nome:'terça-feira',prep:'na'},
+      {id:'quarta',letra:'Qua',nome:'quarta-feira',prep:'na'},
+      {id:'quinta',letra:'Qui',nome:'quinta-feira',prep:'na'},
+      {id:'sexta',letra:'Sex',nome:'sexta-feira',prep:'na'},
+      {id:'sabado',letra:'Sáb',nome:'sábado',prep:'no'},
+      {id:'domingo',letra:'Dom',nome:'domingo',prep:'no'}
+    ];
+    const diaEsc = diasRitual.find(d=>d.id===s.diaFechamento) || diasRitual[6];
+    const ritualDias = diasRitual.map(d=>{
+      const on = d.id===s.diaFechamento;
+      return {letra:d.letra, nome:d.nome,
+        borda: on?'var(--accent)':'var(--line-input)',
+        fundo: on?'var(--accent)':'var(--surface)',
+        texto: on?'var(--on-accent)':'var(--ink-muted)',
+        peso: on?700:500,
+        sel: ()=>this.setState({diaFechamento:d.id})};
+    });
+    const ritualMetas = [
+      {n:3,sub:'dias alternados'},{n:4,sub:'equilibrado'},
+      {n:5,sub:'quase diário'},{n:7,sub:'todo dia'}
+    ].map(m=>{
+      const on = s.metaEscolhida===m.n;
+      return {num:String(m.n), sub:m.sub,
+        borda: on?'var(--accent)':'var(--line-input)',
+        fundo: on?'var(--accent-soft)':'var(--surface)',
+        texto: on?'var(--accent)':'var(--ink)',
+        subCor: on?'var(--accent)':'var(--ink-faint)',
+        sel: ()=>this.setState({metaEscolhida:m.n})};
+    });
+    const eDiaFechamento = s.diaFechamento==='quarta' && !s.semanaFechada;
+
+    const totalDoDia = (d)=>txs.filter(t=>t.dia===d && t.valor<0).reduce((a,t)=>a+Math.abs(t.valor),0);
+    const fecharDias = ['2026-08-03','2026-08-04','2026-08-05'].map(d=>{
+      const reg = diasRegistrados.has(d), parts = this.labelDia(d).split(' · ');
+      const tot = totalDoDia(d);
+      return {
+        label: parts[0], data: parts[1]||'',
+        marca: reg?'var(--up)':'transparent',
+        borda: reg?'var(--up)':'#d9a13a',
+        valorLabel: reg ? (tot>0 ? this.fmt(tot) : 'sem gasto') : 'em aberto',
+        valorCor: reg ? 'var(--ink)' : '#d9a13a'
+      };
+    });
+    const intencoes = [
+      {id:'reg',nome:'Registrar '+metaSemanal+'x na semana'},
+      {id:'delivery',nome:'Menos delivery'},
+      {id:'impulso',nome:'Nenhuma compra por impulso'},
+      {id:'cat',nome:'Categorizar no mesmo dia'}
+    ].map(i=>{
+      const on = s.intencaoSel===i.id;
+      return {nome:i.nome, peso:on?600:500,
+        borda: on?'var(--accent)':'var(--line-input)',
+        fundo: on?'var(--accent)':'var(--surface)',
+        texto: on?'var(--on-accent)':'var(--ink-muted)',
+        sel: ()=>this.setState({intencaoSel:i.id, intencao:i.nome})};
+    });
+
+    const ultimoReg = [...diasRegistrados].sort().reverse()[0];
+    const semanasHist = [
+      {label:'30/6',v:4},{label:'7/7',v:4},{label:'14/7',v:3},
+      {label:'21/7',v:4},{label:'28/7',v:4},{label:'3/8',v:registrosSemana}
+    ];
+    const streakSemanaHero = semanasHist.map(w=>({
+      label:w.label, valor: w.v+'/4',
+      fundo: w.v>=metaSemanal ? 'rgba(255,255,255,.18)' : 'transparent',
+      borda: 'var(--hero-line)', cor: 'var(--on-hero)'
+    }));
+
+    const desafioView = (d, sep)=>{
+      const cc = this.cx(this.cats[d.cat].cor);
+      const atual = Math.min(d.alvo, (d.auto ? registrosSemana : d.atual) + (s.desafioProg[d.id]||0));
+      const pct = Math.round(atual/d.alvo*100);
+      const completo = atual >= d.alvo;
+      return {
+        nome:d.nome, sub: completo ? 'desafio concluído' : d.sub,
+        icone:this.cats[d.cat].icone, cor:cc, corSuave:this.suave(cc,14),
+        pct, pctLabel: pct+'%',
+        progressoLabel: d.tipo==='dias'
+          ? atual+' de '+d.alvo+' '+(d.unidade||'dias')
+          : this.fmt(atual)+' de '+this.fmt(d.alvo),
+        acaoLabel: completo ? 'Concluído' : d.acao,
+        avancar: ()=>{
+          if (completo) return;
+          if (d.auto) { this.setState({sheetOpen:true, digitos:'', descricao:''}); return; }
+          this.setState(st=>({desafioProg:{...st.desafioProg,[d.id]:(st.desafioProg[d.id]||0)+d.passo}}));
+          this.toastMsg(d.tipo==='dias' ? 'Dia registrado em “'+d.nome+'”' : this.fmt(d.passo)+' guardados no desafio');
+        },
+        sep: sep ? 'var(--line-soft)' : 'transparent'
+      };
+    };
+    const ativosIds = this.desafiosBase.filter(d=>d.ativo||s.desafiosEntrei.includes(d.id));
+    const desafiosAtivos = ativosIds.map((d,i)=>desafioView(d, i<ativosIds.length-1));
+    const dispon = this.desafiosBase.filter(d=>!d.ativo && !s.desafiosEntrei.includes(d.id));
+    const desafiosDisponiveis = dispon.map((d,i)=>{
+      const cc = this.cx(this.cats[d.cat].cor);
+      return {
+        nome:d.nome, sub:d.subOff, icone:this.cats[d.cat].icone,
+        cor:cc, corSuave:this.suave(cc,14),
+        sep: i<dispon.length-1 ? 'var(--line-soft)' : 'transparent',
+        entrar: ()=>{
+          this.setState(st=>({desafiosEntrei:[...st.desafiosEntrei, d.id]}));
+          this.toastMsg('Você entrou em “'+d.nome+'”');
+        }
+      };
+    });
+    const economizado = ativosIds.reduce((a,d)=>a+d.economia,0) + 180;
+
+    const simV = (parseInt(s.simDigitos||'0',10))/100;
+    const taxa = this.taxasBase.find(t=>t.id===s.simTaxa) || this.taxasBase[1];
+    const futuro = (anos)=> simV * Math.pow(1+taxa.im, 12*anos);
+    const f5 = futuro(5);
+    const simTaxas = this.taxasBase.map(t=>{
+      const on = t.id===taxa.id;
+      return {
+        nome:t.nome, taxaLabel:t.taxaLabel,
+        borda: on?'var(--accent)':'var(--line-input)',
+        fundo: on?'var(--accent)':'var(--surface)',
+        texto: on?'var(--on-accent)':'var(--ink-muted)',
+        sel: ()=>this.setState({simTaxa:t.id})
+      };
+    });
+    const simPrazos = [1,3,10].map((a,i)=>({
+      label:'Em '+a+(a===1?' ano':' anos'),
+      valorLabel:this.fmt(futuro(a)),
+      sep: i<2 ? 'var(--line-soft)' : 'transparent'
+    }));
+    const digitSim = (d)=>()=>{
+      const nd = (this.state.simDigitos + d).replace(/^0+/,'').slice(0,9);
+      this.setState({simDigitos:nd});
+    };
+    const teclasSim = ['1','2','3','4','5','6','7','8','9','00','0'].map(l=>({label:l,press:digitSim(l)}));
+    teclasSim.push({label:'⌫', press:()=>this.setState({simDigitos:this.state.simDigitos.slice(0,-1)})});
+    const pctReserva = Math.min(100, Math.round(simV/12000*100));
+
+    const orcTotal = this.props.orcamentoMensal || 5000;
+    const orcPct = Math.min(100, Math.round(despesas/orcTotal*100));
+    const orcReal = Math.round(despesas/orcTotal*100);
+    const orcCor = orcReal < 70 ? 'var(--up)' : (orcReal < 90 ? '#d9a13a' : 'var(--down)');
+
+    const catTotais = {};
+    txs.filter(t=>t.valor<0).forEach(t=>{ catTotais[t.cat] = (catTotais[t.cat]||0) + Math.abs(t.valor); });
+    const topCat = Object.keys(catTotais).sort((a,b)=>catTotais[b]-catTotais[a])[0];
+    const assin = catTotais['assinaturas'] || 0;
+    const insights = [];
+    if (assin > 0) insights.push({
+      tag:'Assinaturas',
+      texto:'Assinaturas somam '+this.fmt(assin)+' por mês — '+this.fmt(assin*12)+' no ano.'
+    });
+    if (topCat) insights.push({
+      tag:'Concentração',
+      texto:this.cats[topCat].nome+' concentra '+Math.round(catTotais[topCat]/despesas*100)+'% dos seus gastos em agosto.'
+    });
+    insights.push({
+      tag:'Ritmo',
+      texto:'Você está gastando '+this.fmt(despesas/3)+' por dia em agosto.'
+    });
+    const insight = insights[s.insightIdx % insights.length];
+    const insightDots = insights.map((x,i)=>({cor: (s.insightIdx % insights.length)===i ? 'var(--accent)' : 'var(--line-input)'}));
+
+    const metaAtiva = this.metasBase.find(m=>m.id===s.metaAtiva);
+    const metaAtivaAtual = metaAtiva ? metaAtiva.atual + (s.metasAdd[metaAtiva.id]||0) : 0;
+
+    const acao = s.semanaFechada
+      ? {
+          fundo:'var(--surface-muted)',
+          icone:'M4 5h16v16H4zM4 10h16M8 3v4M16 3v4M9.2 15.4l1.9 1.9 3.7-3.9',
+          titulo:'Semana fechada',
+          sub: s.intencao ? 'Foco desta semana: '+s.intencao.toLowerCase() : 'Você fechou a semana com os registros em dia.',
+          botao:'Rever o resumo', ir: ()=>this.setState({screen:'resumo', fechando:false})
+        }
+      : eDiaFechamento
+      ? {
+          fundo:'var(--accent-soft)',
+          icone:'M4 5h16v16H4zM4 10h16M8 3v4M16 3v4M12 13v4M10 15h4',
+          titulo:'É seu dia de fechar',
+          sub: 'Confira os dias, veja para onde o dinheiro foi e escolha um foco para a próxima.',
+          botao:'Fechar a semana',
+          ir: ()=>this.setState({screen:'fechar', fecharPasso:1, fechando:true, intencaoSel:''})
+        }
+      : emDia
+      ? {
+          fundo:'var(--surface-muted)',
+          icone:'M4 5h16v16H4zM4 10h16M8 3v4M16 3v4M9.2 15.4l1.9 1.9 3.7-3.9',
+          titulo:'Semana em dia',
+          sub: registrosSemana+' de '+metaSemanal+' registros feitos. Veja o que a semana mostrou.',
+          botao:'Ver resumo da semana', ir: goTo('resumo')
+        }
+      : {
+          fundo:'var(--accent-soft)',
+          icone:'M12 8v4.6l3 1.8M21 12a9 9 0 11-9-9',
+          titulo: pendentes.length===1 ? '1 dia sem registro' : pendentes.length+' dias sem registro',
+          sub: 'Lance ' + pendentes.map(d=>this.labelDia(d).split(' · ')[0].toLowerCase()).join(' e ') + ' de uma vez — leva menos de um minuto.',
+          botao:'Colocar em dia', ir: goTo('lote')
+        };
+
+    const loteCats = ['mercado','restaurante','transporte','casa','lazer'];
+    const loteNum = (v)=>{
+      const n = parseFloat(String(v||'').replace(/[^0-9,\.]/g,'').replace(/\./g,'').replace(',','.'));
+      return isNaN(n) ? 0 : n;
+    };
+    const setLote = (dia, patch)=>this.setState(st=>({
+      lote:{...st.lote,[dia]:{valor:'',cat:'mercado',zero:false, ...(st.lote[dia]||{}), ...patch}}
+    }));
+    const loteDias = pendentes.map((dia,i)=>{
+      const v = s.lote[dia] || {valor:'',cat:'mercado',zero:false};
+      return {
+        label: this.labelDia(dia),
+        valor: v.valor,
+        opacidade: v.zero ? 0.4 : 1,
+        sep: i<pendentes.length-1 ? 'var(--line-soft)' : 'transparent',
+        setValor: (e)=>setLote(dia,{valor:e.target.value, zero:false}),
+        zeroSel: ()=>setLote(dia,{zero:!v.zero, valor:''}),
+        zeroBorda: v.zero?'var(--accent)':'var(--line-input)',
+        zeroFundo: v.zero?'var(--accent)':'var(--surface)',
+        zeroTexto: v.zero?'var(--on-accent)':'var(--ink-muted)',
+        cats: loteCats.map(k=>{
+          const on = v.cat===k, cc = this.cx(this.cats[k].cor);
+          return {
+            nome:this.cats[k].nome, ponto:cc,
+            borda: on?cc:'var(--line)', fundo: on?this.suave(cc,10):'var(--surface)',
+            texto: on?'var(--ink)':'var(--ink-muted)',
+            sel: ()=>setLote(dia,{cat:k})
+          };
+        })
+      };
+    });
+    const loteCompleto = pendentes.every(d=>{
+      const v = s.lote[d]; return v && (v.zero || loteNum(v.valor) > 0);
+    });
+
+    const semanaTx = txs.filter(t=>t.dia>=semanaInicio && t.valor<0);
+    const semanaTotal = semanaTx.reduce((a,t)=>a+Math.abs(t.valor),0);
+    const anteriorTotal = txs.filter(t=>t.dia<semanaInicio && t.valor<0).reduce((a,t)=>a+Math.abs(t.valor),0);
+    const deltaPct = anteriorTotal>0 ? Math.round((semanaTotal-anteriorTotal)/anteriorTotal*100) : 0;
+    const catSem = {};
+    semanaTx.forEach(t=>{ catSem[t.cat] = (catSem[t.cat]||0) + Math.abs(t.valor); });
+    const resumoCats = Object.keys(catSem).sort((a,b)=>catSem[b]-catSem[a]).slice(0,3).map(k=>{
+      const pct = semanaTotal>0 ? Math.round(catSem[k]/semanaTotal*100) : 0;
+      return {nome:this.cats[k].nome, valorLabel:this.fmt(catSem[k]), pct, pctLabel:pct+'%', cor:this.cx(this.cats[k].cor)};
+    });
+    const maiorTx = semanaTx.slice().sort((a,b)=>Math.abs(b.valor)-Math.abs(a.valor))[0];
+
+    const lembretes = [
+      {id:'domingo',nome:'Domingo à noite'},{id:'sexta',nome:'Sexta-feira'},
+      {id:'diario',nome:'Todo dia, 21h'},{id:'off',nome:'Sem lembrete'}
+    ].map(l=>{
+      const on = s.lembrete===l.id;
+      return {nome:l.nome, peso:on?600:500,
+        borda:on?'var(--accent)':'var(--line-input)',
+        fundo:on?'var(--accent)':'var(--surface)',
+        texto:on?'var(--on-accent)':'var(--ink-muted)',
+        sel:()=>this.setState({lembrete:l.id})};
+    });
+
+    const seg = (on)=>({bg:on?'var(--surface)':'transparent', cor:on?'var(--ink)':'var(--ink-muted)', sombra:on?'0 1px 2px rgba(0,0,0,.12)':'none'});
+    const sd = seg(tipoDesp), sr = seg(!tipoDesp);
+    const cd = seg(catTabDesp), cr = seg(!catTabDesp);
+
+    return {
+      isHome: s.screen==='home', isExtrato: s.screen==='extrato',
+      isMetas: s.screen==='metas', isCategorias: s.screen==='categorias',
+      isHabitos: s.screen==='habitos', isSimulador: s.screen==='simulador',
+      isLote: s.screen==='lote', isResumo: s.screen==='resumo',
+      isFechar: s.screen==='fechar',
+      fecharP1: s.screen==='fechar' && s.fecharPasso===1,
+      fecharP3: s.screen==='fechar' && s.fecharPasso===3,
+      fecharDias, intencoes,
+      fecharPassoLabel: 'Passo '+(s.fecharPasso===3?'3':'1')+' de 3',
+      passoPontos: [1,2,3].map(n=>({cor: n<=s.fecharPasso ? 'var(--on-hero)' : 'var(--hero-line)'})),
+      fecharAbertosLabel: pendentes.length===0
+        ? 'Todos os dias desta semana estão registrados.'
+        : (pendentes.length===1 ? '1 dia ainda está em aberto.' : pendentes.length+' dias ainda estão em aberto.'),
+      fecharBotao: pendentes.length===0 ? 'Ver o resumo' : (pendentes.length===1 ? 'Lançar 1 dia em aberto' : 'Lançar '+pendentes.length+' dias em aberto'),
+      fecharContinuar: ()=> pendentes.length
+        ? this.setState({screen:'lote'})
+        : this.setState({screen:'resumo', fecharPasso:2}),
+      concluirFechamento: ()=>{
+        this.setState({semanaFechada:true, fechando:false, screen:'home', fecharPasso:1});
+        this.toastMsg('Semana fechada', this.state.intencao
+          ? 'Foco da próxima: '+this.state.intencao.toLowerCase()
+          : 'Sua constância subiu para 6 semanas seguidas');
+      },
+
+      ritualOpen: s.ritualOpen, ritualPrimeira: s.ritualPrimeira,
+      ritualDias, ritualMetas,
+      ritualTitulo: s.ritualPrimeira ? 'Escolha seu ritual' : 'Seu ritual',
+      ritualBotao: s.ritualPrimeira ? 'Começar' : 'Salvar ritual',
+      ritualResumo: 'Você fecha a semana '+diaEsc.prep+' '+diaEsc.nome+', com '+metaSemanal+' registros por semana.',
+      ritualDiaNome: diaEsc.nome,
+      abrirRitual: ()=>this.setState({ritualOpen:true, ritualPrimeira:false}),
+      salvarRitual: ()=>this.setState({ritualOpen:false, ritualPrimeira:false}),
+
+      fechandoAtivo: s.fechando,
+      resumoVoltar: s.fechando
+        ? ()=>this.setState({screen:'fechar', fecharPasso:1})
+        : goTo('home'),
+      resumoBotao: s.fechando ? 'Continuar' : 'Voltar ao início',
+      resumoAcao: s.fechando
+        ? ()=>this.setState({screen:'fechar', fecharPasso:3})
+        : goTo('home'),
+      irCategorias: goTo('categorias'),
+
+      statusTitulo: emDia ? 'Em dia' : (pendentes.length===1 ? '1 dia sem registro' : pendentes.length+' dias sem registro'),
+      statusSub: emDia
+        ? 'Último registro hoje · 5 semanas seguidas em dia'
+        : 'Último registro: ' + this.labelDia(ultimoReg).replace(' · ', ', '),
+      statusPonto: emDia ? 'var(--toast-check)' : '#d9a13a',
+      semanaSegs, semanaDias, rapidos,
+      semanaLabel: registrosSemana+' de '+metaSemanal+' registros nesta semana',
+      abrirOutro: ()=>this.setState({sheetOpen:true, tipo:'despesa', digitos:'', descricao:''}),
+      irResumo: ()=>this.setState({screen:'resumo', toast:'', toastSub:'', toastFechou:false}),
+
+      acaoFundo: acao.fundo, acaoIcone: acao.icone, acaoTitulo: acao.titulo,
+      acaoSub: acao.sub, acaoBotao: acao.botao, acaoIr: acao.ir,
+
+      loteDias, loteBg: loteCompleto ? 'var(--accent)' : 'var(--line-input)',
+      loteBotao: loteCompleto
+        ? (pendentes.length===1 ? 'Salvar 1 dia' : 'Salvar '+pendentes.length+' dias')
+        : 'Preencha os dias em aberto',
+      salvarLote: ()=>{
+        if (!loteCompleto) return;
+        const novos = [];
+        pendentes.forEach(dia=>{
+          const v = this.state.lote[dia];
+          if (v && !v.zero && loteNum(v.valor) > 0) {
+            novos.push({id:Date.now()+Math.random(), nome:this.cats[v.cat].nome, cat:v.cat, valor:-loteNum(v.valor), dia, conta:'cartao'});
+          }
+        });
+        this.setState(st=>({
+          txs:[...novos, ...st.txs].sort((a,b)=> a.dia<b.dia ? 1 : -1),
+          diasExtra:[...st.diasExtra, ...pendentes], lote:{},
+          screen: st.fechando ? 'resumo' : 'home', fecharPasso: st.fechando ? 2 : 1
+        }));
+        this.toastMsg(pendentes.length===1 ? 'Dia colocado em dia' : pendentes.length+' dias colocados em dia');
+      },
+
+      resumoPeriodo: 'Gastos de 3 a 9 de agosto',
+      resumoTotal: this.fmt(semanaTotal),
+      resumoDelta: anteriorTotal===0
+        ? 'primeira semana registrada'
+        : (deltaPct<=0 ? Math.abs(deltaPct)+'% a menos que na semana anterior' : deltaPct+'% a mais que na semana anterior'),
+      resumoCats,
+      resumoMaiorValor: maiorTx ? this.fmt(maiorTx.valor) : this.fmt(0),
+      resumoMaiorNome: maiorTx ? maiorTx.nome : '—',
+      resumoQtd: String(semanaTx.length),
+      resumoMedia: this.fmt(semanaTx.length ? semanaTotal/semanaTx.length : 0),
+
+      semanasEmDia: '5',
+      registrosSemanaLabel: registrosSemana+' de '+metaSemanal,
+      metaSemanalLabel: metaSemanal+' por semana',
+      lancamentosMes: String(txs.length),
+      lancamentosSub: '18 em julho',
+      lembretes,
+      voltarHome: goTo('home'), irHabitos: goTo('habitos'),
+      mostrarStreak: this.props.mostrarStreak !== false,
+      streakDias: s.streakDias || 12,
+      streakTitulo: (s.streakDias||12)+' dias seguidos registrando',
+      streakSub: 'recorde 21 dias · 5 dias sem gasto por impulso',
+      streakSemanaHero,
+      impulsoDias: '5 dias', impulsoRecorde: '14 dias',
+      economizadoLabel: this.fmt(economizado),
+      desafiosAtivos, desafiosDisponiveis,
+
+      simValorLabel: this.fmt(simV),
+      simTaxas, simPrazos,
+      sim5Label: this.fmt(f5),
+      sim5Rendimento: '+ ' + this.fmt(f5 - simV) + ' de rendimento sobre ' + this.fmt(simV),
+      simPctPrincipal: f5 > 0 ? Math.round(simV/f5*100) : 100,
+      simComparacao: simV > 0
+        ? 'Esse valor cobre ' + pctReserva + '% da sua Reserva de emergência hoje.'
+        : 'Digite um valor para ver o custo de oportunidade.',
+      teclasSim,
+      simGuardarBg: simV===0 ? 'var(--line-input)' : 'var(--up)',
+      simGuardarLabel: simV===0 ? 'Informe um valor' : 'Guardar em vez de gastar',
+      simGuardar: ()=>{
+        if (!simV) return;
+        this.setState(st=>({metasAdd:{...st.metasAdd, reserva:(st.metasAdd.reserva||0)+simV}, screen:'metas', simDigitos:''}));
+        this.toastMsg(this.fmt(simV)+' guardados na Reserva de emergência');
+      },
+      mostrarLinkSim: s.tipo==='despesa' && this.valorAtual() > 0,
+      simularDoSheet: ()=>this.setState({screen:'simulador', simDigitos:this.state.digitos, sheetOpen:false}),
+
+      saldoTotalLabel: s.mostrarSaldo ? this.fmt(s.saldoAnim!=null ? s.saldoAnim : saldoTotal) : 'R$ ••••••',
+
+      mostrarInsight: this.props.mostrarInsight !== false,
+      insightTag: insight.tag, insightTexto: insight.texto, insightDots,
+      proximoInsight: ()=>this.setState({insightIdx:(this.state.insightIdx+1)%insights.length}),
+
+      orcPct, orcGrad: orcPct>0 ? Math.round(10000/orcPct) : 100,
+      orcCor, orcPctLabel: orcReal+'% usado',
+      orcGastoLabel: this.fmt(despesas), orcTotalLabel: this.fmt(orcTotal),
+      orcRestanteLabel: despesas <= orcTotal
+        ? 'restam ' + this.fmt(orcTotal-despesas)
+        : this.fmt(despesas-orcTotal) + ' acima',
+
+      aporteOpen: s.aporteOpen,
+      metaAtivaNome: metaAtiva ? metaAtiva.nome : '',
+      metaAtivaFalta: metaAtiva ? 'faltam ' + this.fmt(Math.max(0, metaAtiva.alvo - metaAtivaAtual)) + ' para a meta' : '',
+      aporteCor: this.valorAtual()===0 ? 'var(--ink-faint)' : 'var(--up)',
+      aporteAtalhos: [50,100,200].map(v=>({label:'R$ '+v, sel:()=>this.setState({digitos:String(v*100)})})),
+      aporteBg: this.valorAtual()===0 ? 'var(--line-input)' : 'var(--accent)',
+      aporteLabel: this.valorAtual()===0 ? 'Informe um valor' : 'Adicionar ' + this.fmt(this.valorAtual()),
+      fecharAporte: ()=>this.setState({aporteOpen:false}),
+      confirmarAporte: ()=>{
+        const v = this.valorAtual();
+        if (!v || !metaAtiva) return;
+        this.setState(st=>({metasAdd:{...st.metasAdd,[metaAtiva.id]:(st.metasAdd[metaAtiva.id]||0)+v}, aporteOpen:false, digitos:''}));
+        this.toastMsg(this.fmt(v)+' adicionados a '+metaAtiva.nome);
+      },
+      saldoToggleLabel: s.mostrarSaldo ? 'Ocultar' : 'Mostrar',
+      toggleSaldo: ()=>this.setState({mostrarSaldo:!s.mostrarSaldo}),
+      contas: this.contasBase.map(c=>({
+        nome:c.nome, cor:this.cx(c.cor),
+        saldoLabel: s.mostrarSaldo ? (c.saldo<0 ? '− '+this.fmt(c.saldo) : this.fmt(c.saldo)) : '••••',
+        saldoCor: c.saldo<0 ? 'var(--down)' : 'var(--ink)'
+      })),
+
+      receitasLabel: this.fmt(receitas), despesasLabel: this.fmt(despesas),
+      resultadoLabel: this.sig(net),
+      pctReceitas: Math.round(receitas/maxV*100), pctDespesas: Math.round(despesas/maxV*100),
+      resumoBarras: (this.props.resumoStyle||'barras')==='barras',
+      resumoRosca: (this.props.resumoStyle||'barras')==='rosca',
+      roscaGradient: 'conic-gradient(var(--up) 0 '+Math.round(receitas/(receitas+despesas)*100)+'%, var(--down) 0 100%)',
+      pctSobraLabel: pctSobra+'%',
+
+      mostrarAtalhos: this.props.atalhosRapidos !== false,
+      atalhos,
+      recentes: txs.slice(0,5).map((t,i)=>this.txView(t,i<4)),
+      irExtrato: goTo('extrato'),
+
+      abasEsq: [abaDef('home','Início','M3 10.5L12 3l9 7.5V21H3zM9.5 21v-6h5v6'), abaDef('extrato','Extrato','M5 3h14v18H5zM9 8h6M9 12h6M9 16h4')],
+      abasDir: [abaDef('habitos','Hábitos','M12 3c1.2 3 4.5 4.2 4.5 8a4.5 4.5 0 01-9 0c0-1.6.7-2.6 1.5-3.5.3 1.2 1 1.8 1.8 1.8-.6-2.4-.4-4.6 1.2-6.3z'), abaDef('metas','Metas','M12 21a9 9 0 100-18 9 9 0 000 18zM12 16a4 4 0 100-8 4 4 0 000 8zM12 13.2a1.2 1.2 0 100-2.4 1.2 1.2 0 000 2.4')],
+
+      grupos, semResultados: grupos.length===0,
+      chipsConta, chipsCategoria,
+      filtroEntradas: this.fmt(fIn), filtroSaidas: this.fmt(fOut), filtroSaldo: this.sig(fIn-fOut),
+
+      metas, metasResumo: this.fmt(totalMetas) + ' guardados',
+
+      gridCategorias,
+      verDespesas: ()=>this.setState({catTab:'despesa'}), verReceitas: ()=>this.setState({catTab:'receita'}),
+      tabDespesaBg: cd.bg, tabDespesaCor: cd.cor, tabDespesaSombra: cd.sombra,
+      tabReceitaBg: cr.bg, tabReceitaCor: cr.cor, tabReceitaSombra: cr.sombra,
+
+      sheetOpen: s.sheetOpen,
+      abrirNova: ()=>this.setState({sheetOpen:true,digitos:'',descricao:'',tipo:'despesa',catSel:'mercado'}),
+      fecharNova: ()=>this.setState({sheetOpen:false}),
+      setDespesa: ()=>this.setState({tipo:'despesa',catSel:'mercado'}),
+      setReceita: ()=>this.setState({tipo:'receita',catSel:'salario'}),
+      tipoDespesaBg: sd.bg, tipoDespesaCor: tipoDesp?'var(--down)':'var(--ink-muted)', tipoDespesaSombra: sd.sombra,
+      tipoReceitaBg: sr.bg, tipoReceitaCor: !tipoDesp?'var(--up)':'var(--ink-muted)', tipoReceitaSombra: sr.sombra,
+      valorDigitado: this.fmt(this.valorAtual()),
+      valorCorAtual: this.valorAtual()===0 ? 'var(--ink-faint)' : (tipoDesp?'var(--down)':'var(--up)'),
+      sheetCategorias, sheetContas, teclas,
+      descricao: s.descricao,
+      setDescricao: (e)=>this.setState({descricao:e.target.value}),
+      salvarBg: this.valorAtual()===0 ? 'var(--line-input)' : (tipoDesp?'var(--down)':'var(--up)'),
+      salvarLabel: this.valorAtual()===0 ? 'Informe um valor' : (tipoDesp?'Salvar despesa':'Salvar receita'),
+      salvar: ()=>{
+        const v = this.valorAtual();
+        if (!v) return;
+        const st = this.state;
+        const tx = {
+          id: Date.now(),
+          nome: st.descricao.trim() || this.cats[st.catSel].nome,
+          cat: st.catSel,
+          valor: st.tipo==='despesa' ? -v : v,
+          dia: '2026-08-05',
+          conta: st.contaSel
+        };
+        this.setState({txs:[tx,...st.txs], sheetOpen:false, digitos:'', descricao:''});
+        this.animarSaldo(saldoTotal, saldoTotal + tx.valor);
+        confirmar((st.tipo==='despesa'?'Despesa':'Receita')+' de '+this.fmt(v)+' registrada', tx.dia);
+      },
+
+      toast: s.toast, toastSub: s.toastSub, toastFechou: s.toastFechou
+    };
+  }
+}
+</script>
+</body>
+</html>
