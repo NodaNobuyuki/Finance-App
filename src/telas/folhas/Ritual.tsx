@@ -49,7 +49,12 @@ export function Ritual() {
     >
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 24, paddingBottom: 26, gap: 26 }}
+        contentContainerStyle={{
+          paddingHorizontal: 22,
+          paddingTop: 24,
+          paddingBottom: 26,
+          gap: 26,
+        }}
       >
         <View style={{ gap: 12 }}>
           <View style={{ gap: 3 }}>
@@ -81,7 +86,11 @@ export function Ritual() {
                       backgroundColor: ativo ? t.accent : t.surface,
                     }}
                   >
-                    <Txt tamanho={11.5} peso={ativo ? 700 : 500} cor={ativo ? t.onAccent : t.inkMuted}>
+                    <Txt
+                      tamanho={11.5}
+                      peso={ativo ? 700 : 500}
+                      cor={ativo ? t.onAccent : t.inkMuted}
+                    >
                       {d.letra}
                     </Txt>
                   </View>

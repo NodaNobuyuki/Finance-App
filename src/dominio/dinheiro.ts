@@ -100,11 +100,7 @@ export function deTextoLivre(texto: string): Centavos {
  * Juros compostos sobre centavos, arredondando só no fim.
  * `taxaMensalBps` em pontos-base (88 = 0,88% a.m.) para não guardar float na taxa.
  */
-export function renderPor(
-  principal: Centavos,
-  taxaMensalBps: number,
-  meses: number,
-): Centavos {
+export function renderPor(principal: Centavos, taxaMensalBps: number, meses: number): Centavos {
   if (principal <= 0) return 0;
   return Math.round(principal * Math.pow(1 + taxaMensalBps / 10000, meses));
 }

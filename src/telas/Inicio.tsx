@@ -44,11 +44,12 @@ export function Inicio() {
     const borda =
       registrado || d.estado === 'hoje-aberto' ? t.onHero : futuro ? t.heroLine : t.atencao;
 
-    const aoTocar = registrado || futuro
-      ? undefined
-      : d.ehHoje
-        ? () => despachar({ tipo: 'ABRIR_NOVA' })
-        : () => despachar({ tipo: 'IR_PARA', tela: 'lote' });
+    const aoTocar =
+      registrado || futuro
+        ? undefined
+        : d.ehHoje
+          ? () => despachar({ tipo: 'ABRIR_NOVA' })
+          : () => despachar({ tipo: 'IR_PARA', tela: 'lote' });
 
     return (
       <Toque
@@ -58,7 +59,12 @@ export function Inicio() {
         rotuloAcessivel={`${d.dia} ${registrado ? 'registrado' : 'em aberto'}`}
       >
         <View style={{ alignItems: 'center', gap: 7 }}>
-          <Txt tamanho={10} peso={d.ehHoje ? 700 : 500} espacamento={0.5} cor={d.ehHoje ? t.onHero : t.onHeroSoft}>
+          <Txt
+            tamanho={10}
+            peso={d.ehHoje ? 700 : 500}
+            espacamento={0.5}
+            cor={d.ehHoje ? t.onHero : t.onHeroSoft}
+          >
             {d.letra}
           </Txt>
           <View
@@ -73,7 +79,9 @@ export function Inicio() {
               justifyContent: 'center',
             }}
           >
-            {registrado ? <Icone path={icones.check} tamanho={14} cor={t.hero} espessura={2.6} /> : null}
+            {registrado ? (
+              <Icone path={icones.check} tamanho={14} cor={t.hero} espessura={2.6} />
+            ) : null}
           </View>
         </View>
       </Toque>
@@ -84,7 +92,9 @@ export function Inicio() {
     <View>
       {/* ── Topo: estado do registro ── */}
       <Hero>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+        >
           <Txt tamanho={16} peso={600} cor={t.onHero} espacamento={-0.16}>
             Olá, Marina
           </Txt>
@@ -339,7 +349,11 @@ export function Inicio() {
                   {c.nome}
                 </Txt>
                 <Txt tamanho={11.5} peso={600} numerico cor={saldo < 0 ? t.down : t.ink}>
-                  {estado.mostrarSaldo ? (saldo < 0 ? `− ${formatar(saldo)}` : formatar(saldo)) : '••••'}
+                  {estado.mostrarSaldo
+                    ? saldo < 0
+                      ? `− ${formatar(saldo)}`
+                      : formatar(saldo)
+                    : '••••'}
                 </Txt>
               </View>
             );
@@ -348,7 +362,13 @@ export function Inicio() {
 
         {/* Resumo do mês */}
         <View style={{ gap: 14 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'baseline',
+              justifyContent: 'space-between',
+            }}
+          >
             <Txt tamanho={15} peso={600}>
               {rotuloMes(estado.hoje)}
             </Txt>
@@ -359,7 +379,13 @@ export function Inicio() {
 
           <View style={{ gap: 13 }}>
             <View style={{ gap: 6 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                }}
+              >
                 <Txt tamanho={12.5} cor={t.inkMuted}>
                   Receitas
                 </Txt>
@@ -371,7 +397,13 @@ export function Inicio() {
             </View>
 
             <View style={{ gap: 6 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                }}
+              >
                 <Txt tamanho={12.5} cor={t.inkMuted}>
                   Despesas
                 </Txt>
@@ -385,7 +417,13 @@ export function Inicio() {
 
           {/* Orçamento: a cor progride verde → amarelo → vermelho */}
           <View style={{ gap: 8, paddingTop: 2 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'baseline',
+                justifyContent: 'space-between',
+              }}
+            >
               <Txt tamanho={12.5} cor={t.inkMuted}>
                 Orçamento do mês
               </Txt>

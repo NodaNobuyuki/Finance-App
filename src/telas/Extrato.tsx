@@ -24,7 +24,9 @@ export function Extrato() {
   return (
     <View style={{ gap: 16 }}>
       <Hero estilo={{ paddingBottom: 22 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+        >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Txt tamanho={16} peso={600} cor={t.onHero} espacamento={-0.16}>
               Extrato

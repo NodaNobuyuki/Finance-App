@@ -41,7 +41,9 @@ export function Toast() {
         right: 18,
         bottom: 82,
         opacity: entrada,
-        transform: [{ translateY: entrada.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
+        transform: [
+          { translateY: entrada.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
+        ],
       }}
     >
       <View
@@ -66,7 +68,13 @@ export function Toast() {
             {toast.texto}
           </Txt>
           {toast.sub ? (
-            <Txt tamanho={11.5} peso={500} cor={t.toastInk} entrelinha={1.35} estilo={{ opacity: 0.62 }}>
+            <Txt
+              tamanho={11.5}
+              peso={500}
+              cor={t.toastInk}
+              entrelinha={1.35}
+              estilo={{ opacity: 0.62 }}
+            >
               {toast.sub}
             </Txt>
           ) : null}

@@ -111,7 +111,12 @@ export function Hero({
 }) {
   const { t } = useTema();
   return (
-    <View style={[{ backgroundColor: t.hero, paddingHorizontal: 22, paddingTop: 20, paddingBottom: 24 }, estilo]}>
+    <View
+      style={[
+        { backgroundColor: t.hero, paddingHorizontal: 22, paddingTop: 20, paddingBottom: 24 },
+        estilo,
+      ]}
+    >
       {children}
     </View>
   );

@@ -43,10 +43,7 @@ describe('saldoDaConta', () => {
 
 describe('saldoTotal', () => {
   it('é a soma dos saldos derivados de cada conta', () => {
-    const somaPorConta = seed.contas.reduce(
-      (a, c) => a + saldoDaConta(c, seed.transacoes),
-      0,
-    );
+    const somaPorConta = seed.contas.reduce((a, c) => a + saldoDaConta(c, seed.transacoes), 0);
     expect(saldoTotal(seed.contas, seed.transacoes)).toBe(somaPorConta);
   });
 

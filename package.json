@@ -16,8 +16,12 @@
     "@testing-library/react-native": "^14.0.1",
     "@types/jest": "^29.5.14",
     "@types/react": "~19.1.0",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~10.0.0",
+    "eslint-config-prettier": "^10.1.8",
     "jest": "^29.7.0",
     "jest-expo": "~54.0.17",
+    "prettier": "^3.9.6",
     "react-test-renderer": "19.1.0",
     "typescript": "~5.9.2"
   },
@@ -30,7 +34,10 @@
     "test": "jest",
     "doctor": "npx --yes expo-doctor",
     "bundle": "node -e \"require('fs').rmSync('.bundle-check',{recursive:true,force:true})\" && expo export --platform android --output-dir .bundle-check",
-    "verificar": "npm run typecheck && npm run test && npm run doctor && npm run bundle"
+    "verificar": "npm run lint && npm run typecheck && npm run test && npm run doctor && npm run bundle",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "jest": {
     "preset": "jest-expo"

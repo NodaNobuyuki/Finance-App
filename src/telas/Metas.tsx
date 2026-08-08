@@ -65,7 +65,13 @@ export function Metas() {
 
               <View style={{ gap: 7 }}>
                 <Barra pct={m.pct} cor={cor} />
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'baseline',
+                    justifyContent: 'space-between',
+                  }}
+                >
                   <Txt tamanho={15} peso={600} numerico>
                     {formatar(m.guardadoCentavos)}
                   </Txt>

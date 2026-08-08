@@ -38,7 +38,9 @@ export function Folha({
         bottom: 0,
         backgroundColor: t.canvas,
         opacity: entrada,
-        transform: [{ translateY: entrada.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
+        transform: [
+          { translateY: entrada.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) },
+        ],
       }}
     >
       {cabecalho ?? (

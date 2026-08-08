@@ -40,7 +40,8 @@ export type Toast = {
   duracaoMs: number;
 };
 
-export type Folha = null | { tipo: 'nova' } | { tipo: 'aporte'; metaId: string } | { tipo: 'ritual' };
+export type Folha =
+  null | { tipo: 'nova' } | { tipo: 'aporte'; metaId: string } | { tipo: 'ritual' };
 
 export type Estado = {
   hoje: DiaISO;
@@ -309,7 +310,11 @@ export function reducer(e: Estado, a: Acao): Estado {
     }
 
     case 'ABRIR_APORTE':
-      return { ...e, folha: { tipo: 'aporte', metaId: a.metaId }, rascunho: { ...e.rascunho, digitos: '' } };
+      return {
+        ...e,
+        folha: { tipo: 'aporte', metaId: a.metaId },
+        rascunho: { ...e.rascunho, digitos: '' },
+      };
 
     case 'ABRIR_RITUAL':
       return { ...e, folha: { tipo: 'ritual' }, ritualPrimeira: false };
@@ -337,7 +342,10 @@ export function reducer(e: Estado, a: Acao): Estado {
       return { ...e, rascunho: { ...e.rascunho, descricao: a.texto } };
 
     case 'DIGITO':
-      return { ...e, rascunho: { ...e.rascunho, digitos: empilharDigitos(e.rascunho.digitos, a.valor) } };
+      return {
+        ...e,
+        rascunho: { ...e.rascunho, digitos: empilharDigitos(e.rascunho.digitos, a.valor) },
+      };
 
     case 'APAGAR_DIGITO':
       return { ...e, rascunho: { ...e.rascunho, digitos: removerDigito(e.rascunho.digitos) } };
@@ -428,7 +436,11 @@ export function reducer(e: Estado, a: Acao): Estado {
     case 'AVANCAR_DESAFIO': {
       // Desafio automático não avança no toque: ele reflete os registros da semana.
       if (a.automatico) {
-        return { ...e, folha: { tipo: 'nova' }, rascunho: { ...RASCUNHO_VAZIO, contaId: e.rascunho.contaId } };
+        return {
+          ...e,
+          folha: { tipo: 'nova' },
+          rascunho: { ...RASCUNHO_VAZIO, contaId: e.rascunho.contaId },
+        };
       }
       const seq = e.seq + 1;
       return {
@@ -493,7 +505,9 @@ export function reducer(e: Estado, a: Acao): Estado {
       }
       seq += 1;
       const texto =
-        a.pendentes.length === 1 ? 'Dia colocado em dia' : `${a.pendentes.length} dias colocados em dia`;
+        a.pendentes.length === 1
+          ? 'Dia colocado em dia'
+          : `${a.pendentes.length} dias colocados em dia`;
       return {
         ...e,
         seq,

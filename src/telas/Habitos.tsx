@@ -1,15 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
-import {
-  Barra,
-  BotaoVoltar,
-  CartaoNumero,
-  Disco,
-  Hero,
-  Toque,
-  Txt,
-} from '../componentes/basicos';
-import { Icone } from '../componentes/Icone';
+import { Barra, BotaoVoltar, CartaoNumero, Disco, Hero, Toque, Txt } from '../componentes/basicos';
 import { categoria, icones } from '../dominio/categorias';
 import { nomeDoMes } from '../dominio/datas';
 import * as seed from '../dominio/seed';
@@ -268,7 +259,10 @@ export function Habitos() {
               {resumoDoRitual(estado)}
             </Txt>
           </View>
-          <Toque aoTocar={() => despachar({ tipo: 'ABRIR_RITUAL' })} rotuloAcessivel="Ajustar ritual">
+          <Toque
+            aoTocar={() => despachar({ tipo: 'ABRIR_RITUAL' })}
+            rotuloAcessivel="Ajustar ritual"
+          >
             <View
               style={{
                 borderWidth: 1,
@@ -312,7 +306,11 @@ export function Habitos() {
                       backgroundColor: ativo ? t.accent : t.surface,
                     }}
                   >
-                    <Txt tamanho={12.5} peso={ativo ? 600 : 500} cor={ativo ? t.onAccent : t.inkMuted}>
+                    <Txt
+                      tamanho={12.5}
+                      peso={ativo ? 600 : 500}
+                      cor={ativo ? t.onAccent : t.inkMuted}
+                    >
                       {l.nome}
                     </Txt>
                   </View>

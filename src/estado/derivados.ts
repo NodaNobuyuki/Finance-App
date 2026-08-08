@@ -210,9 +210,10 @@ export function atalhosRapidos(e: Estado): AtalhoRapido[] {
     .filter((k) => porCategoria[k].length < 2)
     .sort((a, b) => Math.min(...porCategoria[a]) - Math.min(...porCategoria[b]));
 
-  return [...repetidas, ...resto]
-    .slice(0, 4)
-    .map((categoriaId) => ({ categoriaId, valorCentavos: valorHabitual(porCategoria[categoriaId]) }));
+  return [...repetidas, ...resto].slice(0, 4).map((categoriaId) => ({
+    categoriaId,
+    valorCentavos: valorHabitual(porCategoria[categoriaId]),
+  }));
 }
 
 /* ── Insights ────────────────────────────────────────────────── */
@@ -308,7 +309,8 @@ export function acaoDoDia(e: Estado): AcaoDoDia {
   return {
     variante: 'convite',
     icone: 'relogio',
-    titulo: s.pendentes.length === 1 ? '1 dia sem registro' : `${s.pendentes.length} dias sem registro`,
+    titulo:
+      s.pendentes.length === 1 ? '1 dia sem registro' : `${s.pendentes.length} dias sem registro`,
     sub: `Lance ${nomes} de uma vez — leva menos de um minuto.`,
     botao: 'Colocar em dia',
     destino: 'lote',
@@ -367,7 +369,9 @@ export function resumoDaSemana(e: Estado): ResumoSemana {
       pct: percentual(porCategoria[id], total),
     }));
 
-  const maior = [...daSemana].sort((a, b) => Math.abs(b.valorCentavos) - Math.abs(a.valorCentavos))[0];
+  const maior = [...daSemana].sort(
+    (a, b) => Math.abs(b.valorCentavos) - Math.abs(a.valorCentavos),
+  )[0];
   const deltaPct = anterior > 0 ? Math.round(((total - anterior) / anterior) * 100) : 0;
 
   return {
@@ -390,7 +394,10 @@ export function resumoDaSemana(e: Estado): ResumoSemana {
 export function historicoDeSemanas(e: Estado) {
   const s = semana(e);
   return [
-    ...seed.historicoSemanas.map((h) => ({ rotulo: rotuloDiaMes(h.inicio), registros: h.registros })),
+    ...seed.historicoSemanas.map((h) => ({
+      rotulo: rotuloDiaMes(h.inicio),
+      registros: h.registros,
+    })),
     { rotulo: rotuloDiaMes(s.inicio), registros: s.registros },
   ].map((w) => ({ ...w, atingiu: w.registros >= e.metaSemanal, meta: e.metaSemanal }));
 }

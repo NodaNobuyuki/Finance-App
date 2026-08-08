@@ -1,0 +1,11 @@
+node_modules/
+.bundle-check/
+.bundle-ios/
+dist/
+package-lock.json
+
+# Importado do Claude Design — referência, não formatamos.
+design/
+
+# Documentação é prosa: reflow automático só gera ruído no diff.
+*.md

@@ -36,7 +36,8 @@ export function FecharSemana() {
     .filter((d) => d.dia <= estado.hoje)
     .map((d) => {
       const total = estado.transacoes.reduce(
-        (a, tx) => (tx.ocorridoEm === d.dia && tx.valorCentavos < 0 ? a + Math.abs(tx.valorCentavos) : a),
+        (a, tx) =>
+          tx.ocorridoEm === d.dia && tx.valorCentavos < 0 ? a + Math.abs(tx.valorCentavos) : a,
         0,
       );
       const registrado = registrados.has(d.dia);
@@ -99,7 +100,11 @@ export function FecharSemana() {
                       backgroundColor: ativa ? t.accent : t.surface,
                     }}
                   >
-                    <Txt tamanho={13.5} peso={ativa ? 600 : 500} cor={ativa ? t.onAccent : t.inkMuted}>
+                    <Txt
+                      tamanho={13.5}
+                      peso={ativa ? 600 : 500}
+                      cor={ativa ? t.onAccent : t.inkMuted}
+                    >
                       {i.nome}
                     </Txt>
                   </View>

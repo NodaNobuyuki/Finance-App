@@ -1,0 +1,53 @@
+name: Verificar
+
+# Roda a mesma bateria que `npm run verificar` faz na máquina do dev.
+# Se passar aqui, passa lá — não há checagem exclusiva do CI.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # Um push novo cancela a execução anterior do mesmo branch.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `ci` em vez de `install`: respeita o package-lock à risca, então o CI
+      # falha se o lock estiver dessincronizado — que foi exatamente o tipo de
+      # problema que apareceu na migração de SDK.
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Formatação (Prettier)
+        run: npm run format:check
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Tipos (tsc)
+        run: npm run typecheck
+
+      - name: Testes (Jest)
+        run: npm test -- --ci
+
+      # Confere se as versões das deps batem com o SDK do Expo instalado.
+      - name: Saúde do projeto (expo-doctor)
+        run: npm run doctor
+
+      # A prova final: o bundle que iria para o aparelho realmente compila.
+      - name: Bundle Android
+        run: npm run bundle

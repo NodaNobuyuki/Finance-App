@@ -114,7 +114,11 @@ export function Lote() {
                   ]}
                 />
 
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 6 }}
+                >
                   {CATEGORIAS_LOTE.map((id) => {
                     const cat = categoria(id);
                     const cor = resolverCor(cat.cor, paleta);
@@ -138,7 +142,9 @@ export function Lote() {
                             backgroundColor: ativo ? comAlfa(cor, 10) : t.surface,
                           }}
                         >
-                          <View style={{ width: 6, height: 6, borderRadius: 999, backgroundColor: cor }} />
+                          <View
+                            style={{ width: 6, height: 6, borderRadius: 999, backgroundColor: cor }}
+                          />
                           <Txt tamanho={12} peso={600} cor={ativo ? t.ink : t.inkMuted}>
                             {cat.nome}
                           </Txt>

@@ -3,12 +3,7 @@ import { ScrollView, TextInput, View } from 'react-native';
 import { BotaoPrincipal, Rotulo, Toque, Txt } from '../../componentes/basicos';
 import { Icone } from '../../componentes/Icone';
 import { Teclado } from '../../componentes/Teclado';
-import {
-  categoria,
-  categoriasDespesa,
-  categoriasReceita,
-  icones,
-} from '../../dominio/categorias';
+import { categoria, categoriasDespesa, categoriasReceita, icones } from '../../dominio/categorias';
 import { deDigitos, formatar } from '../../dominio/dinheiro';
 import * as seed from '../../dominio/seed';
 import { useLoja } from '../../estado/store';
@@ -54,7 +49,15 @@ export function NovaTransacao() {
   return (
     <Folha titulo="Nova transação" aoFechar={() => despachar({ tipo: 'FECHAR_FOLHA' })}>
       <View style={{ paddingHorizontal: 16, paddingBottom: 12, gap: 14 }}>
-        <View style={{ flexDirection: 'row', gap: 2, borderRadius: 12, backgroundColor: t.segment, padding: 3 }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: 2,
+            borderRadius: 12,
+            backgroundColor: t.segment,
+            padding: 3,
+          }}
+        >
           {segmento('Despesa', despesa, despesa ? t.down : t.inkMuted, () =>
             despachar({ tipo: 'RASCUNHO_TIPO', valor: 'despesa' }),
           )}
@@ -157,7 +160,11 @@ export function NovaTransacao() {
 
         <View style={{ gap: 8 }}>
           <Rotulo>Conta</Rotulo>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 7 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 7 }}
+          >
             {seed.contas.map((c) => {
               const ativo = r.contaId === c.id;
               return (

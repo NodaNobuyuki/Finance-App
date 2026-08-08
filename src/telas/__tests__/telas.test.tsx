@@ -80,7 +80,11 @@ describe('estados-limite', () => {
   });
 
   it('Fechar semana mostra o passo 3', async () => {
-    const tela = await montar(<FecharSemana />, { ...estadoInicial, fecharPasso: 3, fechando: true });
+    const tela = await montar(<FecharSemana />, {
+      ...estadoInicial,
+      fecharPasso: 3,
+      fechando: true,
+    });
     expect(tela.getByText('Um foco para a próxima')).toBeTruthy();
   });
 });
