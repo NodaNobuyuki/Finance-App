@@ -6,7 +6,6 @@ import { categoria } from '../dominio/categorias';
 import { rotuloDia, rotuloMesCurto } from '../dominio/datas';
 import { comSinal, formatar } from '../dominio/dinheiro';
 import { totalEntradas, totalSaidas } from '../dominio/saldo';
-import * as seed from '../dominio/seed';
 import { agruparPorDia, categoriasUsadas, transacoesFiltradas } from '../estado/derivados';
 import { useLoja } from '../estado/store';
 import { resolverCor } from '../tema/paletas';
@@ -115,7 +114,7 @@ export function Extrato() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: 7, paddingHorizontal: 18 }}
         >
-          {[{ id: 'todas', nome: 'Todas as contas' }, ...seed.contas].map((c) => (
+          {[{ id: 'todas', nome: 'Todas as contas' }, ...estado.contas].map((c) => (
             <Chip
               key={c.id}
               rotulo={c.nome}

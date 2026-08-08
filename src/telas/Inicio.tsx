@@ -7,7 +7,6 @@ import { categoria, icones } from '../dominio/categorias';
 import { rotuloMes } from '../dominio/datas';
 import { comSinal, formatar, formatarRedondo } from '../dominio/dinheiro';
 import { saldoDaConta } from '../dominio/saldo';
-import * as seed from '../dominio/seed';
 import {
   acaoDoDia,
   atalhosRapidos,
@@ -322,7 +321,7 @@ export function Inicio() {
 
         {/* Contas — saldo derivado das transações, nunca guardado */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {seed.contas.map((c) => {
+          {estado.contas.map((c) => {
             const saldo = saldoDaConta(c, estado.transacoes);
             return (
               <View

@@ -184,25 +184,39 @@ src/
 **App Expo rodando** (`src/`), portado do protótipo `design/Poupa Hábitos.dc.html`. 9 telas — Início, Extrato, Metas, Categorias, Hábitos, Simulador, Lote, Resumo, Fechar semana — mais 3 folhas: Nova transação, Aporte e Ritual. 13 paletas, teclado numérico próprio, toast com undo.
 
 ```
-src/dominio/    dinheiro (centavos), saldo derivado, categorias, datas, seed
+src/dominio/    dinheiro (centavos), saldo derivado, guardado das metas,
+                categorias, taxas, datas, seed
 src/estado/     store (reducer + context) e derivados (seleções)
 src/componentes/ primitivos que leem tokens do tema
 src/telas/      uma tela por arquivo, folhas em telas/folhas/
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = lint + tipos + 71 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = lint + tipos + 84 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+
+### `seed` é semente do estado, não fonte de consulta
+
+Todo dado do usuário — transações, contas, metas, aportes, desafios, orçamento — mora em `Estado`. `src/dominio/seed.ts` só alimenta `estadoInicial`; tela, componente e derivado leem sempre de `estado.*`. Um `no-restricted-imports` no ESLint segura a regra.
+
+O motivo é persistência: **o que não está no `Estado` não tem como ser gravado nem recarregado.** Enquanto metas e desafios eram constantes de módulo, eram imutáveis por construção, e os contadores paralelos (`aportes: Record<metaId, número>`) só existiam para contornar isso.
+
+`categorias` e `taxas` continuam sendo constantes de módulo de propósito: são catálogo, não dado de quem usa o app.
+
+**Guardado da meta é derivado, igual ao saldo:** `guardadoInicialCentavos + soma dos aportes daquela meta` (`src/dominio/metas.ts`). Como a soma filtra por `metaId`, aporte que aponta para meta apagada não entra em total nenhum.
 
 **Resolvido do protótipo:** saldo derivado (com teste travando os valores), undo no toast, orçamento com cor progressiva, insight na Home, aporte de valor livre.
 
 **Pendências abertas:**
 - Data ancorada em `AGORA` (`src/dominio/datas.ts`) — centralizada, mas ainda fixa. `hojeReal()` está pronto ao lado
+- `semanaFechada` é `boolean` e não sabe de qual semana. Em memória some ao fechar o app; persistido, fica `true` para sempre e o ritual nunca mais abre. Vira `DiaISO | null` (o início da semana fechada) junto com o relógio real
+- Aporte não move dinheiro: guardar R$ 500 numa meta não altera saldo nenhum. Modelar como transferência exige o conceito de par de transações — decisão à parte, ainda não tomada
 - Tela Categorias abre o extrato filtrado, mas não virou tela de orçamento
 - Setas de mês no Extrato e "Nova categoria" são decorativas
 - Sem persistência: estado só em memória, fecha o app e perde tudo
 - Erros ainda são `throw new Error` genéricos em 3 pontos
+- Ids são `tx-${seq}`/`ap-${seq}` — determinísticos para teste, mas colidem entre reinstalações e entre aparelhos. Trocar por UUID v7 injetado antes de existir dado real
 
-**Próximo ciclo:** persistência com `expo-sqlite` atrás de um repository, com migrations versionadas desde a v1 — sem elas, a primeira atualização que mudar tabela corrompe dado de quem já usa. Depois: `SectionList` no Extrato (o agrupamento em `agruparPorDia` já encaixa) e memoização dos derivados.
+**Próximo ciclo, em ordem:** ids que sobrevivem a dois aparelhos → erros tipados (`ErroDeDominio` ≠ `ErroDeInfra`, antes do SQLite trazer disco cheio e migration falha) → persistência com `expo-sqlite` atrás de um repository, com migrations versionadas desde a v1 e testes de contrato rodando contra memória e contra SQLite → relógio real junto com a virada de semana. Só depois: `SectionList` no Extrato (o agrupamento em `agruparPorDia` já encaixa, e ele hoje é O(n·dias)) e memoização dos derivados.
 
 **Decisão em aberto:** a v1 vale ser 100% local, sem backend. Não perde o loop comportamental, dispensa auth e infra, e encurta muito o caminho até a loja. Backend entra quando houver sync entre aparelhos ou receita — mesmo critério já aplicado ao Open Finance.
 

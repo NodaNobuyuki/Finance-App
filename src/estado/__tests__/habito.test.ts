@@ -1,4 +1,4 @@
-import { semana } from '../derivados';
+import { desafios, metas, semana, totalGuardado } from '../derivados';
 import { Acao, Estado, estadoInicial, reducer } from '../store';
 
 /**
@@ -132,15 +132,64 @@ describe('fechamento da semana', () => {
 });
 
 describe('aporte na meta', () => {
-  it('soma em centavos e limpa o rascunho', () => {
-    const depois = aplicar(
+  const guardar = (metaId: string, digitos: string) =>
+    aplicar(
       estadoInicial,
-      { tipo: 'ABRIR_APORTE', metaId: 'reserva' },
-      { tipo: 'DEFINIR_DIGITOS', digitos: '10000' },
+      { tipo: 'ABRIR_APORTE', metaId },
+      { tipo: 'DEFINIR_DIGITOS', digitos },
       { tipo: 'CONFIRMAR_APORTE' },
     );
-    expect(depois.aportes.reserva).toBe(10000);
+
+  it('registra o aporte como evento, em centavos, e limpa o rascunho', () => {
+    const depois = guardar('reserva', '10000');
+    expect(depois.aportes).toHaveLength(1);
+    expect(depois.aportes[0]).toMatchObject({
+      metaId: 'reserva',
+      valorCentavos: 10000,
+      ocorridoEm: estadoInicial.hoje,
+      origem: 'manual',
+    });
     expect(depois.folha).toBeNull();
     expect(depois.rascunho.digitos).toBe('');
+  });
+
+  it('move o guardado da meta, sem tocar nas outras', () => {
+    const antes = metas(estadoInicial);
+    const depois = metas(guardar('reserva', '10000'));
+    const antesReserva = antes.find((m) => m.id === 'reserva')!;
+    const depoisReserva = depois.find((m) => m.id === 'reserva')!;
+
+    expect(depoisReserva.guardadoCentavos).toBe(antesReserva.guardadoCentavos + 10000);
+    expect(depois.find((m) => m.id === 'chile')!.guardadoCentavos).toBe(
+      antes.find((m) => m.id === 'chile')!.guardadoCentavos,
+    );
+    expect(totalGuardado(guardar('reserva', '10000'))).toBe(totalGuardado(estadoInicial) + 10000);
+  });
+
+  it('ignora meta inexistente em vez de criar aporte órfão', () => {
+    const depois = guardar('meta-que-nao-existe', '10000');
+    expect(depois.aportes).toHaveLength(0);
+  });
+});
+
+describe('desafios', () => {
+  it('entrar em um desafio o move de disponível para ativo', () => {
+    const antes = desafios(estadoInicial);
+    expect(antes.disponiveis.some((d) => d.id === 'cafe')).toBe(true);
+
+    const depois = desafios(
+      aplicar(estadoInicial, { tipo: 'ACEITAR_DESAFIO', desafioId: 'cafe', nome: '5 dias' }),
+    );
+    expect(depois.ativos.some((d) => d.id === 'cafe')).toBe(true);
+    expect(depois.disponiveis.some((d) => d.id === 'cafe')).toBe(false);
+  });
+
+  it('marcar o dia avança só o desafio tocado, sem passar do alvo', () => {
+    const marcar = { tipo: 'AVANCAR_DESAFIO', desafioId: 'assin', automatico: false, rotulo: 'x' };
+    // 'assin' começa em 1 de 3: cinco toques não podem levar além de 3.
+    const depois = aplicar(estadoInicial, ...(Array(5).fill(marcar) as Acao[]));
+    const assin = desafios(depois).ativos.find((d) => d.id === 'assin')!;
+    expect(assin.atual).toBe(assin.alvo);
+    expect(assin.completo).toBe(true);
   });
 });

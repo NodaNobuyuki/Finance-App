@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { BotaoPrincipal, BotaoVoltar, Hero, Rotulo, Toque, Txt } from '../componentes/basicos';
 import { Teclado } from '../componentes/Teclado';
 import { deDigitos, formatar, percentual } from '../dominio/dinheiro';
-import * as seed from '../dominio/seed';
+import { taxas } from '../dominio/taxas';
 import { metas, projecao } from '../estado/derivados';
 import { useLoja } from '../estado/store';
 import { useTema } from '../tema/TemaContext';
@@ -44,7 +44,7 @@ export function Simulador() {
         <View style={{ gap: 9 }}>
           <Rotulo>Onde investir</Rotulo>
           <View style={{ flexDirection: 'row', gap: 7 }}>
-            {seed.taxas.map((taxa) => {
+            {taxas.map((taxa) => {
               const ativa = taxa.id === estado.simTaxaId;
               return (
                 <Toque

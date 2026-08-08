@@ -2,20 +2,18 @@ import React from 'react';
 import { View } from 'react-native';
 import { categoria } from '../dominio/categorias';
 import { comSinal } from '../dominio/dinheiro';
-import * as seed from '../dominio/seed';
 import { Transacao } from '../dominio/tipos';
+import { useLoja } from '../estado/store';
 import { comAlfa, resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
 import { Disco, Txt } from './basicos';
 
-function nomeDaConta(contaId: string): string {
-  return seed.contas.find((c) => c.id === contaId)?.nome ?? '';
-}
-
 export function ItemTransacao({ tx, separador }: { tx: Transacao; separador: boolean }) {
+  const { estado } = useLoja();
   const { t, paleta } = useTema();
   const cat = categoria(tx.categoriaId);
   const cor = resolverCor(cat.cor, paleta);
+  const nomeDaConta = estado.contas.find((c) => c.id === tx.contaId)?.nome ?? '';
 
   return (
     <View
@@ -34,7 +32,7 @@ export function ItemTransacao({ tx, separador }: { tx: Transacao; separador: boo
           {tx.descricao}
         </Txt>
         <Txt tamanho={11.5} cor={t.inkSoft}>
-          {cat.nome} · {nomeDaConta(tx.contaId)}
+          {cat.nome} · {nomeDaConta}
         </Txt>
       </View>
       <Txt tamanho={14} peso={600} numerico cor={tx.valorCentavos < 0 ? t.ink : t.up}>

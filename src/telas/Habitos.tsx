@@ -3,7 +3,6 @@ import { View } from 'react-native';
 import { Barra, BotaoVoltar, CartaoNumero, Disco, Hero, Toque, Txt } from '../componentes/basicos';
 import { categoria, icones } from '../dominio/categorias';
 import { nomeDoMes } from '../dominio/datas';
-import * as seed from '../dominio/seed';
 import {
   desafios,
   historicoDeSemanas,
@@ -42,7 +41,7 @@ export function Habitos() {
 
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginTop: 20 }}>
           <Txt tamanho={48} peso={600} numerico cor={t.onHero} espacamento={-1.9} entrelinha={0.9}>
-            {seed.contexto.semanasEmDia}
+            {estado.contexto.semanasEmDia}
           </Txt>
           <Txt tamanho={12.5} cor={t.onHeroSoft} entrelinha={1.4} estilo={{ paddingBottom: 4 }}>
             semanas seguidas{'\n'}com registro em dia
@@ -93,7 +92,7 @@ export function Habitos() {
           <CartaoNumero
             rotulo={`Lançamentos em ${nomeDoMes(estado.hoje)}`}
             valor={String(transacoesDoMes(estado).length)}
-            nota={`${seed.contexto.lancamentosMesAnterior} no mês anterior`}
+            nota={`${estado.contexto.lancamentosMesAnterior} no mês anterior`}
             corValor={t.up}
           />
         </View>

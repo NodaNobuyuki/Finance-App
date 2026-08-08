@@ -11,9 +11,10 @@ import {
   somarDias,
 } from '../dominio/datas';
 import { Centavos, formatar, percentual, renderPor } from '../dominio/dinheiro';
+import { guardadoDaMeta, totalGuardado as somarGuardado } from '../dominio/metas';
 import { somaPorCategoria, totalEntradas, totalSaidas } from '../dominio/saldo';
-import * as seed from '../dominio/seed';
-import { Transacao } from '../dominio/tipos';
+import { taxa } from '../dominio/taxas';
+import { Desafio, Transacao } from '../dominio/tipos';
 import { Estado } from './store';
 
 /**
@@ -154,7 +155,7 @@ export type Orcamento = {
 };
 
 export function orcamento(e: Estado): Orcamento {
-  const total = seed.contexto.orcamentoMensalCentavos;
+  const total = e.orcamentoMensalCentavos;
   const gasto = resumoDoMes(e).despesas;
   const pctReal = percentual(gasto, total);
   return {
@@ -328,7 +329,7 @@ export function statusDoRegistro(e: Estado): { titulo: string; sub: string; emDi
         ? '1 dia sem registro'
         : `${s.pendentes.length} dias sem registro`,
     sub: s.emDia
-      ? `Último registro hoje · ${seed.contexto.semanasEmDia} semanas seguidas em dia`
+      ? `Último registro hoje · ${e.contexto.semanasEmDia} semanas seguidas em dia`
       : `Último registro: ${ultimo ? rotuloCurto(ultimo, e.hoje) : '—'}`,
   };
 }
@@ -394,7 +395,7 @@ export function resumoDaSemana(e: Estado): ResumoSemana {
 export function historicoDeSemanas(e: Estado) {
   const s = semana(e);
   return [
-    ...seed.historicoSemanas.map((h) => ({
+    ...e.historicoSemanas.map((h) => ({
       rotulo: rotuloDiaMes(h.inicio),
       registros: h.registros,
     })),
@@ -418,15 +419,15 @@ export type DesafioView = {
   automatico: boolean;
 };
 
-export function desafios(e: Estado): { ativos: DesafioView[]; disponiveis: typeof seed.desafios } {
+export function desafios(e: Estado): { ativos: DesafioView[]; disponiveis: Desafio[] } {
   const s = semana(e);
-  const estaAtivo = (id: string, padrao: boolean) => padrao || e.desafiosAceitos.includes(id);
 
-  const ativos = seed.desafios
-    .filter((d) => estaAtivo(d.id, d.ativoPorPadrao))
+  const ativos = e.desafios
+    .filter((d) => d.aceito)
     .map((d) => {
-      const base = d.automatico ? s.registros : d.progressoInicial;
-      const atual = Math.min(d.alvo, base + (e.progressoDesafios[d.id] ?? 0));
+      // Desafio automático espelha os registros da semana; o resto conta o
+      // progresso que o próprio usuário marcou.
+      const atual = Math.min(d.alvo, d.automatico ? s.registros : d.progresso);
       const completo = atual >= d.alvo;
       return {
         id: d.id,
@@ -443,20 +444,20 @@ export function desafios(e: Estado): { ativos: DesafioView[]; disponiveis: typeo
       };
     });
 
-  const disponiveis = seed.desafios.filter((d) => !estaAtivo(d.id, d.ativoPorPadrao));
-  return { ativos, disponiveis };
+  return { ativos, disponiveis: e.desafios.filter((d) => !d.aceito) };
 }
 
 export function economizado(e: Estado): Centavos {
-  const ativos = seed.desafios.filter((d) => d.ativoPorPadrao || e.desafiosAceitos.includes(d.id));
-  return ativos.reduce((a, d) => a + d.economiaCentavos, seed.contexto.economiaBaseCentavos);
+  return e.desafios
+    .filter((d) => d.aceito)
+    .reduce((a, d) => a + d.economiaCentavos, e.contexto.economiaBaseCentavos);
 }
 
 /* ── Metas ───────────────────────────────────────────────────── */
 
 export function metas(e: Estado) {
-  return seed.metas.map((m) => {
-    const guardado = m.guardadoInicialCentavos + (e.aportes[m.id] ?? 0);
+  return e.metas.map((m) => {
+    const guardado = guardadoDaMeta(m, e.aportes);
     return {
       ...m,
       guardadoCentavos: guardado,
@@ -467,14 +468,13 @@ export function metas(e: Estado) {
 }
 
 export function totalGuardado(e: Estado): Centavos {
-  return metas(e).reduce((a, m) => a + m.guardadoCentavos, 0);
+  return somarGuardado(e.metas, e.aportes);
 }
 
 /* ── Simulador ───────────────────────────────────────────────── */
 
 export function projecao(valorCentavos: Centavos, taxaId: string, anos: number): Centavos {
-  const taxa = seed.taxas.find((t) => t.id === taxaId) ?? seed.taxas[1];
-  return renderPor(valorCentavos, taxa.bpsMensal, anos * 12);
+  return renderPor(valorCentavos, taxa(taxaId).bpsMensal, anos * 12);
 }
 
 /* ── Extrato ─────────────────────────────────────────────────── */

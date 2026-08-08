@@ -10,7 +10,16 @@ import {
   removerDigito,
 } from '../dominio/dinheiro';
 import * as seed from '../dominio/seed';
-import { Tela, Transacao } from '../dominio/tipos';
+import {
+  Aporte,
+  Conta,
+  Contexto,
+  Desafio,
+  Meta,
+  SemanaHistorica,
+  Tela,
+  Transacao,
+} from '../dominio/tipos';
 
 /* ────────────────────────────────────────────────────────────────
    Estado
@@ -46,19 +55,28 @@ export type Folha =
 export type Estado = {
   hoje: DiaISO;
   tela: Tela;
+
+  /* ── Entidades ──────────────────────────────────────────────────
+     Tudo o que é dado do usuário mora aqui, e só aqui. Nada disto pode
+     voltar a ser constante de módulo: o que não está no estado não tem
+     como ser persistido nem recarregado. */
   transacoes: Transacao[];
+  contas: Conta[];
+  metas: Meta[];
+  /** Eventos de "guardei dinheiro". O guardado de cada meta é derivado deles. */
+  aportes: Aporte[];
+  desafios: Desafio[];
+  historicoSemanas: SemanaHistorica[];
   /** Dias que o usuário declarou "não gastei" — contam como registro. */
   diasSemGasto: DiaISO[];
+  orcamentoMensalCentavos: Centavos;
+  contexto: Contexto;
 
   mostrarSaldo: boolean;
   filtroConta: string;
   filtroCategoria: string;
   abaCategorias: 'despesa' | 'receita';
   insightIdx: number;
-
-  aportes: Record<string, Centavos>;
-  progressoDesafios: Record<string, number>;
-  desafiosAceitos: string[];
 
   ritualDiaFechamento: DiaRitualId;
   metaSemanal: number;
@@ -91,21 +109,26 @@ const RASCUNHO_VAZIO: Rascunho = {
   descricao: '',
 };
 
+/** Único ponto do app que lê `seed`: é a semente do estado, não fonte de consulta. */
 export const estadoInicial: Estado = {
   hoje: AGORA,
   tela: 'home',
+
   transacoes: seed.transacoes,
+  contas: seed.contas,
+  metas: seed.metas,
+  aportes: seed.aportes,
+  desafios: seed.desafios,
+  historicoSemanas: seed.historicoSemanas,
   diasSemGasto: [],
+  orcamentoMensalCentavos: seed.orcamentoMensalCentavos,
+  contexto: seed.contexto,
 
   mostrarSaldo: true,
   filtroConta: 'todas',
   filtroCategoria: 'todas',
   abaCategorias: 'despesa',
   insightIdx: 0,
-
-  aportes: {},
-  progressoDesafios: {},
-  desafiosAceitos: [],
 
   ritualDiaFechamento: 'domingo',
   metaSemanal: 4,
@@ -232,7 +255,6 @@ function avisar(seq: number, texto: string, sub?: string): Toast {
 }
 
 function novaTransacao(
-  e: Estado,
   seq: number,
   campos: {
     contaId: string;
@@ -254,6 +276,29 @@ function novaTransacao(
     origem: 'manual',
     criadoEm: 1_000_000 + seq,
   };
+}
+
+function novoAporte(
+  seq: number,
+  campos: { metaId: string; valorCentavos: Centavos; ocorridoEm: DiaISO },
+): Aporte {
+  return {
+    id: `ap-${seq}`,
+    metaId: campos.metaId,
+    valorCentavos: campos.valorCentavos,
+    ocorridoEm: campos.ocorridoEm,
+    origem: 'manual',
+    criadoEm: 1_000_000 + seq,
+  };
+}
+
+/** Aplica `mudar` ao desafio de id `desafioId` e devolve a lista nova. */
+function comDesafio(
+  desafios: Desafio[],
+  desafioId: string,
+  mudar: (d: Desafio) => Desafio,
+): Desafio[] {
+  return desafios.map((d) => (d.id === desafioId ? mudar(d) : d));
 }
 
 const LINHA_LOTE_VAZIA: LinhaLote = { texto: '', categoriaId: 'mercado', semGasto: false };
@@ -357,7 +402,7 @@ export function reducer(e: Estado, a: Acao): Estado {
       const valor = deDigitos(e.rascunho.digitos);
       if (valor <= 0) return e;
       const seq = e.seq + 1;
-      const tx = novaTransacao(e, seq, {
+      const tx = novaTransacao(seq, {
         contaId: e.rascunho.contaId,
         categoriaId: e.rascunho.categoriaId,
         valorCentavos: e.rascunho.tipo === 'despesa' ? -valor : valor,
@@ -383,7 +428,7 @@ export function reducer(e: Estado, a: Acao): Estado {
       if (a.valorCentavos <= 0) return e;
       const seq = e.seq + 1;
       const cat = categoria(a.categoriaId);
-      const tx = novaTransacao(e, seq, {
+      const tx = novaTransacao(seq, {
         contaId: e.rascunho.contaId,
         categoriaId: a.categoriaId,
         valorCentavos: -a.valorCentavos,
@@ -418,15 +463,19 @@ export function reducer(e: Estado, a: Acao): Estado {
 
     case 'CONFIRMAR_APORTE': {
       if (!e.folha || e.folha.tipo !== 'aporte') return e;
+      const { metaId } = e.folha;
       const valor = deDigitos(e.rascunho.digitos);
       if (valor <= 0) return e;
-      const meta = seed.metas.find((m) => m.id === (e.folha as { metaId: string }).metaId);
+      const meta = e.metas.find((m) => m.id === metaId);
       if (!meta) return e;
       const seq = e.seq + 1;
       return {
         ...e,
         seq,
-        aportes: { ...e.aportes, [meta.id]: (e.aportes[meta.id] ?? 0) + valor },
+        aportes: [
+          novoAporte(seq, { metaId: meta.id, valorCentavos: valor, ocorridoEm: e.hoje }),
+          ...e.aportes,
+        ],
         folha: null,
         rascunho: { ...e.rascunho, digitos: '' },
         toast: avisar(seq, `${formatar(valor)} adicionados a ${meta.nome}`),
@@ -446,21 +495,22 @@ export function reducer(e: Estado, a: Acao): Estado {
       return {
         ...e,
         seq,
-        progressoDesafios: {
-          ...e.progressoDesafios,
-          [a.desafioId]: (e.progressoDesafios[a.desafioId] ?? 0) + 1,
-        },
+        desafios: comDesafio(e.desafios, a.desafioId, (d) => ({
+          ...d,
+          progresso: Math.min(d.alvo, d.progresso + 1),
+        })),
         toast: avisar(seq, `Dia registrado em “${a.rotulo}”`),
       };
     }
 
     case 'ACEITAR_DESAFIO': {
-      if (e.desafiosAceitos.includes(a.desafioId)) return e;
+      const alvo = e.desafios.find((d) => d.id === a.desafioId);
+      if (!alvo || alvo.aceito) return e;
       const seq = e.seq + 1;
       return {
         ...e,
         seq,
-        desafiosAceitos: [...e.desafiosAceitos, a.desafioId],
+        desafios: comDesafio(e.desafios, a.desafioId, (d) => ({ ...d, aceito: true })),
         toast: avisar(seq, `Você entrou em “${a.nome}”`),
       };
     }
@@ -494,7 +544,7 @@ export function reducer(e: Estado, a: Acao): Estado {
         if (valor <= 0) return e;
         seq += 1;
         novos.push(
-          novaTransacao(e, seq, {
+          novaTransacao(seq, {
             contaId: e.rascunho.contaId,
             categoriaId: linha.categoriaId,
             valorCentavos: -valor,
@@ -590,13 +640,16 @@ export function reducer(e: Estado, a: Acao): Estado {
     case 'SIM_GUARDAR': {
       const valor = deDigitos(e.simDigitos);
       if (valor <= 0) return e;
-      const meta = seed.metas.find((m) => m.id === a.metaId);
+      const meta = e.metas.find((m) => m.id === a.metaId);
       if (!meta) return e;
       const seq = e.seq + 1;
       return {
         ...e,
         seq,
-        aportes: { ...e.aportes, [meta.id]: (e.aportes[meta.id] ?? 0) + valor },
+        aportes: [
+          novoAporte(seq, { metaId: meta.id, valorCentavos: valor, ocorridoEm: e.hoje }),
+          ...e.aportes,
+        ],
         tela: 'metas',
         simDigitos: '',
         toast: avisar(seq, `${formatar(valor)} guardados na ${meta.nome}`),
@@ -620,7 +673,7 @@ export function reducer(e: Estado, a: Acao): Estado {
 
 type Loja = { estado: Estado; despachar: React.Dispatch<Acao> };
 
-const Contexto = createContext<Loja | null>(null);
+const ContextoDaLoja = createContext<Loja | null>(null);
 
 export function LojaProvider({
   children,
@@ -631,11 +684,11 @@ export function LojaProvider({
 }) {
   const [estado, despachar] = useReducer(reducer, inicial);
   const valor = useMemo(() => ({ estado, despachar }), [estado]);
-  return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
+  return <ContextoDaLoja.Provider value={valor}>{children}</ContextoDaLoja.Provider>;
 }
 
 export function useLoja(): Loja {
-  const ctx = useContext(Contexto);
+  const ctx = useContext(ContextoDaLoja);
   if (!ctx) throw new Error('useLoja precisa estar dentro de <LojaProvider>');
   return ctx;
 }

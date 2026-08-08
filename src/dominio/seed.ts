@@ -1,9 +1,17 @@
 import { hex, token } from '../tema/paletas';
-import { Conta, Desafio, Meta, Taxa, Transacao } from './tipos';
+import { Aporte, Conta, Contexto, Desafio, Meta, SemanaHistorica, Transacao } from './tipos';
 
 /**
  * Dados de demonstração. Todos os valores já em centavos inteiros.
- * Enquanto não há backend, é isto que a store carrega no boot.
+ *
+ * Este módulo é a SEMENTE do estado, não uma fonte consultada em runtime:
+ * quem lê daqui é `estadoInicial`, em `src/estado/store.tsx`, e mais ninguém.
+ * Tela, componente e derivado leem sempre de `estado.*`. Um `no-restricted-imports`
+ * no ESLint segura essa regra.
+ *
+ * O motivo é persistência: o que não está em `Estado` não tem como ser gravado
+ * nem recarregado. Enquanto contas, metas e desafios morarem neste arquivo,
+ * eles são imutáveis por construção.
  */
 
 /**
@@ -111,6 +119,9 @@ export const metas: Meta[] = [
   },
 ];
 
+/** Nenhum aporte de partida: o guardado de cada meta começa na abertura dela. */
+export const aportes: Aporte[] = [];
+
 export const desafios: Desafio[] = [
   {
     id: 'reg4',
@@ -120,9 +131,9 @@ export const desafios: Desafio[] = [
     alvo: 4,
     unidade: 'registros',
     acao: 'Registrar agora',
-    progressoInicial: 0,
+    progresso: 0,
     automatico: true,
-    ativoPorPadrao: true,
+    aceito: true,
     categoriaId: 'salario',
     economiaCentavos: 0,
   },
@@ -134,8 +145,8 @@ export const desafios: Desafio[] = [
     alvo: 14,
     unidade: 'lançamentos',
     acao: 'Revisar 1',
-    progressoInicial: 12,
-    ativoPorPadrao: true,
+    progresso: 12,
+    aceito: true,
     categoriaId: 'contas',
     economiaCentavos: 0,
   },
@@ -147,8 +158,8 @@ export const desafios: Desafio[] = [
     alvo: 3,
     unidade: 'assinaturas',
     acao: 'Revisar 1',
-    progressoInicial: 1,
-    ativoPorPadrao: true,
+    progresso: 1,
+    aceito: true,
     categoriaId: 'assinaturas',
     economiaCentavos: 0,
   },
@@ -160,8 +171,8 @@ export const desafios: Desafio[] = [
     alvo: 7,
     unidade: 'dias',
     acao: 'Marcar hoje',
-    progressoInicial: 0,
-    ativoPorPadrao: false,
+    progresso: 0,
+    aceito: false,
     categoriaId: 'restaurante',
     economiaCentavos: 31200,
   },
@@ -173,8 +184,8 @@ export const desafios: Desafio[] = [
     alvo: 5,
     unidade: 'dias',
     acao: 'Marcar hoje',
-    progressoInicial: 0,
-    ativoPorPadrao: false,
+    progresso: 0,
+    aceito: false,
     categoriaId: 'restaurante',
     economiaCentavos: 6000,
   },
@@ -186,21 +197,15 @@ export const desafios: Desafio[] = [
     alvo: 7,
     unidade: 'dias',
     acao: 'Marcar hoje',
-    progressoInicial: 0,
-    ativoPorPadrao: false,
+    progresso: 0,
+    aceito: false,
     categoriaId: 'transporte',
     economiaCentavos: 24400,
   },
 ];
 
-export const taxas: Taxa[] = [
-  { id: 'poupanca', nome: 'Poupança', bpsMensal: 60, rotulo: '0,6% a.m.' },
-  { id: 'cdi', nome: 'CDI 100%', bpsMensal: 88, rotulo: '0,88% a.m.' },
-  { id: 'cdi2', nome: 'CDI + 2%', bpsMensal: 105, rotulo: '1,05% a.m.' },
-];
-
 /** Histórico de semanas fechadas, anterior aos dados de transação. */
-export const historicoSemanas = [
+export const historicoSemanas: SemanaHistorica[] = [
   { inicio: '2026-06-30', registros: 4 },
   { inicio: '2026-07-07', registros: 4 },
   { inicio: '2026-07-14', registros: 3 },
@@ -208,13 +213,12 @@ export const historicoSemanas = [
   { inicio: '2026-07-28', registros: 4 },
 ];
 
+/** Teto de gasto do mês. Vira `budgets.limit_cents` quando houver backend. */
+export const orcamentoMensalCentavos = 500000;
+
 /** Números de contexto que ainda não saem das transações carregadas. */
-export const contexto = {
-  /** Teto de gasto do mês. Vira `budgets.limit_cents` quando houver backend. */
-  orcamentoMensalCentavos: 500000,
+export const contexto: Contexto = {
   semanasEmDia: 5,
   lancamentosMesAnterior: 18,
   economiaBaseCentavos: 18000,
-  impulsoDias: '5 dias',
-  impulsoRecorde: '14 dias',
 };

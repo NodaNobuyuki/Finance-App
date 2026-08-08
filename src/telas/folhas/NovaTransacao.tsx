@@ -5,7 +5,6 @@ import { Icone } from '../../componentes/Icone';
 import { Teclado } from '../../componentes/Teclado';
 import { categoria, categoriasDespesa, categoriasReceita, icones } from '../../dominio/categorias';
 import { deDigitos, formatar } from '../../dominio/dinheiro';
-import * as seed from '../../dominio/seed';
 import { useLoja } from '../../estado/store';
 import { sans } from '../../tema/fontes';
 import { comAlfa, resolverCor } from '../../tema/paletas';
@@ -165,7 +164,7 @@ export function NovaTransacao() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: 7 }}
           >
-            {seed.contas.map((c) => {
+            {estado.contas.map((c) => {
               const ativo = r.contaId === c.id;
               return (
                 <Toque

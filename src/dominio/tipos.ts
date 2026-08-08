@@ -43,11 +43,29 @@ export type Meta = {
   id: string;
   nome: string;
   alvoCentavos: Centavos;
-  /** Quanto já estava guardado antes desta sessão. Aportes entram por evento. */
+  /**
+   * Saldo de abertura da meta — o que já estava guardado antes do app.
+   * O guardado exibido nunca é este valor: é
+   * `guardadoInicialCentavos + soma dos aportes` — ver `metas.ts`.
+   */
   guardadoInicialCentavos: Centavos;
   prazo: string;
   cor: CorRef;
   icone: string;
+};
+
+/**
+ * Cada vez que o usuário guarda dinheiro numa meta. É evento, não contador:
+ * some o aporte e o guardado volta sozinho ao que era.
+ */
+export type Aporte = {
+  id: string;
+  metaId: string;
+  /** Centavos inteiros, sempre positivo. */
+  valorCentavos: Centavos;
+  ocorridoEm: DiaISO;
+  origem: Origem;
+  criadoEm: number;
 };
 
 export type Desafio = {
@@ -59,13 +77,32 @@ export type Desafio = {
   alvo: number;
   unidade: string;
   acao: string;
-  progressoInicial: number;
+  /** Quanto já foi cumprido. Em desafio automático, é ignorado. */
+  progresso: number;
   /** Progresso vem dos registros da semana, não de toque manual. */
   automatico?: boolean;
-  ativoPorPadrao: boolean;
+  /** O usuário entrou no desafio (ou ele já vem aceito de fábrica). */
+  aceito: boolean;
   categoriaId: string;
   /** Quanto o desafio evitou de gasto, em centavos. */
   economiaCentavos: Centavos;
+};
+
+/** Uma semana já encerrada, para a trilha de constância. */
+export type SemanaHistorica = {
+  inicio: DiaISO;
+  registros: number;
+};
+
+/**
+ * Números que a tela ainda mostra mas que nenhum cálculo produz — vieram do
+ * protótipo. Ficam agrupados aqui para que dê para achá-los quando cada um
+ * virar derivação de verdade.
+ */
+export type Contexto = {
+  semanasEmDia: number;
+  lancamentosMesAnterior: number;
+  economiaBaseCentavos: Centavos;
 };
 
 export type Taxa = {
