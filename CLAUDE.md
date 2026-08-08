@@ -126,7 +126,7 @@ interface RawTransaction {
 ### Ordem de implementação
 
 1. Manual rápido — ✅ pronto
-2. OFX/CSV + share sheet do Android
+2. OFX/CSV + share sheet do Android — exige development build (EAS)
 3. Notificações Android
 4. Recorrência inferida (elimina ingestão do que é previsível)
 5. E-mail via OAuth (cobre iOS)
@@ -181,16 +181,52 @@ src/
 
 ## Estado atual
 
-**Protótipo (Claude Design):** 6 telas funcionais — Início, Extrato, Metas, Categorias, Hábitos, Simulador. Sistema de paletas completo, teclado numérico customizado, toasts, filtros por conta/categoria, streaks e desafios com progresso.
+**App Expo rodando** (`src/`), portado do protótipo `design/Poupa Hábitos.dc.html`. 9 telas — Início, Extrato, Metas, Categorias, Hábitos, Simulador, Lote, Resumo, Fechar semana — mais 3 folhas: Nova transação, Aporte e Ritual. 13 paletas, teclado numérico próprio, toast com undo.
 
-**Pendências conhecidas do protótipo:**
-- Saldos de conta são estáticos (`contasBase`) — não refletem transações novas
-- Toast não tem "Desfazer"
-- Tela Categorias é só grid de totais, sem interação — candidata a virar tela de orçamento
-- Data hardcoded (`'2026-08-03'`)
-- Meta aceita apenas aporte fixo de R$ 100
+```
+src/dominio/    dinheiro (centavos), saldo derivado, categorias, datas, seed
+src/estado/     store (reducer + context) e derivados (seleções)
+src/componentes/ primitivos que leem tokens do tema
+src/telas/      uma tela por arquivo, folhas em telas/folhas/
+src/tema/       paletas como tokens + provider
+```
 
-**Próximo ciclo:** saldo derivado, undo no toast, barra de orçamento com cor progressiva (verde → amarelo → vermelho), card de insight automático na Home.
+Verificação: `npm run verificar` = lint + tipos + 71 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+
+**Resolvido do protótipo:** saldo derivado (com teste travando os valores), undo no toast, orçamento com cor progressiva, insight na Home, aporte de valor livre.
+
+**Pendências abertas:**
+- Data ancorada em `AGORA` (`src/dominio/datas.ts`) — centralizada, mas ainda fixa. `hojeReal()` está pronto ao lado
+- Tela Categorias abre o extrato filtrado, mas não virou tela de orçamento
+- Setas de mês no Extrato e "Nova categoria" são decorativas
+- Sem persistência: estado só em memória, fecha o app e perde tudo
+- Erros ainda são `throw new Error` genéricos em 3 pontos
+
+**Próximo ciclo:** persistência com `expo-sqlite` atrás de um repository, com migrations versionadas desde a v1 — sem elas, a primeira atualização que mudar tabela corrompe dado de quem já usa. Depois: `SectionList` no Extrato (o agrupamento em `agruparPorDia` já encaixa) e memoização dos derivados.
+
+**Decisão em aberto:** a v1 vale ser 100% local, sem backend. Não perde o loop comportamental, dispensa auth e infra, e encurta muito o caminho até a loja. Backend entra quando houver sync entre aparelhos ou receita — mesmo critério já aplicado ao Open Finance.
+
+---
+
+## SDK do Expo está fixado em 54 de propósito
+
+**Não atualize sem ler isto.** A App Store publica o Expo Go **54.0.2** desde setembro de 2025, e o Expo Go roda só um SDK por vez. Subir o projeto para 55+ quebra o teste em iPhone — que hoje é o único aparelho disponível.
+
+O acoplamento acaba quando o projeto migrar para **development build** (EAS). Aí o cliente é compilado por nós e o SDK volta a ser escolha livre. Isso vai acontecer de qualquer forma no item 2 da ordem de implementação: share sheet e `NotificationListenerService` são código nativo e **não rodam no Expo Go, em SDK nenhum**.
+
+Ao subir de SDK, depois do dev build:
+
+```
+npx expo install expo@^NN
+npx expo install --fix      # runtime + jest-expo + typescript
+# manual — o Expo não vigia estes: @types/react, react-test-renderer
+# (versão exata do react), @testing-library/react-native
+npm run verificar
+```
+
+Dois detalhes que já custaram tempo: `expo install --check` lê o `node_modules`, não o `package.json` — editar o manifesto sem instalar dá falso "tudo certo". E numa troca grande, apague `node_modules` e `package-lock.json` antes do install.
+
+Se o `verificar` quebrar depois de subir SDK, olhe qual arquivo falhou. Os testes de domínio e estado não importam nada externo: se eles quebram, é regressão real. Já `telas.test.tsx` depende de `react` e do RNTL — quando os 30 testes dele caem juntos com a mesma mensagem, quase sempre é mudança de API da biblioteca, não bug do app.
 
 ---
 
