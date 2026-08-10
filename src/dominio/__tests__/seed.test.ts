@@ -23,17 +23,28 @@ describe('semente ancorada em AGORA', () => {
     expect([...new Set(dias)]).toEqual(['2026-08-03', '2026-08-02', '2026-08-01']);
   });
 
-  it('corrige o histórico de semanas — o fixture cravava terças', () => {
-    // O protótipo trazia 30/6, 7/7, 14/7, 21/7 e 28/7, que são TERÇAS, enquanto
-    // `inicioDaSemana` sempre devolve segunda. A trilha de constância da tela
-    // Hábitos rotulava as semanas um dia deslocado. Datas relativas ao início
-    // da semana eliminam a chance de isso voltar.
-    expect(semente(AGORA).historicoSemanas.map((h) => h.inicio)).toEqual([
+  it('os dias sem gasto caem nas 5 semanas anteriores', () => {
+    // O protótipo trazia a trilha como contagens soltas (4, 4, 3, 4, 4) que não
+    // correspondiam a dado nenhum. Agora ela é derivada, então a demo precisa
+    // dos registros de verdade — e eles vão para trás da semana corrente, que
+    // é a única que as transações da demo alcançam.
+    expect(semente(AGORA).diasSemGasto).toEqual([
       '2026-06-29',
+      '2026-07-01',
       '2026-07-06',
+      '2026-07-07',
+      '2026-07-09',
       '2026-07-13',
+      '2026-07-14',
+      '2026-07-15',
+      '2026-07-16',
       '2026-07-20',
+      '2026-07-21',
+      '2026-07-22',
+      '2026-07-24',
       '2026-07-27',
+      '2026-07-29',
+      '2026-07-30',
     ]);
   });
 });
@@ -52,14 +63,37 @@ describe('semente em qualquer dia', () => {
     expect(ultimos7).toHaveLength(14);
   });
 
-  it.each(DIAS_VARIADOS)('%s: o histórico são as 5 semanas anteriores, em ordem', (hoje) => {
-    const historico = semente(hoje).historicoSemanas;
-    expect(historico).toHaveLength(5);
-    for (const h of historico) {
-      expect(diaDaSemana(h.inicio)).toBe(1); // toda segunda-feira
-      expect(h.inicio < inicioDaSemana(hoje)).toBe(true);
+  it.each(DIAS_VARIADOS)('%s: os dias sem gasto ficam no passado, fora da semana corrente', (hoje) => {
+    const dias = semente(hoje).diasSemGasto;
+    const estaSemana = inicioDaSemana(hoje);
+
+    // Nenhum invade a semana corrente: a constância dela tem de sair do que a
+    // pessoa registrar agora, não da semente.
+    for (const d of dias) expect(d < estaSemana).toBe(true);
+    // E nenhum é mais antigo do que as 5 semanas que a trilha mostra.
+    for (const d of dias) expect(d >= somarDias(estaSemana, -35)).toBe(true);
+    expect(new Set(dias).size).toBe(dias.length);
+  });
+
+  it.each(DIAS_VARIADOS)('%s: as 5 semanas anteriores têm todas registro', (hoje) => {
+    const dias = new Set(semente(hoje).diasSemGasto);
+    const estaSemana = inicioDaSemana(hoje);
+
+    for (let semana = 1; semana <= 5; semana++) {
+      const inicio = somarDias(estaSemana, -7 * semana);
+      const naSemana = [...dias].filter((d) => d >= inicio && d < somarDias(inicio, 7));
+      expect(diaDaSemana(inicio)).toBe(1); // toda segunda-feira
+      expect(naSemana.length).toBeGreaterThan(0);
     }
-    expect(historico[4].inicio).toBe(somarDias(inicioDaSemana(hoje), -7));
+  });
+
+  it.each(DIAS_VARIADOS)('%s: o prazo das metas fica sempre no futuro', (hoje) => {
+    // O prazo era texto cravado ('15 dez 2026'), então a demo abria vencida
+    // depois daquela data. Agora é deslocamento a partir de `hoje`.
+    for (const m of semente(hoje).metas) {
+      expect(m.prazo).not.toBeNull();
+      expect(m.prazo! > hoje).toBe(true);
+    }
   });
 
   it.each(DIAS_VARIADOS)('%s: valores não dependem da data', (hoje) => {

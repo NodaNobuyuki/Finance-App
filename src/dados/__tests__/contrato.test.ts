@@ -60,7 +60,7 @@ describe.each(implementacoes)('repositório: %s', (_nome, criar) => {
     expect(lido!.contas).toHaveLength(estado.contas.length);
     expect(lido!.metas).toHaveLength(estado.metas.length);
     expect(lido!.progressoDesafios).toHaveLength(estado.progressoDesafios.length);
-    expect(lido!.historicoSemanas).toHaveLength(estado.historicoSemanas.length);
+    expect(lido!.diasSemGasto).toEqual(estado.diasSemGasto);
     expect(lido!.perfil).toEqual(estado.perfil);
   });
 

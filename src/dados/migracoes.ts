@@ -147,6 +147,58 @@ export const migracoes: Migracao[] = [
       `DROP TABLE desafios`,
     ],
   },
+  {
+    versao: 3,
+    nome: 'constancia-vira-derivada',
+    sql: [
+      // `semanas_historicas` guardava a contagem de registros de cada semana
+      // fechada. Contador gravado, e ninguém escrevia nele: a trilha de
+      // constância de quem usava o app nunca saía da semana corrente.
+      //
+      // Agora a contagem é derivada das datas das transações e dos dias sem
+      // gasto — que já estão no banco. Nada se perde ao derrubar a tabela, e o
+      // número passa a se corrigir sozinho quando chega lançamento retroativo,
+      // que é o caso da importação de OFX.
+      //
+      // É o mesmo motivo pelo qual saldo de conta nunca virou coluna.
+      `DROP TABLE semanas_historicas`,
+    ],
+  },
+  {
+    versao: 4,
+    nome: 'prazo-da-meta-vira-data',
+    sql: [
+      // `metas.prazo` guardava o texto já formatado ('faltam 134 dias · 15 dez
+      // 2026'), que envelhecia sozinho e não dava para criar meta com prazo:
+      // não havia data para calcular nada. Agora é `DiaISO` ou NULL.
+      //
+      // SQLite não afrouxa NOT NULL por ALTER, então a tabela é reconstruída.
+      // O texto antigo não é recuperável como data — 'faltam 134 dias' depende
+      // de um "hoje" que já passou —, então ele vira NULL: meta sem prazo, que
+      // a pessoa redefine em um toque, é melhor que uma data chutada.
+      `CREATE TABLE metas_nova (
+         id TEXT PRIMARY KEY NOT NULL,
+         nome TEXT NOT NULL,
+         alvo_centavos INTEGER NOT NULL,
+         guardado_inicial_centavos INTEGER NOT NULL,
+         prazo TEXT,
+         cor TEXT NOT NULL,
+         icone TEXT NOT NULL,
+         atualizado_em INTEGER NOT NULL
+       )`,
+
+      `INSERT INTO metas_nova
+         (id, nome, alvo_centavos, guardado_inicial_centavos, prazo, cor, icone, atualizado_em)
+         SELECT id, nome, alvo_centavos, guardado_inicial_centavos,
+                CASE WHEN prazo GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+                     THEN prazo ELSE NULL END,
+                cor, icone, atualizado_em
+           FROM metas`,
+
+      `DROP TABLE metas`,
+      `ALTER TABLE metas_nova RENAME TO metas`,
+    ],
+  },
 ];
 
 async function versaoAtual(motor: MotorSQL): Promise<number> {

@@ -72,6 +72,11 @@ export function somarDias(dia: DiaISO, n: number): DiaISO {
   return d.toISOString().slice(0, 10);
 }
 
+/** Dias inteiros de `de` até `ate`. Negativo quando `ate` já passou. */
+export function diferencaEmDias(de: DiaISO, ate: DiaISO): number {
+  return Math.round((paraUTC(ate).getTime() - paraUTC(de).getTime()) / 86_400_000);
+}
+
 /** 0 = domingo … 6 = sábado. */
 export function diaDaSemana(dia: DiaISO): number {
   return paraUTC(dia).getUTCDay();
@@ -122,6 +127,18 @@ export function rotuloMesCurto(dia: DiaISO): string {
   const { ano, mes } = partes(dia);
   const nome = MESES[mes - 1];
   return `${nome[0].toUpperCase()}${nome.slice(1)} ${ano}`;
+}
+
+/** `"15 dez 2026"`, para prazo de meta. */
+export function rotuloDataCurta(dia: DiaISO): string {
+  const { ano, mes, data } = partes(dia);
+  return `${data} ${MESES_CURTOS[mes - 1]} ${ano}`;
+}
+
+/** `"jun 2027"` — prazo longe o bastante para o dia não importar. */
+export function rotuloMesAno(dia: DiaISO): string {
+  const { ano, mes } = partes(dia);
+  return `${MESES_CURTOS[mes - 1]} ${ano}`;
 }
 
 /** `"3/8"`, usado no histórico de semanas. */

@@ -1,5 +1,5 @@
 import { definicoesDesafios, progressoDe } from '../../dominio/desafios';
-import { desafios, metas, semana } from '../derivados';
+import { desafios, historicoDeSemanas, metas, semana, semanasEmDia } from '../derivados';
 import {
   Acao,
   criarEstadoDemo,
@@ -28,14 +28,15 @@ describe('estado vazio', () => {
     expect(estadoVazio.metas).toEqual([]);
     expect(estadoVazio.aportes).toEqual([]);
     expect(estadoVazio.progressoDesafios).toEqual([]);
-    expect(estadoVazio.historicoSemanas).toEqual([]);
+    expect(estadoVazio.diasSemGasto).toEqual([]);
     expect(estadoVazio.perfil.nome).toBe('');
   });
 
   it('não inventa constância para quem acabou de instalar', () => {
-    // A demo traz `semanasEmDia: 5`. Herdar isso faria a Home anunciar
-    // "5 semanas seguidas em dia" para quem abriu o app agora.
-    expect(estadoVazio.contexto.semanasEmDia).toBe(0);
+    // Sem registro nenhum não há streak, e a trilha não mostra semanas
+    // anteriores à instalação: elas não são constância que a pessoa falhou.
+    expect(semanasEmDia(estadoVazio)).toBe(0);
+    expect(historicoDeSemanas(estadoVazio)).toHaveLength(1);
     expect(estadoVazio.contexto.lancamentosMesAnterior).toBe(0);
     expect(estadoVazio.contexto.economiaBaseCentavos).toBe(0);
     expect(estadoVazio.orcamentoMensalCentavos).toBe(0);

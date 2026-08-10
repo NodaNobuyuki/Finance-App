@@ -27,7 +27,6 @@ import {
   Meta,
   Perfil,
   ProgressoDesafio,
-  SemanaHistorica,
   Tela,
   Transacao,
 } from '../dominio/tipos';
@@ -62,7 +61,46 @@ export type Toast = {
 };
 
 export type Folha =
-  null | { tipo: 'nova' } | { tipo: 'aporte'; metaId: string } | { tipo: 'ritual' };
+  | null
+  | { tipo: 'nova' }
+  | { tipo: 'aporte'; metaId: string }
+  | { tipo: 'ritual' }
+  | { tipo: 'conta' }
+  | { tipo: 'meta' };
+
+/**
+ * Rascunho de cadastro de conta e de meta.
+ *
+ * `id` nulo é criação; preenchido é edição da linha existente. Um só rascunho
+ * por vez porque uma folha por vez é o que a interface abre — dois campos
+ * paralelos só criariam estado morto para manter em sincronia.
+ *
+ * Não é persistido, pelo mesmo motivo do onboarding: quem fecha o app no meio
+ * de um cadastro começa de novo, e é melhor assim do que reabrir num formulário
+ * pela metade sem lembrar o que estava fazendo.
+ */
+export type CadastroConta = {
+  id: string | null;
+  nome: string;
+  tipo: Conta['tipo'];
+  digitos: string;
+};
+
+export type CadastroMeta = {
+  id: string | null;
+  nome: string;
+  digitos: string;
+  prazo: DiaISO | null;
+};
+
+const CADASTRO_CONTA_VAZIO: CadastroConta = {
+  id: null,
+  nome: '',
+  tipo: 'corrente',
+  digitos: '',
+};
+
+const CADASTRO_META_VAZIO: CadastroMeta = { id: null, nome: '', digitos: '', prazo: null };
 
 /**
  * Rascunho do primeiro uso. Não é persistido: quem fecha o app no meio começa
@@ -104,8 +142,12 @@ export type Estado = {
   aportes: Aporte[];
   /** Só o que é do usuário; a definição do desafio é catálogo. */
   progressoDesafios: ProgressoDesafio[];
-  historicoSemanas: SemanaHistorica[];
-  /** Dias que o usuário declarou "não gastei" — contam como registro. */
+  /**
+   * Dias que o usuário declarou "não gastei" — contam como registro.
+   *
+   * Junto com as datas das transações, é daqui que sai toda a constância:
+   * trilha de semanas e streak são derivados, não contadores gravados.
+   */
   diasSemGasto: DiaISO[];
   orcamentoMensalCentavos: Centavos;
   contexto: Contexto;
@@ -143,6 +185,8 @@ export type Estado = {
 
   folha: Folha;
   rascunho: Rascunho;
+  cadastroConta: CadastroConta;
+  cadastroMeta: CadastroMeta;
   simDigitos: string;
   simTaxaId: string;
 
@@ -176,8 +220,7 @@ function estadoDe(hoje: DiaISO, s: Semente, onboardingConcluido: boolean): Estad
     metas: s.metas,
     aportes: s.aportes,
     progressoDesafios: s.progressoDesafios,
-    historicoSemanas: s.historicoSemanas,
-    diasSemGasto: [],
+    diasSemGasto: s.diasSemGasto,
     orcamentoMensalCentavos: s.orcamentoMensalCentavos,
     contexto: s.contexto,
 
@@ -205,6 +248,8 @@ function estadoDe(hoje: DiaISO, s: Semente, onboardingConcluido: boolean): Estad
 
     folha: null,
     rascunho: RASCUNHO_VAZIO,
+    cadastroConta: CADASTRO_CONTA_VAZIO,
+    cadastroMeta: CADASTRO_META_VAZIO,
     simDigitos: '',
     simTaxaId: 'cdi',
 
@@ -252,6 +297,17 @@ export type Acao =
   | { tipo: 'ABRIR_APORTE'; metaId: string }
   | { tipo: 'ABRIR_RITUAL' }
   | { tipo: 'FECHAR_FOLHA' }
+  /** Sem `contaId`, é criação; com, é edição da conta existente. */
+  | { tipo: 'ABRIR_CONTA'; contaId?: string }
+  | { tipo: 'CADASTRO_CONTA_CAMPO'; campo: 'nome' | 'digitos'; valor: string }
+  | { tipo: 'CADASTRO_CONTA_TIPO'; tipo_: Conta['tipo'] }
+  | { tipo: 'SALVAR_CONTA' }
+  | { tipo: 'APAGAR_CONTA'; contaId: string }
+  | { tipo: 'ABRIR_META'; metaId?: string }
+  | { tipo: 'CADASTRO_META_CAMPO'; campo: 'nome' | 'digitos'; valor: string }
+  | { tipo: 'CADASTRO_META_PRAZO'; prazo: DiaISO | null }
+  | { tipo: 'SALVAR_META' }
+  | { tipo: 'APAGAR_META'; metaId: string }
   | { tipo: 'RASCUNHO_TIPO'; valor: 'despesa' | 'receita' }
   | { tipo: 'RASCUNHO_CATEGORIA'; categoriaId: string }
   | { tipo: 'RASCUNHO_CONTA'; contaId: string }
@@ -527,6 +583,219 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
 
     case 'FECHAR_FOLHA':
       return { ...e, folha: null };
+
+    case 'ABRIR_CONTA': {
+      const existente = e.contas.find((c) => c.id === a.contaId);
+      return {
+        ...e,
+        folha: { tipo: 'conta' },
+        cadastroConta: existente
+          ? {
+              id: existente.id,
+              nome: existente.nome,
+              tipo: existente.tipo,
+              digitos: String(Math.abs(existente.saldoInicialCentavos)),
+            }
+          : CADASTRO_CONTA_VAZIO,
+      };
+    }
+
+    case 'CADASTRO_CONTA_CAMPO':
+      return { ...e, cadastroConta: { ...e.cadastroConta, [a.campo]: a.valor } };
+
+    case 'CADASTRO_CONTA_TIPO':
+      return { ...e, cadastroConta: { ...e.cadastroConta, tipo: a.tipo_ } };
+
+    case 'SALVAR_CONTA': {
+      const c = e.cadastroConta;
+      const nome = c.nome.trim();
+      if (!nome) return e;
+
+      // Cartão é dívida: o saldo de abertura entra negativo. Digitar "-" num
+      // teclado numérico de app de finanças é fricção sem ganho — o tipo da
+      // conta já diz o sinal.
+      const magnitude = deDigitos(c.digitos);
+      const saldoInicialCentavos = c.tipo === 'cartao' ? -magnitude : magnitude;
+
+      const seq = e.seq + 1;
+      const anterior = c.id ? e.contas.find((x) => x.id === c.id) : undefined;
+
+      if (anterior) {
+        const conta: Conta = {
+          ...anterior,
+          nome,
+          tipo: c.tipo,
+          saldoInicialCentavos,
+          // Cor escolhida a dedo (as da demo, por exemplo) sobrevive à edição;
+          // só trocar o tipo justifica repintar.
+          cor: c.tipo === anterior.tipo ? anterior.cor : corDaConta(c.tipo),
+        };
+        return {
+          ...e,
+          seq,
+          contas: e.contas.map((x) => (x.id === conta.id ? conta : x)),
+          folha: null,
+          cadastroConta: CADASTRO_CONTA_VAZIO,
+          toast: avisar(seq, `${nome} atualizada`),
+        };
+      }
+
+      const conta: Conta = {
+        id: d.gerarId(),
+        nome,
+        tipo: c.tipo,
+        saldoInicialCentavos,
+        cor: corDaConta(c.tipo),
+      };
+      return {
+        ...e,
+        seq,
+        contas: [...e.contas, conta],
+        folha: null,
+        cadastroConta: CADASTRO_CONTA_VAZIO,
+        // Sem conta antes, o rascunho apontava para o vazio: a primeira criada
+        // vira o destino padrão do próximo lançamento.
+        rascunho: e.contas.length === 0 ? { ...e.rascunho, contaId: conta.id } : e.rascunho,
+        toast: avisar(seq, `${nome} criada`),
+      };
+    }
+
+    case 'APAGAR_CONTA': {
+      const conta = e.contas.find((c) => c.id === a.contaId);
+      if (!conta) return e;
+
+      const seq = e.seq + 1;
+      // Ficar sem nenhuma conta deixaria o app sem destino para lançamento —
+      // e o caminho de volta seria refazer o onboarding. Regra de domínio, não
+      // limitação de tela: melhor a pessoa criar a substituta antes.
+      if (e.contas.length === 1) {
+        return {
+          ...e,
+          seq,
+          toast: avisar(
+            seq,
+            'Esta é sua única conta',
+            'Crie outra antes de apagar — o app precisa de pelo menos uma.',
+          ),
+        };
+      }
+
+      // Os lançamentos vão junto. Deixá-los órfãos tiraria o dinheiro deles do
+      // saldo de toda conta (a soma filtra por `contaId`) e os manteria no
+      // Extrato: o total mudaria sem que nada explicasse por quê.
+      const transacoes = e.transacoes.filter((t) => t.contaId !== conta.id);
+      const perdidas = e.transacoes.length - transacoes.length;
+      const restantes = e.contas.filter((c) => c.id !== conta.id);
+
+      return {
+        ...e,
+        seq,
+        contas: restantes,
+        transacoes,
+        folha: null,
+        cadastroConta: CADASTRO_CONTA_VAZIO,
+        rascunho:
+          e.rascunho.contaId === conta.id
+            ? { ...e.rascunho, contaId: restantes[0].id }
+            : e.rascunho,
+        toast: {
+          id: seq,
+          texto: `${conta.nome} apagada`,
+          sub: perdidas > 0 ? `${perdidas} lançamentos foram junto.` : undefined,
+          acao: { rotulo: 'Desfazer', acao: { tipo: 'RESTAURAR', estado: { ...e, folha: null } } },
+          duracaoMs: 6000,
+        },
+      };
+    }
+
+    case 'ABRIR_META': {
+      const existente = e.metas.find((m) => m.id === a.metaId);
+      return {
+        ...e,
+        folha: { tipo: 'meta' },
+        cadastroMeta: existente
+          ? {
+              id: existente.id,
+              nome: existente.nome,
+              digitos: String(existente.alvoCentavos),
+              prazo: existente.prazo,
+            }
+          : CADASTRO_META_VAZIO,
+      };
+    }
+
+    case 'CADASTRO_META_CAMPO':
+      return { ...e, cadastroMeta: { ...e.cadastroMeta, [a.campo]: a.valor } };
+
+    case 'CADASTRO_META_PRAZO':
+      return { ...e, cadastroMeta: { ...e.cadastroMeta, prazo: a.prazo } };
+
+    case 'SALVAR_META': {
+      const c = e.cadastroMeta;
+      const nome = c.nome.trim();
+      const alvo = deDigitos(c.digitos);
+      // Meta sem alvo não tem barra de progresso nem "faltam X" — não é meta.
+      if (!nome || alvo <= 0) return e;
+
+      const seq = e.seq + 1;
+      const anterior = c.id ? e.metas.find((x) => x.id === c.id) : undefined;
+
+      if (anterior) {
+        // `guardadoInicialCentavos` não entra na edição de propósito: ele é
+        // abertura, e o guardado atual é derivado dos aportes. Reescrevê-lo
+        // aqui moveria dinheiro sem nenhum aporte por trás.
+        const meta: Meta = { ...anterior, nome, alvoCentavos: alvo, prazo: c.prazo };
+        return {
+          ...e,
+          seq,
+          metas: e.metas.map((x) => (x.id === meta.id ? meta : x)),
+          folha: null,
+          cadastroMeta: CADASTRO_META_VAZIO,
+          toast: avisar(seq, `${nome} atualizada`),
+        };
+      }
+
+      const meta: Meta = {
+        id: d.gerarId(),
+        nome,
+        alvoCentavos: alvo,
+        guardadoInicialCentavos: 0,
+        prazo: c.prazo,
+        cor: token('accent'),
+        icone: icones.metas,
+      };
+      return {
+        ...e,
+        seq,
+        metas: [...e.metas, meta],
+        folha: null,
+        cadastroMeta: CADASTRO_META_VAZIO,
+        toast: avisar(seq, `${nome} criada`, 'Guarde o primeiro valor quando quiser.'),
+      };
+    }
+
+    case 'APAGAR_META': {
+      const meta = e.metas.find((m) => m.id === a.metaId);
+      if (!meta) return e;
+
+      const seq = e.seq + 1;
+      // Os aportes ficam. `guardadoDaMeta` filtra por `metaId`, então aporte de
+      // meta apagada não entra em total nenhum — e continua lá para o desfazer
+      // devolver o guardado exatamente como estava.
+      return {
+        ...e,
+        seq,
+        metas: e.metas.filter((m) => m.id !== meta.id),
+        folha: null,
+        cadastroMeta: CADASTRO_META_VAZIO,
+        toast: {
+          id: seq,
+          texto: `${meta.nome} apagada`,
+          acao: { rotulo: 'Desfazer', acao: { tipo: 'RESTAURAR', estado: { ...e, folha: null } } },
+          duracaoMs: 6000,
+        },
+      };
+    }
 
     case 'RASCUNHO_TIPO':
       return {
@@ -864,7 +1133,9 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
                 nome: o.metaNome.trim(),
                 alvoCentavos: alvo,
                 guardadoInicialCentavos: 0,
-                prazo: 'sem prazo definido',
+                // Prazo fica para depois: mais um campo no primeiro minuto de
+                // uso é mais gente desistindo. Entra pela folha de meta.
+                prazo: null,
                 cor: token('accent'),
                 icone: icones.metas,
               },

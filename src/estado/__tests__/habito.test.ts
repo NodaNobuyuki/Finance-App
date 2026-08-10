@@ -1,6 +1,21 @@
 import { inicioDaSemana, somarDias } from '../../dominio/datas';
-import { desafios, metas, semana, semanaEstaFechada, totalGuardado } from '../derivados';
-import { Acao, criarReducer, dependenciasDeTeste, Estado, estadoInicial } from '../store';
+import {
+  desafios,
+  historicoDeSemanas,
+  metas,
+  semana,
+  semanaEstaFechada,
+  semanasEmDia,
+  totalGuardado,
+} from '../derivados';
+import {
+  Acao,
+  criarReducer,
+  dependenciasDeTeste,
+  Estado,
+  estadoInicial,
+  estadoVazio,
+} from '../store';
 
 /**
  * O ciclo do hábito é o produto. Estes testes travam o comportamento que o
@@ -155,6 +170,81 @@ describe('fechamento da semana', () => {
     const amanha = somarDias(estadoInicial.hoje, 1);
     const depois = aplicar(fechado, { tipo: 'DIA_MUDOU', dia: amanha });
     expect(semanaEstaFechada(depois)).toBe(inicioDaSemana(amanha) === fechado.semanaFechada);
+  });
+});
+
+describe('constância', () => {
+  /** Marca `dias` registros na semana que começa `semanas` atrás. */
+  const comRegistros = (estado: Estado, semanas: number, dias: number): Estado => {
+    const inicio = somarDias(inicioDaSemana(estado.hoje), -7 * semanas);
+    return {
+      ...estado,
+      diasSemGasto: [
+        ...estado.diasSemGasto,
+        ...Array.from({ length: dias }, (_, i) => somarDias(inicio, i)),
+      ],
+    };
+  };
+
+  const limpo = (): Estado => ({ ...estadoVazio, diasSemGasto: [], transacoes: [] });
+
+  it('a trilha vem dos dias registrados, não de um contador gravado', () => {
+    // Esta é a regressão que motivou a mudança: `historicoSemanas` era um array
+    // que nada escrevia, então a trilha de quem usava o app nunca passava da
+    // semana corrente por mais semanas que ele fechasse.
+    const e = comRegistros(comRegistros(limpo(), 1, 4), 2, 3);
+    const trilha = historicoDeSemanas(e);
+
+    expect(trilha).toHaveLength(3); // 2 semanas atrás, 1 atrás e a corrente
+    expect(trilha.map((w) => w.registros)).toEqual([3, 4, 0]);
+    expect(trilha.map((w) => w.atingiu)).toEqual([false, true, false]);
+  });
+
+  it('conta as semanas seguidas que bateram a meta', () => {
+    const e = comRegistros(comRegistros(comRegistros(limpo(), 1, 4), 2, 5), 3, 2);
+    // 3 semanas atrás ficou em 2 de 4 e quebra a sequência.
+    expect(semanasEmDia(e)).toBe(2);
+  });
+
+  it('a semana corrente em andamento não zera o streak', () => {
+    // Segunda-feira de manhã, nada registrado ainda: a semana não falhou, só
+    // não terminou. Contá-la como falha zeraria o número toda semana.
+    const e = comRegistros(limpo(), 1, 4);
+    expect(semana(e).registros).toBe(0);
+    expect(semanasEmDia(e)).toBe(1);
+  });
+
+  it('a semana corrente entra assim que cumpre a meta', () => {
+    // Meta 3 porque hoje é quarta: a semana corrente só tem 3 dias vividos, e
+    // dia futuro não conta como registro nem para a trilha nem para o streak.
+    const base: Estado = { ...comRegistros(limpo(), 1, 3), metaSemanal: 3 };
+    expect(semanasEmDia(base)).toBe(1);
+
+    const cumprida = comRegistros(base, 0, 4);
+    expect(semana(cumprida).registros).toBe(3);
+    expect(semanasEmDia(cumprida)).toBe(2);
+  });
+
+  it('lançamento com data retroativa corrige a semana passada', () => {
+    // É o caso da importação de OFX. Um contador gravado no fechamento ficaria
+    // velho; derivado, o número se acerta sozinho.
+    const e = comRegistros(limpo(), 1, 3);
+    expect(semanasEmDia(e)).toBe(0);
+    expect(semanasEmDia(comRegistros(e, 1, 4))).toBe(1);
+  });
+
+  it('a trilha não mostra semanas anteriores ao primeiro registro', () => {
+    const e = comRegistros(limpo(), 1, 4);
+    expect(historicoDeSemanas(e)).toHaveLength(2);
+  });
+
+  it('a trilha para de crescer no limite da tela', () => {
+    let e = limpo();
+    for (let s = 1; s <= 12; s++) e = comRegistros(e, s, 4);
+    expect(historicoDeSemanas(e)).toHaveLength(6);
+    // O streak não é limitado pela trilha: aquilo é o que cabe na tela, isto é
+    // o que a pessoa fez.
+    expect(semanasEmDia(e)).toBe(12);
   });
 });
 

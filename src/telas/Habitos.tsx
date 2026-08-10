@@ -8,6 +8,7 @@ import {
   historicoDeSemanas,
   resumoDoRitual,
   semana,
+  semanasEmDia,
   transacoesDoMes,
 } from '../estado/derivados';
 import { useLoja } from '../estado/store';
@@ -28,6 +29,7 @@ export function Habitos() {
   const s = semana(estado);
   const { ativos, disponiveis } = desafios(estado);
   const historico = historicoDeSemanas(estado);
+  const seguidas = semanasEmDia(estado);
 
   return (
     <View>
@@ -41,10 +43,11 @@ export function Habitos() {
 
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginTop: 20 }}>
           <Txt tamanho={48} peso={600} numerico cor={t.onHero} espacamento={-1.9} entrelinha={0.9}>
-            {estado.contexto.semanasEmDia}
+            {seguidas}
           </Txt>
           <Txt tamanho={12.5} cor={t.onHeroSoft} entrelinha={1.4} estilo={{ paddingBottom: 4 }}>
-            semanas seguidas{'\n'}com registro em dia
+            {seguidas === 1 ? 'semana seguida' : 'semanas seguidas'}
+            {'\n'}com registro em dia
           </Txt>
         </View>
 

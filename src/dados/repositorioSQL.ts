@@ -1,13 +1,5 @@
 import { EscritaFalhou, LeituraFalhou } from '../dominio/erros';
-import {
-  Aporte,
-  Conta,
-  Meta,
-  Origem,
-  ProgressoDesafio,
-  SemanaHistorica,
-  Transacao,
-} from '../dominio/tipos';
+import { Aporte, Conta, Meta, Origem, ProgressoDesafio, Transacao } from '../dominio/tipos';
 import { CorRef } from '../tema/paletas';
 import { diferencaDeChaves, diferencaPorId, Diferenca, vazia } from './diff';
 import { aplicarMigracoes } from './migracoes';
@@ -59,7 +51,8 @@ type LinhaMeta = {
   nome: string;
   alvo_centavos: number;
   guardado_inicial_centavos: number;
-  prazo: string;
+  /** NULL quando a meta não tem prazo — ver migration v4. */
+  prazo: string | null;
   cor: string;
   icone: string;
 };
@@ -315,7 +308,7 @@ export function criarRepositorioSQL(
           prefs.map((p) => [p.chave, JSON.parse(p.valor)]),
         ) as Preferencias;
 
-        const [contas, transacoes, metas, aportes, progressos, semanas, dias] = await Promise.all([
+        const [contas, transacoes, metas, aportes, progressos, dias] = await Promise.all([
           motor.consultar<LinhaConta>(`SELECT * FROM contas`),
           motor.consultar<LinhaTransacao>(
             `SELECT * FROM transacoes ORDER BY ocorrido_em DESC, criado_em DESC`,
@@ -323,9 +316,6 @@ export function criarRepositorioSQL(
           motor.consultar<LinhaMeta>(`SELECT * FROM metas`),
           motor.consultar<LinhaAporte>(`SELECT * FROM aportes ORDER BY criado_em DESC`),
           motor.consultar<LinhaProgressoDesafio>(`SELECT * FROM progresso_desafios`),
-          motor.consultar<SemanaHistorica>(
-            `SELECT inicio, registros FROM semanas_historicas ORDER BY inicio`,
-          ),
           motor.consultar<{ dia: string }>(`SELECT dia FROM dias_sem_gasto ORDER BY dia`),
         ]);
 
@@ -335,7 +325,6 @@ export function criarRepositorioSQL(
           metas: metas.map(TABELA_METAS.daLinha),
           aportes: aportes.map(TABELA_APORTES.daLinha),
           progressoDesafios: progressos.map(TABELA_PROGRESSO_DESAFIOS.daLinha),
-          historicoSemanas: semanas.map((s) => ({ inicio: s.inicio, registros: s.registros })),
           diasSemGasto: dias.map((d) => d.dia),
           ...guardadas,
         } satisfies EstadoPersistido;
@@ -361,16 +350,6 @@ export function criarRepositorioSQL(
             TABELA_PROGRESSO_DESAFIOS,
             diferencaPorId(antes?.progressoDesafios ?? [], depois.progressoDesafios),
           );
-
-          if (antes?.historicoSemanas !== depois.historicoSemanas) {
-            await motor.executar(`DELETE FROM semanas_historicas`);
-            for (const s of depois.historicoSemanas) {
-              await motor.executar(
-                `INSERT INTO semanas_historicas (inicio, registros) VALUES (?, ?)`,
-                [s.inicio, s.registros],
-              );
-            }
-          }
 
           if (antes?.diasSemGasto !== depois.diasSemGasto) {
             const d = diferencaDeChaves(antes?.diasSemGasto ?? [], depois.diasSemGasto);
@@ -398,7 +377,6 @@ export function criarRepositorioSQL(
             'contas',
             'metas',
             'progresso_desafios',
-            'semanas_historicas',
             'dias_sem_gasto',
             'preferencias',
           ]) {

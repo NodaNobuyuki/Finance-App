@@ -22,7 +22,6 @@ export function criarRepositorioMemoria(): RepositorioLocal {
     metas: [...e.metas],
     aportes: [...e.aportes],
     progressoDesafios: [...e.progressoDesafios],
-    historicoSemanas: [...e.historicoSemanas],
     diasSemGasto: [...e.diasSemGasto],
     contexto: { ...e.contexto },
   });

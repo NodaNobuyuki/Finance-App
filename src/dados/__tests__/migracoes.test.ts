@@ -52,9 +52,14 @@ describe('aplicar do zero', () => {
       'metas',
       'preferencias',
       'progresso_desafios',
-      'semanas_historicas',
       'transacoes',
     ]);
+  });
+
+  it('a v3 derruba a tabela de semanas — a constância virou derivada', async () => {
+    const motor = criarMotorNode();
+    await aplicarMigracoes(motor);
+    expect(await tabelas(motor)).not.toContain('semanas_historicas');
   });
 
   it('a v2 preserva o progresso que já existia na v1', async () => {
@@ -79,6 +84,65 @@ describe('aplicar do zero', () => {
       'SELECT id, aceito, progresso FROM progresso_desafios',
     );
     expect(linhas).toEqual([{ id: 'cafe', aceito: 1, progresso: 3 }]);
+  });
+
+  it('a v4 converte o prazo antigo em NULL e preserva o que já era data', async () => {
+    const motor = criarMotorNode();
+
+    // Aparelho parado na v3, com o prazo ainda como texto pré-formatado.
+    await motor.emTransacao(async () => {
+      for (const m of migracoes.slice(0, 3)) {
+        for (const comando of m.sql) await motor.executar(comando);
+      }
+      await motor.executar('PRAGMA user_version = 3');
+    });
+    await motor.executar(
+      `INSERT INTO metas (id, nome, alvo_centavos, guardado_inicial_centavos, prazo, cor, icone,
+         atualizado_em)
+       VALUES ('chile', 'Chile', 800000, 320000, 'faltam 134 dias · 15 dez 2026', 'accent', 'x', 1),
+              ('nova', 'Nova', 100000, 0, '2027-01-31', 'accent', 'x', 1)`,
+    );
+
+    expect(await aplicarMigracoes(motor)).toBe(VERSAO_ESPERADA);
+
+    const linhas = await motor.consultar<{ id: string; prazo: string | null }>(
+      'SELECT id, prazo FROM metas ORDER BY id',
+    );
+    // O texto antigo não é recuperável como data: ele dependia de um "hoje" que
+    // já passou. Vira meta sem prazo, que a pessoa redefine em um toque.
+    expect(linhas).toEqual([
+      { id: 'chile', prazo: null },
+      { id: 'nova', prazo: '2027-01-31' },
+    ]);
+  });
+
+  it('a v4 mantém o resto da meta intacto', async () => {
+    const motor = criarMotorNode();
+    await motor.emTransacao(async () => {
+      for (const m of migracoes.slice(0, 3)) {
+        for (const comando of m.sql) await motor.executar(comando);
+      }
+      await motor.executar('PRAGMA user_version = 3');
+    });
+    await motor.executar(
+      `INSERT INTO metas (id, nome, alvo_centavos, guardado_inicial_centavos, prazo, cor, icone,
+         atualizado_em)
+       VALUES ('chile', 'Chile', 800000, 320000, 'faltam 134 dias', 'hex:#2f6f8f', 'M2 12h20', 7)`,
+    );
+
+    await aplicarMigracoes(motor);
+
+    const [linha] = await motor.consultar<Record<string, unknown>>('SELECT * FROM metas');
+    expect(linha).toEqual({
+      id: 'chile',
+      nome: 'Chile',
+      alvo_centavos: 800000,
+      guardado_inicial_centavos: 320000,
+      prazo: null,
+      cor: 'hex:#2f6f8f',
+      icone: 'M2 12h20',
+      atualizado_em: 7,
+    });
   });
 
   it('é idempotente — rodar de novo não faz nada', async () => {

@@ -49,7 +49,14 @@ export type Meta = {
    * `guardadoInicialCentavos + soma dos aportes` — ver `metas.ts`.
    */
   guardadoInicialCentavos: Centavos;
-  prazo: string;
+  /**
+   * Data-alvo, ou `null` para meta sem prazo.
+   *
+   * Era string pré-formatada (`'faltam 134 dias · 15 dez 2026'`), o que
+   * envelhecia sozinho: o texto continuava dizendo 134 dias um ano depois.
+   * O rótulo agora é derivado por `rotuloDePrazo()`, contra o dia corrente.
+   */
+  prazo: DiaISO | null;
   cor: CorRef;
   icone: string;
 };
@@ -86,19 +93,16 @@ export type Perfil = {
   nome: string;
 };
 
-/** Uma semana já encerrada, para a trilha de constância. */
-export type SemanaHistorica = {
-  inicio: DiaISO;
-  registros: number;
-};
-
 /**
  * Números que a tela ainda mostra mas que nenhum cálculo produz — vieram do
  * protótipo. Ficam agrupados aqui para que dê para achá-los quando cada um
  * virar derivação de verdade.
+ *
+ * `semanasEmDia` saiu daqui: virou `semanasEmDia()` em `estado/derivados.ts`.
+ * Como campo, ele nascia da semente e nada o incrementava — a constância de
+ * quem usava o app de verdade ficava parada em zero para sempre.
  */
 export type Contexto = {
-  semanasEmDia: number;
   lancamentosMesAnterior: number;
   economiaBaseCentavos: Centavos;
 };

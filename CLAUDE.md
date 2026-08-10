@@ -193,7 +193,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = lint + tipos + 261 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = lint + tipos + 319 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
@@ -230,13 +230,43 @@ Ids são UUID v7 (`src/dominio/ids.ts`), sem dependência nova: `crypto.getRando
 
 `semanaFechada` é `DiaISO | null` — guarda **qual** semana foi fechada, e `semanaEstaFechada()` compara com a semana corrente. Era `boolean`, o que sob persistência congelaria o ritual fechado para sempre.
 
+### Constância é derivada, como o saldo
+
+A trilha de semanas (`historicoDeSemanas`) e o streak (`semanasEmDia`) saem de `diasRegistrados` — datas das transações mais `diasSemGasto`. Não existe contador gravado.
+
+Era um array `historicoSemanas` no `Estado` e uma tabela `semanas_historicas`, e **nada escrevia neles**: `FECHAR_CONCLUIR` gravava `semanaFechada` e nada mais, então a trilha de quem usava o app de verdade nunca passava da semana corrente e `contexto.semanasEmDia` ficava parado em zero para sempre. Na demo não aparecia, porque a semente vinha preenchida. É o mesmo erro que a regra do saldo derivado já proíbe, e a migration v3 derruba a tabela.
+
+Derivar também é o que segura o número depois: lançamento com data retroativa — **importação de OFX é exatamente isso** — corrige a semana correspondente sozinho, enquanto um contador fechado na segunda-feira ficaria velho sem caminho de volta.
+
+Duas decisões de produto embutidas: a semana corrente só entra no streak depois de bater a meta (contá-la em andamento zeraria o número toda segunda), e a trilha não mostra semanas anteriores ao primeiro registro (semana antes da instalação não é constância que a pessoa falhou). A trilha para em 6 colunas, que é o que cabe na tela; o streak não tem teto.
+
+### Conta e meta são criadas dentro do app
+
+Folhas `CadastroConta` e `CadastroMeta` (`src/telas/folhas/`), abertas pela linha de contas na Home e pelo botão em Metas. O rascunho mora em `cadastroConta` / `cadastroMeta`, com `id: null` para criação e preenchido para edição — um só por vez, porque uma folha por vez é o que a interface abre. Não é persistido, pelo mesmo motivo do onboarding.
+
+Três regras de domínio ficaram no reducer, não na tela:
+
+**Cartão nasce negativo.** O tipo da conta define o sinal do saldo de abertura; digitar "menos" num teclado numérico é fricção sem ganho, e fatura lançada como positivo inflaria o patrimônio.
+
+**Apagar conta leva os lançamentos junto.** Deixá-los órfãos tiraria o dinheiro deles do saldo de toda conta — a soma filtra por `contaId` — e os manteria no Extrato: o total mudaria sem nada explicando. Tudo com undo no toast, via `RESTAURAR`.
+
+**A última conta não é apagável.** Sem nenhuma, não há destino para lançamento e `rascunho.contaId` aponta para o vazio. É recado de domínio no toast, não botão desabilitado.
+
+Apagar meta é o oposto e de propósito: os aportes **ficam**. `guardadoDaMeta` filtra por `metaId`, então aporte de meta apagada não entra em total nenhum, e é isso que faz o desfazer reconstruir o guardado exato. Editar meta também não toca em `guardadoInicialCentavos` — ele é abertura, e reescrevê-lo moveria dinheiro sem aporte por trás.
+
+**`Meta.prazo` é `DiaISO | null`.** Era string pré-formatada (`'faltam 134 dias · 15 dez 2026'`) e envelhecia sozinha: seguia anunciando os mesmos 134 dias meses depois. O texto agora sai de `rotuloDePrazo(prazo, hoje)` a cada render — dias até 180, meses acima disso. A migration v4 reconstrói a tabela (SQLite não afrouxa `NOT NULL` por `ALTER`) e converte o texto antigo em `NULL`: 'faltam 134 dias' dependia de um "hoje" que já passou, então data chutada seria pior que meta sem prazo.
+
+O seletor de prazo são atalhos (3 meses, 6 meses, 1 ano, 2 anos), não calendário: a pergunta é "em quanto tempo", não "em que dia", e um date picker seria dependência nativa nova para responder pior.
+
 ### Primeiro uso
 
 O app abre **vazio**. Banco sem nada é sinal de instalação nova: `criarEstadoVazio` + onboarding de 3 passos (nome, primeira conta com saldo de abertura, meta opcional). Nada é gravado antes de a pessoa concluir — o disco não deve conter dado que ela não criou.
 
 A demo virou modo explícito (`criarEstadoDemo`), alcançável pelo onboarding e por Hábitos. **`estadoVazio` é o par de `estadoInicial` nos testes**, e as telas são montadas contra os dois.
 
-Os números de `contexto` (`semanasEmDia`, `lancamentosMesAnterior`) são placeholders da demo e vão a **zero** no estado vazio: anunciar "5 semanas seguidas em dia" para quem instalou agora é mentira, não valor de partida.
+Os números que sobraram em `contexto` (`lancamentosMesAnterior`, `economiaBaseCentavos`) são placeholders da demo e vão a **zero** no estado vazio: anunciar "18 lançamentos no mês anterior" para quem instalou agora é mentira, não valor de partida. `semanasEmDia` saiu de lá e virou derivado — ver "Constância é derivada".
+
+A demo ganhou `diasSemGasto` nas 5 semanas anteriores, que é de onde a trilha dela sai agora. São dias sem gasto, e não transações, porque os saldos da demo estão cravados nos valores do protótipo em `saldo.test.ts` — "não gastei" conta como registro sem mexer em dinheiro.
 
 ### Desafio: definição é catálogo, progresso é do usuário
 
@@ -258,16 +288,15 @@ O motivo é persistência: **o que não está no `Estado` não tem como ser grav
 
 **Pendências abertas:**
 - Aporte não move dinheiro: guardar R$ 500 numa meta não altera saldo nenhum. Modelar como transferência exige o conceito de par de transações — decisão à parte, ainda não tomada
-- Conta e meta só nascem no onboarding. Falta "nova conta" e "nova meta" no app já rodando — hoje quem apaga tudo fica sem caminho para recriar
 - Categoria órfã aparece como "Sem categoria" mas não há como recategorizar o lançamento
-- `Meta.prazo` é string pré-formatada (`'faltam 134 dias · 15 dez 2026'`), então envelhece sozinha. Vira `DiaISO` quando metas forem criadas pelo usuário
 - Tela Categorias abre o extrato filtrado, mas não virou tela de orçamento
 - Setas de mês no Extrato e "Nova categoria" são decorativas
 - Categorias ainda são catálogo fixo. Viram dado do usuário (e vão para o `Estado` e para o banco) quando "Nova categoria" funcionar
+- Sobraram dois placeholders em `contexto`, e eles têm o mesmo defeito que `semanasEmDia` tinha: nascem da semente e nada os atualiza. `lancamentosMesAnterior` é derivável em cinco linhas (contar transações do mês anterior); `economiaBaseCentavos` é número inventado da demo e some quando `economizado()` passar a somar só o que existe. Aí o tipo `Contexto` inteiro desaparece
 - Sem retentativa ativa de gravação: o reenvio pega carona na próxima mudança. Um outbox resolve, se virar problema
 - Nenhuma tela lê do banco sob demanda — o estado inteiro é carregado no boot. Aguenta bem os primeiros anos; a saída é paginar por período no repositório
 
-**Próximo ciclo:** criação de conta e meta fora do onboarding, categorias como dado do usuário (destrava "Nova categoria" e a tela Categorias virar orçamento) e recategorizar lançamento. Depois: `SectionList` no Extrato (o agrupamento em `agruparPorDia` já encaixa, e ele hoje é O(n·dias)) e memoização dos derivados.
+**Próximo ciclo:** categorias como dado do usuário (destrava "Nova categoria" e a tela Categorias virar orçamento) e recategorizar lançamento — as duas caem juntas, porque recategorizar precisa de uma lista que a pessoa controla. Depois: `SectionList` no Extrato (o agrupamento em `agruparPorDia` já encaixa, e ele hoje é O(n·dias)) e memoização dos derivados.
 
 **Decisão em aberto:** a v1 vale ser 100% local, sem backend. Não perde o loop comportamental, dispensa auth e infra, e encurta muito o caminho até a loja. Backend entra quando houver sync entre aparelhos ou receita — mesmo critério já aplicado ao Open Finance.
 

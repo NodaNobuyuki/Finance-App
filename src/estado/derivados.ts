@@ -12,7 +12,7 @@ import {
 } from '../dominio/datas';
 import { Centavos, formatar, percentual, renderPor } from '../dominio/dinheiro';
 import { DefinicaoDesafio, definicoesDesafios, progressoDe } from '../dominio/desafios';
-import { guardadoDaMeta, totalGuardado as somarGuardado } from '../dominio/metas';
+import { guardadoDaMeta, rotuloDePrazo, totalGuardado as somarGuardado } from '../dominio/metas';
 import { somaPorCategoria, totalEntradas, totalSaidas } from '../dominio/saldo';
 import { taxa } from '../dominio/taxas';
 import { Transacao } from '../dominio/tipos';
@@ -52,6 +52,21 @@ export type Semana = {
   meta: number;
   emDia: boolean;
 };
+
+/**
+ * Quantos dias daquela semana têm registro, contando só até `hoje`.
+ *
+ * É a mesma regra de contagem de `semana()`, isolada para que a trilha de
+ * constância e o streak não possam divergir dela.
+ */
+function registrosNaSemana(registrados: Set<DiaISO>, inicio: DiaISO, hoje: DiaISO): number {
+  let n = 0;
+  for (let i = 0; i < 7; i++) {
+    const dia = somarDias(inicio, i);
+    if (dia <= hoje && registrados.has(dia)) n += 1;
+  }
+  return n;
+}
 
 export function semana(e: Estado): Semana {
   const inicio = inicioDaSemana(e.hoje);
@@ -332,6 +347,7 @@ export function acaoDoDia(e: Estado): AcaoDoDia {
 export function statusDoRegistro(e: Estado): { titulo: string; sub: string; emDia: boolean } {
   const s = semana(e);
   const ultimo = ultimoRegistro(e);
+  const seguidas = semanasEmDia(e);
   return {
     emDia: s.emDia,
     titulo: s.emDia
@@ -340,10 +356,12 @@ export function statusDoRegistro(e: Estado): { titulo: string; sub: string; emDi
         ? '1 dia sem registro'
         : `${s.pendentes.length} dias sem registro`,
     sub: s.emDia
-      ? // Sem histórico, não há constância para anunciar. Quem instalou hoje
+      ? // Sem constância acumulada não há o que anunciar. Quem instalou hoje
         // não pode ler "5 semanas seguidas em dia".
-        e.contexto.semanasEmDia > 0
-        ? `Último registro hoje · ${e.contexto.semanasEmDia} semanas seguidas em dia`
+        seguidas > 0
+        ? `Último registro hoje · ${seguidas} ${
+            seguidas === 1 ? 'semana seguida' : 'semanas seguidas'
+          } em dia`
         : 'Último registro hoje'
       : `Último registro: ${ultimo ? rotuloCurto(ultimo, e.hoje) : '—'}`,
   };
@@ -406,16 +424,79 @@ export function resumoDaSemana(e: Estado): ResumoSemana {
   };
 }
 
-/** Histórico de constância: semanas anteriores + a semana corrente. */
+/** Quantas colunas a trilha da tela Hábitos mostra, contando a semana corrente. */
+const SEMANAS_NA_TRILHA = 6;
+
+/**
+ * Trilha de constância: uma coluna por semana, da mais antiga à corrente.
+ *
+ * Derivada dos dias registrados, nunca acumulada. Já foi um array gravado que
+ * só crescia no fechamento da semana — e como nada escrevia nele, a trilha de
+ * quem instalava o app nunca passava da semana corrente.
+ *
+ * Derivar também é o que mantém o número certo depois: lançamento com data
+ * retroativa (importar OFX é exatamente isso) corrige a semana correspondente
+ * sozinho, enquanto um contador gravado no fechamento ficaria velho para
+ * sempre — o mesmo motivo pelo qual saldo e guardado são derivados.
+ */
 export function historicoDeSemanas(e: Estado) {
-  const s = semana(e);
-  return [
-    ...e.historicoSemanas.map((h) => ({
-      rotulo: rotuloDiaMes(h.inicio),
-      registros: h.registros,
-    })),
-    { rotulo: rotuloDiaMes(s.inicio), registros: s.registros },
-  ].map((w) => ({ ...w, atingiu: w.registros >= e.metaSemanal, meta: e.metaSemanal }));
+  const registrados = diasRegistrados(e);
+  const atual = inicioDaSemana(e.hoje);
+  const primeiro = [...registrados].sort()[0];
+  // Sem registro nenhum, a trilha é só a semana corrente. Semana anterior à
+  // instalação não é constância que a pessoa deixou de cumprir — mostrá-la
+  // vazia acusaria falha por tempo em que o app nem existia para ela.
+  const maisAntiga = primeiro ? inicioDaSemana(primeiro) : atual;
+
+  const inicios: DiaISO[] = [];
+  for (let i = 0; i < SEMANAS_NA_TRILHA; i++) {
+    const inicio = somarDias(atual, -7 * i);
+    inicios.unshift(inicio);
+    if (inicio <= maisAntiga) break;
+  }
+
+  return inicios.map((inicio) => {
+    const registros = registrosNaSemana(registrados, inicio, e.hoje);
+    return {
+      rotulo: rotuloDiaMes(inicio),
+      registros,
+      atingiu: registros >= e.metaSemanal,
+      meta: e.metaSemanal,
+    };
+  });
+}
+
+/**
+ * Semanas seguidas em que a meta de registros foi cumprida.
+ *
+ * A semana corrente só entra depois de bater a meta: enquanto está em
+ * andamento ela não é uma semana falhada, e tratá-la como tal zeraria o streak
+ * toda segunda-feira — o oposto do que um streak deve fazer.
+ *
+ * Não é limitada por `SEMANAS_NA_TRILHA`: aquilo é o que cabe na tela, isto é o
+ * que a pessoa fez. A meta aplicada é a de hoje, inclusive às semanas
+ * passadas; guardar a meta vigente em cada uma exigiria histórico gravado, que
+ * é justamente o que se está tirando daqui.
+ */
+export function semanasEmDia(e: Estado): number {
+  const registrados = diasRegistrados(e);
+  if (registrados.size === 0) return 0;
+
+  const maisAntiga = inicioDaSemana([...registrados].sort()[0]);
+  let inicio = inicioDaSemana(e.hoje);
+  let seguidas = 0;
+
+  if (registrosNaSemana(registrados, inicio, e.hoje) < e.metaSemanal) {
+    inicio = somarDias(inicio, -7);
+  }
+
+  while (inicio >= maisAntiga) {
+    if (registrosNaSemana(registrados, inicio, e.hoje) < e.metaSemanal) break;
+    seguidas += 1;
+    inicio = somarDias(inicio, -7);
+  }
+
+  return seguidas;
 }
 
 /* ── Desafios ────────────────────────────────────────────────── */
@@ -489,6 +570,9 @@ export function metas(e: Estado) {
       guardadoCentavos: guardado,
       faltamCentavos: Math.max(0, m.alvoCentavos - guardado),
       pct: Math.min(100, percentual(guardado, m.alvoCentavos)),
+      // Derivado contra `hoje`, não gravado: prazo escrito como texto
+      // envelhecia sozinho e seguia anunciando os mesmos dias meses depois.
+      prazoLabel: rotuloDePrazo(m.prazo, e.hoje),
     };
   });
 }

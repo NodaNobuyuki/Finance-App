@@ -1,15 +1,6 @@
 import { hex, token } from '../tema/paletas';
 import { DiaISO, inicioDaSemana, somarDias } from './datas';
-import {
-  Aporte,
-  Conta,
-  Contexto,
-  Meta,
-  Perfil,
-  ProgressoDesafio,
-  SemanaHistorica,
-  Transacao,
-} from './tipos';
+import { Aporte, Conta, Contexto, Meta, Perfil, ProgressoDesafio, Transacao } from './tipos';
 
 /**
  * Dados de demonstração. Todos os valores já em centavos inteiros.
@@ -111,35 +102,42 @@ function transacoesDemo(hoje: DiaISO): Transacao[] {
   ];
 }
 
-const metas: Meta[] = [
-  {
-    id: 'chile',
-    nome: 'Viagem para o Chile',
-    alvoCentavos: 800000,
-    guardadoInicialCentavos: 320000,
-    prazo: 'faltam 134 dias · 15 dez 2026',
-    cor: hex('#2f6f8f'),
-    icone: 'M2 12h20M12 2c3 3 3 17 0 20M12 2c-3 3-3 17 0 20',
-  },
-  {
-    id: 'reserva',
-    nome: 'Reserva de emergência',
-    alvoCentavos: 1200000,
-    guardadoInicialCentavos: 640000,
-    prazo: 'faltam 11 meses · jun 2027',
-    cor: token('up'),
-    icone: 'M12 3l8 3v6c0 5-3.4 8.2-8 9-4.6-.8-8-4-8-9V6z',
-  },
-  {
-    id: 'note',
-    nome: 'Notebook novo',
-    alvoCentavos: 450000,
-    guardadoInicialCentavos: 285000,
-    prazo: 'faltam 78 dias · 20 out 2026',
-    cor: token('accent'),
-    icone: 'M4 5h16v10H4zM2 19h20M9 19l.6-2h4.8l.6 2',
-  },
-];
+/**
+ * Metas da demo. O prazo é um deslocamento em dias a partir de `hoje`, nunca
+ * data cravada: ancorado em `AGORA`, reproduz 15/12/2026, jun/2027 e
+ * 20/10/2026 do protótipo, e em qualquer outro dia continua no futuro.
+ */
+function metasDemo(hoje: DiaISO): Meta[] {
+  return [
+    {
+      id: 'chile',
+      nome: 'Viagem para o Chile',
+      alvoCentavos: 800000,
+      guardadoInicialCentavos: 320000,
+      prazo: somarDias(hoje, 132),
+      cor: hex('#2f6f8f'),
+      icone: 'M2 12h20M12 2c3 3 3 17 0 20M12 2c-3 3-3 17 0 20',
+    },
+    {
+      id: 'reserva',
+      nome: 'Reserva de emergência',
+      alvoCentavos: 1200000,
+      guardadoInicialCentavos: 640000,
+      prazo: somarDias(hoje, 314),
+      cor: token('up'),
+      icone: 'M12 3l8 3v6c0 5-3.4 8.2-8 9-4.6-.8-8-4-8-9V6z',
+    },
+    {
+      id: 'note',
+      nome: 'Notebook novo',
+      alvoCentavos: 450000,
+      guardadoInicialCentavos: 285000,
+      prazo: somarDias(hoje, 76),
+      cor: token('accent'),
+      icone: 'M4 5h16v10H4zM2 19h20M9 19l.6-2h4.8l.6 2',
+    },
+  ];
+}
 
 /**
  * Progresso de demonstração. Só faz sentido na demo: quem instala o app hoje
@@ -151,13 +149,32 @@ const progressoDesafios: ProgressoDesafio[] = [
   { id: 'assin', aceito: true, progresso: 1 },
 ];
 
-/** Histórico de semanas fechadas — as 5 semanas anteriores à corrente. */
-function historicoDemo(hoje: DiaISO): SemanaHistorica[] {
+/**
+ * Dias em que a Marina declarou não ter gasto nada, nas 5 semanas anteriores.
+ *
+ * É daqui que sai a trilha de constância da demo. Antes ela vinha de um array
+ * de contagens (`4, 4, 3, 4, 4`) que não correspondia a dado nenhum: a tela
+ * anunciava registros que não existiam em lugar algum do estado. Agora a
+ * trilha é derivada, então a demo precisa de registros de verdade.
+ *
+ * São dias sem gasto, e não transações, de propósito: "não gastei" conta como
+ * registro sem mexer em dinheiro, e os saldos da demo estão cravados nos
+ * valores do protótipo (ver `saldo.test.ts`).
+ *
+ * A progressão 2 → 3 → 4 → 4 → 3+ conta uma história de hábito sendo formado,
+ * em vez de um platô que nenhuma pessoa real teria na primeira semana.
+ */
+function diasSemGastoDemo(hoje: DiaISO): DiaISO[] {
   const estaSemana = inicioDaSemana(hoje);
-  return [4, 4, 3, 4, 4].map((registros, i) => ({
-    inicio: somarDias(estaSemana, -7 * (5 - i)),
-    registros,
-  }));
+  // Por semana (da mais antiga à anterior), quais dias da semana foram
+  // marcados — 0 = segunda. Só dias no começo da semana, porque as transações
+  // da demo caem nos últimos dias e dia repetido não contaria duas vezes.
+  const porSemana = [[0, 2], [0, 1, 3], [0, 1, 2, 3], [0, 1, 2, 4], [0, 2, 3]];
+
+  return porSemana.flatMap((dias, i) => {
+    const inicio = somarDias(estaSemana, -7 * (porSemana.length - i));
+    return dias.map((d) => somarDias(inicio, d));
+  });
 }
 
 /** Teto de gasto do mês. Vira `budgets.limit_cents` quando houver backend. */
@@ -165,7 +182,6 @@ const orcamentoMensalCentavos = 500000;
 
 /** Números de contexto que ainda não saem das transações carregadas. */
 const contexto: Contexto = {
-  semanasEmDia: 5,
   lancamentosMesAnterior: 18,
   economiaBaseCentavos: 18000,
 };
@@ -178,7 +194,7 @@ export type Semente = {
   metas: Meta[];
   aportes: Aporte[];
   progressoDesafios: ProgressoDesafio[];
-  historicoSemanas: SemanaHistorica[];
+  diasSemGasto: DiaISO[];
   orcamentoMensalCentavos: number;
   contexto: Contexto;
 };
@@ -188,11 +204,11 @@ export function semente(hoje: DiaISO): Semente {
     perfil: { nome: 'Marina' },
     contas,
     transacoes: transacoesDemo(hoje),
-    metas,
+    metas: metasDemo(hoje),
     // Nenhum aporte de partida: o guardado de cada meta começa na abertura dela.
     aportes: [],
     progressoDesafios,
-    historicoSemanas: historicoDemo(hoje),
+    diasSemGasto: diasSemGastoDemo(hoje),
     orcamentoMensalCentavos,
     contexto,
   };
@@ -202,8 +218,8 @@ export function semente(hoje: DiaISO): Semente {
  * O que um app recém-instalado carrega: nada.
  *
  * Os números de contexto vão a zero de propósito. Eles são placeholders de
- * tela, e a demo os traz preenchidos — entregar "5 semanas seguidas em dia"
- * para quem abriu o app agora é mentira, não é dado de partida.
+ * tela, e a demo os traz preenchidos — entregar "18 lançamentos no mês
+ * anterior" para quem abriu o app agora é mentira, não é dado de partida.
  */
 export function vazia(): Semente {
   return {
@@ -213,8 +229,8 @@ export function vazia(): Semente {
     metas: [],
     aportes: [],
     progressoDesafios: [],
-    historicoSemanas: [],
+    diasSemGasto: [],
     orcamentoMensalCentavos: 0,
-    contexto: { semanasEmDia: 0, lancamentosMesAnterior: 0, economiaBaseCentavos: 0 },
+    contexto: { lancamentosMesAnterior: 0, economiaBaseCentavos: 0 },
   };
 }

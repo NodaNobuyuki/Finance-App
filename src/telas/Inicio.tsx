@@ -325,39 +325,70 @@ export function Inicio() {
           {estado.contas.map((c) => {
             const saldo = saldoDaConta(c, estado.transacoes);
             return (
-              <View
+              // Tocar a conta abre a edição — é o único lugar em que ela
+              // aparece, então é daqui que se renomeia e se apaga.
+              <Toque
                 key={c.id}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                  backgroundColor: t.surfaceMuted,
-                  borderRadius: 999,
-                  paddingVertical: 6,
-                  paddingHorizontal: 11,
-                }}
+                aoTocar={() => despachar({ tipo: 'ABRIR_CONTA', contaId: c.id })}
+                rotuloAcessivel={`Editar ${c.nome}`}
               >
                 <View
                   style={{
-                    width: 7,
-                    height: 7,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    backgroundColor: t.surfaceMuted,
                     borderRadius: 999,
-                    backgroundColor: resolverCor(c.cor, paleta),
+                    paddingVertical: 6,
+                    paddingHorizontal: 11,
                   }}
-                />
-                <Txt tamanho={11.5} peso={500} cor={t.inkMuted}>
-                  {c.nome}
-                </Txt>
-                <Txt tamanho={11.5} peso={600} numerico cor={saldo < 0 ? t.down : t.ink}>
-                  {estado.mostrarSaldo
-                    ? saldo < 0
-                      ? `− ${formatar(saldo)}`
-                      : formatar(saldo)
-                    : '••••'}
-                </Txt>
-              </View>
+                >
+                  <View
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: 999,
+                      backgroundColor: resolverCor(c.cor, paleta),
+                    }}
+                  />
+                  <Txt tamanho={11.5} peso={500} cor={t.inkMuted}>
+                    {c.nome}
+                  </Txt>
+                  <Txt tamanho={11.5} peso={600} numerico cor={saldo < 0 ? t.down : t.ink}>
+                    {estado.mostrarSaldo
+                      ? saldo < 0
+                        ? `− ${formatar(saldo)}`
+                        : formatar(saldo)
+                      : '••••'}
+                  </Txt>
+                </View>
+              </Toque>
             );
           })}
+
+          <Toque
+            aoTocar={() => despachar({ tipo: 'ABRIR_CONTA' })}
+            rotuloAcessivel="Nova conta"
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 5,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderStyle: 'dashed',
+                borderColor: t.lineInput,
+                paddingVertical: 6,
+                paddingHorizontal: 11,
+              }}
+            >
+              <Icone path={icones.mais} tamanho={13} cor={t.inkSoft} espessura={2} />
+              <Txt tamanho={11.5} peso={600} cor={t.inkSoft}>
+                Nova conta
+              </Txt>
+            </View>
+          </Toque>
         </View>
 
         {/* Resumo do mês */}

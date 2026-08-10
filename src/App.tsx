@@ -29,6 +29,8 @@ import { Onboarding } from './telas/Onboarding';
 import { Resumo } from './telas/Resumo';
 import { Simulador } from './telas/Simulador';
 import { Aporte } from './telas/folhas/Aporte';
+import { CadastroConta } from './telas/folhas/CadastroConta';
+import { CadastroMeta } from './telas/folhas/CadastroMeta';
 import { NovaTransacao } from './telas/folhas/NovaTransacao';
 import { Ritual } from './telas/folhas/Ritual';
 import { TemaProvider, useTema } from './tema/TemaContext';
@@ -68,6 +70,10 @@ function FolhaAtual() {
       return <Aporte metaId={estado.folha.metaId} />;
     case 'ritual':
       return <Ritual />;
+    case 'conta':
+      return <CadastroConta />;
+    case 'meta':
+      return <CadastroMeta />;
     default:
       return null;
   }

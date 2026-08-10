@@ -118,7 +118,12 @@ describe('fechar e reabrir', () => {
     ]);
     const depois = await sessao(motor);
 
-    expect(depois.diasSemGasto).toEqual(pendentes);
+    // A demo já traz dias sem gasto das semanas anteriores — é deles que sai a
+    // trilha de constância. O que este teste guarda é que os dois dias fechados
+    // agora entraram, sem duplicar nada, e sobreviveram a fechar e reabrir.
+    expect(depois.diasSemGasto).toEqual(expect.arrayContaining(pendentes));
+    expect(depois.diasSemGasto).toHaveLength(criarEstadoDemo(AGORA).diasSemGasto.length + 2);
+    expect(new Set(depois.diasSemGasto).size).toBe(depois.diasSemGasto.length);
     expect(depois.transacoes.some((t) => t.valorCentavos === -4250)).toBe(true);
   });
 

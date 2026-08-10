@@ -22,6 +22,8 @@ import { Onboarding } from '../Onboarding';
 import { Resumo } from '../Resumo';
 import { Simulador } from '../Simulador';
 import { Aporte } from '../folhas/Aporte';
+import { CadastroConta } from '../folhas/CadastroConta';
+import { CadastroMeta } from '../folhas/CadastroMeta';
 import { NovaTransacao } from '../folhas/NovaTransacao';
 import { Ritual } from '../folhas/Ritual';
 
@@ -52,6 +54,8 @@ const TELAS: {
   { nome: 'nova transação', no: <NovaTransacao />, texto: 'Nova transação' },
   { nome: 'aporte', no: <Aporte metaId="reserva" />, texto: 'Adicionar à meta' },
   { nome: 'ritual', no: <Ritual />, texto: 'Seu ritual' },
+  { nome: 'nova conta', no: <CadastroConta />, texto: 'Nova conta' },
+  { nome: 'nova meta', no: <CadastroMeta />, texto: 'Nova meta' },
 ];
 
 describe('renderização das telas', () => {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import { Barra, Disco, Hero, Toque, Txt } from '../componentes/basicos';
+import { Icone } from '../componentes/Icone';
 import { Vazio } from '../componentes/Vazio';
 import { icones } from '../dominio/categorias';
 import { formatar } from '../dominio/dinheiro';
@@ -17,13 +18,45 @@ export function Metas() {
   return (
     <View>
       <Hero estilo={{ paddingBottom: 22 }}>
-        <View style={{ gap: 6 }}>
-          <Txt tamanho={16} peso={600} cor={t.onHero} espacamento={-0.16}>
-            Metas
-          </Txt>
-          <Txt tamanho={12.5} cor={t.onHeroSoft}>
-            {formatar(totalGuardado(estado))} guardados
-          </Txt>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
+          <View style={{ gap: 6 }}>
+            <Txt tamanho={16} peso={600} cor={t.onHero} espacamento={-0.16}>
+              Metas
+            </Txt>
+            <Txt tamanho={12.5} cor={t.onHeroSoft}>
+              {formatar(totalGuardado(estado))} guardados
+            </Txt>
+          </View>
+
+          <Toque
+            aoTocar={() => despachar({ tipo: 'ABRIR_META' })}
+            rotuloAcessivel="Nova meta"
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: t.heroLine,
+                paddingVertical: 7,
+                paddingHorizontal: 13,
+              }}
+            >
+              <Icone path={icones.mais} tamanho={14} cor={t.onHero} espessura={2} />
+              <Txt tamanho={12.5} peso={600} cor={t.onHero}>
+                Nova meta
+              </Txt>
+            </View>
+          </Toque>
         </View>
       </Hero>
 
@@ -34,8 +67,8 @@ export function Metas() {
             titulo="Nenhuma meta ainda"
             texto="Meta é o que transforma gasto evitado em algo concreto. Sem uma, o dinheiro que sobra não vira nada."
             acao={{
-              rotulo: 'Simular quanto rende',
-              aoTocar: () => despachar({ tipo: 'IR_PARA', tela: 'simulador' }),
+              rotulo: 'Criar primeira meta',
+              aoTocar: () => despachar({ tipo: 'ABRIR_META' }),
             }}
           />
         ) : null}
@@ -59,21 +92,42 @@ export function Metas() {
                       {m.nome}
                     </Txt>
                     <Txt tamanho={11.5} cor={t.inkSoft}>
-                      {m.prazo}
+                      {m.prazoLabel}
                     </Txt>
                   </View>
                 </View>
-                <View
-                  style={{
-                    backgroundColor: t.accentSoft,
-                    borderRadius: 999,
-                    paddingVertical: 4,
-                    paddingHorizontal: 9,
-                  }}
-                >
-                  <Txt tamanho={12.5} peso={600} numerico cor={t.accent}>
-                    {m.pct}%
-                  </Txt>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View
+                    style={{
+                      backgroundColor: t.accentSoft,
+                      borderRadius: 999,
+                      paddingVertical: 4,
+                      paddingHorizontal: 9,
+                    }}
+                  >
+                    <Txt tamanho={12.5} peso={600} numerico cor={t.accent}>
+                      {m.pct}%
+                    </Txt>
+                  </View>
+
+                  <Toque
+                    aoTocar={() => despachar({ tipo: 'ABRIR_META', metaId: m.id })}
+                    rotuloAcessivel={`Editar ${m.nome}`}
+                  >
+                    <View
+                      style={{
+                        width: 30,
+                        height: 30,
+                        borderRadius: 999,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: t.surfaceMuted,
+                      }}
+                    >
+                      <Icone path={icones.lapis} tamanho={14} cor={t.inkMuted} espessura={1.8} />
+                    </View>
+                  </Toque>
                 </View>
               </View>
 

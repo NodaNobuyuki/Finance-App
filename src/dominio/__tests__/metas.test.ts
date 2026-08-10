@@ -1,4 +1,5 @@
-import { faltamParaMeta, guardadoDaMeta, totalGuardado } from '../metas';
+import { AGORA, somarDias } from '../datas';
+import { faltamParaMeta, guardadoDaMeta, rotuloDePrazo, totalGuardado } from '../metas';
 import { Aporte, Meta } from '../tipos';
 
 /**
@@ -24,7 +25,7 @@ const reserva: Meta = {
   nome: 'Reserva',
   alvoCentavos: 1200000,
   guardadoInicialCentavos: 640000,
-  prazo: '',
+  prazo: null,
   cor: { tipo: 'hex', hex: '#000000' },
   icone: '',
 };
@@ -74,6 +75,42 @@ describe('totalGuardado', () => {
   it('todo total é inteiro', () => {
     const total = totalGuardado([reserva, chile], [aporte('reserva', 3333)]);
     expect(Number.isInteger(total)).toBe(true);
+  });
+});
+
+describe('rotuloDePrazo', () => {
+  /**
+   * O rótulo já foi campo gravado (`'faltam 134 dias · 15 dez 2026'`) e por isso
+   * envelhecia: a meta seguia anunciando os mesmos dias meses depois. Estes
+   * testes travam que ele é sempre calculado contra o dia recebido.
+   */
+  it('meta sem prazo diz isso, sem inventar data', () => {
+    expect(rotuloDePrazo(null, AGORA)).toBe('sem prazo definido');
+  });
+
+  it('conta em dias quando está perto', () => {
+    expect(rotuloDePrazo(somarDias(AGORA, 132), AGORA)).toBe('faltam 132 dias · 15 dez 2026');
+    expect(rotuloDePrazo(somarDias(AGORA, 76), AGORA)).toBe('faltam 76 dias · 20 out 2026');
+  });
+
+  it('conta em meses quando está longe — 314 dias não ajuda ninguém', () => {
+    expect(rotuloDePrazo(somarDias(AGORA, 314), AGORA)).toBe('faltam 10 meses · jun 2027');
+  });
+
+  it('singular no último dia', () => {
+    expect(rotuloDePrazo(somarDias(AGORA, 1), AGORA)).toBe('falta 1 dia · 6 ago 2026');
+    expect(rotuloDePrazo(AGORA, AGORA)).toBe('vence hoje · 5 ago 2026');
+  });
+
+  it('prazo que passou não vira contagem negativa', () => {
+    expect(rotuloDePrazo(somarDias(AGORA, -3), AGORA)).toBe('prazo vencido · 2 ago 2026');
+  });
+
+  it('o mesmo prazo muda de texto conforme o dia anda', () => {
+    const prazo = somarDias(AGORA, 40);
+    expect(rotuloDePrazo(prazo, AGORA)).toBe('faltam 40 dias · 14 set 2026');
+    expect(rotuloDePrazo(prazo, somarDias(AGORA, 39))).toBe('falta 1 dia · 14 set 2026');
+    expect(rotuloDePrazo(prazo, somarDias(AGORA, 41))).toBe('prazo vencido · 14 set 2026');
   });
 });
 
