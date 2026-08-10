@@ -2,7 +2,8 @@ import React from 'react';
 import { ScrollView, View } from 'react-native';
 import { Chip, Hero, Toque, Txt } from '../componentes/basicos';
 import { ItemTransacao } from '../componentes/ItemTransacao';
-import { categoria } from '../dominio/categorias';
+import { Vazio } from '../componentes/Vazio';
+import { categoria, icones } from '../dominio/categorias';
 import { rotuloDia, rotuloMesCurto } from '../dominio/datas';
 import { comSinal, formatar } from '../dominio/dinheiro';
 import { totalEntradas, totalSaidas } from '../dominio/saldo';
@@ -175,11 +176,33 @@ export function Extrato() {
         ))}
 
         {grupos.length === 0 ? (
-          <View style={{ paddingVertical: 34, alignItems: 'center' }}>
-            <Txt tamanho={13} cor={t.inkFaint}>
-              Nenhuma transação com esses filtros.
-            </Txt>
-          </View>
+          // Duas coisas diferentes: ainda não há nada, ou o filtro não casou.
+          // A saída de cada uma é outra, então a mensagem não pode ser a mesma.
+          estado.transacoes.length === 0 ? (
+            <Vazio
+              icone={icones.extrato}
+              titulo="Seu extrato começa aqui"
+              texto="Cada lançamento vira histórico, e o histórico é o que mostra para onde seu dinheiro vai."
+              acao={{
+                rotulo: 'Registrar o primeiro',
+                aoTocar: () => despachar({ tipo: 'ABRIR_NOVA' }),
+              }}
+            />
+          ) : (
+            <Vazio
+              compacto
+              icone={icones.grafico}
+              titulo="Nenhuma transação com esses filtros"
+              texto="Tente outra conta ou outra categoria."
+              acao={{
+                rotulo: 'Limpar filtros',
+                aoTocar: () => {
+                  despachar({ tipo: 'FILTRO_CONTA', conta: 'todas' });
+                  despachar({ tipo: 'FILTRO_CATEGORIA', categoria: 'todas' });
+                },
+              }}
+            />
+          )
         ) : null}
       </View>
     </View>

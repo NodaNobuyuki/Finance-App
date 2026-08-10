@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { Barra, Disco, Hero, Rotulo, Toque, Txt } from '../componentes/basicos';
 import { Icone } from '../componentes/Icone';
 import { ItemTransacao } from '../componentes/ItemTransacao';
+import { Vazio } from '../componentes/Vazio';
 import { categoria, icones } from '../dominio/categorias';
 import { rotuloMes } from '../dominio/datas';
 import { comSinal, formatar, formatarRedondo } from '../dominio/dinheiro';
@@ -95,7 +96,7 @@ export function Inicio() {
           style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
         >
           <Txt tamanho={16} peso={600} cor={t.onHero} espacamento={-0.16}>
-            Olá, Marina
+            {estado.perfil.nome ? `Olá, ${estado.perfil.nome}` : 'Olá'}
           </Txt>
           <View
             style={{
@@ -109,7 +110,7 @@ export function Inicio() {
             }}
           >
             <Txt tamanho={12.5} peso={600} cor={t.onHero}>
-              M
+              {estado.perfil.nome.trim().charAt(0).toUpperCase() || '—'}
             </Txt>
           </View>
         </View>
@@ -471,9 +472,22 @@ export function Inicio() {
               </Txt>
             </Toque>
           </View>
-          {recentes.map((tx, i) => (
-            <ItemTransacao key={tx.id} tx={tx} separador={i < recentes.length - 1} />
-          ))}
+          {recentes.length > 0 ? (
+            recentes.map((tx, i) => (
+              <ItemTransacao key={tx.id} tx={tx} separador={i < recentes.length - 1} />
+            ))
+          ) : (
+            <Vazio
+              compacto
+              icone={icones.extrato}
+              titulo="Nenhum lançamento ainda"
+              texto="Registre o primeiro gasto — leva menos de dez segundos."
+              acao={{
+                rotulo: 'Registrar agora',
+                aoTocar: () => despachar({ tipo: 'ABRIR_NOVA' }),
+              }}
+            />
+          )}
         </View>
       </View>
     </View>

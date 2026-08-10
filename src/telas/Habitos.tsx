@@ -1,7 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import { Barra, BotaoVoltar, CartaoNumero, Disco, Hero, Toque, Txt } from '../componentes/basicos';
-import { categoria, icones } from '../dominio/categorias';
+import { categoria } from '../dominio/categorias';
 import { nomeDoMes } from '../dominio/datas';
 import {
   desafios,
@@ -319,11 +319,57 @@ export function Habitos() {
           </View>
         </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11 }}>
-          <Disco path={icones.check} cor={t.up} fundo={t.segment} tamanho={32} icone={16} />
-          <Txt tamanho={12.5} cor={t.inkMuted} entrelinha={1.4} estilo={{ flex: 1 }}>
-            Julho fechado: 4 semanas seguidas com registro em dia
+        {/* ── Dados ── */}
+        <View style={{ gap: 10 }}>
+          <Txt tamanho={15} peso={600}>
+            Seus dados
           </Txt>
+          <Txt tamanho={12} cor={t.inkSoft} entrelinha={1.45} estilo={{ marginTop: -4 }}>
+            Tudo fica só neste aparelho. Nada é enviado para nenhum servidor.
+          </Txt>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {estado.transacoes.length === 0 ? (
+              <Toque
+                aoTocar={() => despachar({ tipo: 'CARREGAR_DEMO' })}
+                rotuloAcessivel="Carregar dados de exemplo"
+              >
+                <View
+                  style={{
+                    borderRadius: 999,
+                    paddingVertical: 9,
+                    paddingHorizontal: 15,
+                    borderWidth: 1,
+                    borderColor: t.lineInput,
+                  }}
+                >
+                  <Txt tamanho={12.5} peso={600} cor={t.inkMuted}>
+                    Carregar dados de exemplo
+                  </Txt>
+                </View>
+              </Toque>
+            ) : (
+              // Destrutivo, mas com undo no toast em vez de modal de
+              // confirmação — a mesma regra de apagar um lançamento.
+              <Toque
+                aoTocar={() => despachar({ tipo: 'APAGAR_DADOS' })}
+                rotuloAcessivel="Apagar todos os dados"
+              >
+                <View
+                  style={{
+                    borderRadius: 999,
+                    paddingVertical: 9,
+                    paddingHorizontal: 15,
+                    borderWidth: 1,
+                    borderColor: t.down,
+                  }}
+                >
+                  <Txt tamanho={12.5} peso={600} cor={t.down}>
+                    Apagar todos os dados
+                  </Txt>
+                </View>
+              </Toque>
+            )}
+          </View>
         </View>
       </View>
     </View>

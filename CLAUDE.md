@@ -185,14 +185,64 @@ src/
 
 ```
 src/dominio/    dinheiro (centavos), saldo derivado, guardado das metas,
-                categorias, taxas, datas, seed
+                categorias, taxas, datas, ids, erros, seed
+src/dados/      persistência: motor SQL, migrations, repositórios
 src/estado/     store (reducer + context) e derivados (seleções)
 src/componentes/ primitivos que leem tokens do tema
-src/telas/      uma tela por arquivo, folhas em telas/folhas/
+src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em Onboarding
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = lint + tipos + 84 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = lint + tipos + 261 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+
+### Erros: domínio ≠ infra
+
+`ErroDeDominio` é regra violada — explicável ao usuário, repetir não adianta. `ErroDeInfra` é o mundo falhando — disco cheio, migration quebrada — e costuma valer retentar. A distinção decide a interface, e `mensagemParaOUsuario()` nunca vaza detalhe técnico de infra.
+
+`categoria(id)` **não lança**: id fora do catálogo devolve uma categoria órfã que preserva o id. Com dado em disco, uma linha apontando para categoria removida derrubaria o Extrato inteiro.
+
+### Persistência
+
+```
+Estado (memória, sempre a fonte)
+  └─ usePersistencia  → compara referências, O(1)
+       └─ RepositorioLocal   ← contrato, duas implementações
+            ├─ repositorioSQL(MotorSQL)   → motorExpo (aparelho)
+            │                             → motorNode (teste, SQLite real)
+            └─ repositorioMemoria
+```
+
+**Nada é aguardado pela interface.** A gravação é efeito pós-render; o usuário vê saldo e toast na hora. O gatilho é comparação por referência — como o reducer é imutável, digitar no teclado numérico não encosta no banco.
+
+**A escrita é diff por id**, não reescrita de tabela: registrar um gasto grava uma linha. Falha de gravação devolve o ponto de comparação para trás, então a próxima escrita reenvia o que se perdeu.
+
+**`MotorSQL` existe para o SQL ser testável.** `expo-sqlite` é nativo e não roda no Jest; sem esse seam, migrations só seriam exercitadas no aparelho. A mesma suíte de contrato roda contra memória e contra SQLite de verdade (`node:sqlite`, embutido no Node 24). Sem cobertura sobra só `motorExpo.ts`, que é repasse puro.
+
+**Migration publicada nunca é editada** — entra versão nova no fim da lista. Editar a v1 depois que alguém instalou deixa o banco daquela pessoa no esquema antigo com `user_version` já avançado. Cada uma roda na própria transação: falhou, o banco fica íntegro na versão anterior.
+
+### O reducer é puro; id e relógio entram por injeção
+
+`criarReducer(deps)` recebe `{ gerarId, agoraMs }`. São as duas únicas fontes de não-determinismo em toda a escrita, e chamá-las dentro do reducer tornaria os testes irreproduzíveis. `dependenciasReais` usa UUID v7 e `Date.now()`; `dependenciasDeTeste()` usa contadores. **É este o mesmo ponto onde o repositório vai se plugar** — não abra um segundo.
+
+Ids são UUID v7 (`src/dominio/ids.ts`), sem dependência nova: `crypto.getRandomValues` quando existir, `Math.random` como fallback. Sequencial colidiria entre reinstalações e entre aparelhos, e id de linha gravada não se troca sem migração de dado vivo.
+
+**A data real está ligada.** `AGORA` continua existindo só como âncora dos testes; o app monta com `criarEstadoInicial(hojeReal())` e `useSincronizarDia` reconfere quando o app volta do segundo plano. Por isso a semente é função do dia: data cravada envelheceria e a demo abriria num mês vazio.
+
+`semanaFechada` é `DiaISO | null` — guarda **qual** semana foi fechada, e `semanaEstaFechada()` compara com a semana corrente. Era `boolean`, o que sob persistência congelaria o ritual fechado para sempre.
+
+### Primeiro uso
+
+O app abre **vazio**. Banco sem nada é sinal de instalação nova: `criarEstadoVazio` + onboarding de 3 passos (nome, primeira conta com saldo de abertura, meta opcional). Nada é gravado antes de a pessoa concluir — o disco não deve conter dado que ela não criou.
+
+A demo virou modo explícito (`criarEstadoDemo`), alcançável pelo onboarding e por Hábitos. **`estadoVazio` é o par de `estadoInicial` nos testes**, e as telas são montadas contra os dois.
+
+Os números de `contexto` (`semanasEmDia`, `lancamentosMesAnterior`) são placeholders da demo e vão a **zero** no estado vazio: anunciar "5 semanas seguidas em dia" para quem instalou agora é mentira, não valor de partida.
+
+### Desafio: definição é catálogo, progresso é do usuário
+
+`src/dominio/desafios.ts` guarda nome, alvo e ação; `Estado.progressoDesafios` guarda só `{ id, aceito, progresso }`, e a ausência de linha faz valer o padrão da definição.
+
+Isso não desfaz a regra abaixo — é a mesma divisão de categoria × transação. O motivo é atualização: com a definição gravada no banco de cada pessoa, **desafio novo publicado numa versão seguinte nunca apareceria** para quem já instalou, porque o app leria a lista do disco. Foi por isso que entrou a migration v2.
 
 ### `seed` é semente do estado, não fonte de consulta
 
@@ -207,16 +257,17 @@ O motivo é persistência: **o que não está no `Estado` não tem como ser grav
 **Resolvido do protótipo:** saldo derivado (com teste travando os valores), undo no toast, orçamento com cor progressiva, insight na Home, aporte de valor livre.
 
 **Pendências abertas:**
-- Data ancorada em `AGORA` (`src/dominio/datas.ts`) — centralizada, mas ainda fixa. `hojeReal()` está pronto ao lado
-- `semanaFechada` é `boolean` e não sabe de qual semana. Em memória some ao fechar o app; persistido, fica `true` para sempre e o ritual nunca mais abre. Vira `DiaISO | null` (o início da semana fechada) junto com o relógio real
 - Aporte não move dinheiro: guardar R$ 500 numa meta não altera saldo nenhum. Modelar como transferência exige o conceito de par de transações — decisão à parte, ainda não tomada
+- Conta e meta só nascem no onboarding. Falta "nova conta" e "nova meta" no app já rodando — hoje quem apaga tudo fica sem caminho para recriar
+- Categoria órfã aparece como "Sem categoria" mas não há como recategorizar o lançamento
+- `Meta.prazo` é string pré-formatada (`'faltam 134 dias · 15 dez 2026'`), então envelhece sozinha. Vira `DiaISO` quando metas forem criadas pelo usuário
 - Tela Categorias abre o extrato filtrado, mas não virou tela de orçamento
 - Setas de mês no Extrato e "Nova categoria" são decorativas
-- Sem persistência: estado só em memória, fecha o app e perde tudo
-- Erros ainda são `throw new Error` genéricos em 3 pontos
-- Ids são `tx-${seq}`/`ap-${seq}` — determinísticos para teste, mas colidem entre reinstalações e entre aparelhos. Trocar por UUID v7 injetado antes de existir dado real
+- Categorias ainda são catálogo fixo. Viram dado do usuário (e vão para o `Estado` e para o banco) quando "Nova categoria" funcionar
+- Sem retentativa ativa de gravação: o reenvio pega carona na próxima mudança. Um outbox resolve, se virar problema
+- Nenhuma tela lê do banco sob demanda — o estado inteiro é carregado no boot. Aguenta bem os primeiros anos; a saída é paginar por período no repositório
 
-**Próximo ciclo, em ordem:** ids que sobrevivem a dois aparelhos → erros tipados (`ErroDeDominio` ≠ `ErroDeInfra`, antes do SQLite trazer disco cheio e migration falha) → persistência com `expo-sqlite` atrás de um repository, com migrations versionadas desde a v1 e testes de contrato rodando contra memória e contra SQLite → relógio real junto com a virada de semana. Só depois: `SectionList` no Extrato (o agrupamento em `agruparPorDia` já encaixa, e ele hoje é O(n·dias)) e memoização dos derivados.
+**Próximo ciclo:** criação de conta e meta fora do onboarding, categorias como dado do usuário (destrava "Nova categoria" e a tela Categorias virar orçamento) e recategorizar lançamento. Depois: `SectionList` no Extrato (o agrupamento em `agruparPorDia` já encaixa, e ele hoje é O(n·dias)) e memoização dos derivados.
 
 **Decisão em aberto:** a v1 vale ser 100% local, sem backend. Não perde o loop comportamental, dispensa auth e infra, e encurta muito o caminho até a loja. Backend entra quando houver sync entre aparelhos ou receita — mesmo critério já aplicado ao Open Finance.
 

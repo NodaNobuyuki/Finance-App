@@ -1,5 +1,6 @@
-import { desafios, metas, semana, totalGuardado } from '../derivados';
-import { Acao, Estado, estadoInicial, reducer } from '../store';
+import { inicioDaSemana, somarDias } from '../../dominio/datas';
+import { desafios, metas, semana, semanaEstaFechada, totalGuardado } from '../derivados';
+import { Acao, criarReducer, dependenciasDeTeste, Estado, estadoInicial } from '../store';
 
 /**
  * O ciclo do hábito é o produto. Estes testes travam o comportamento que o
@@ -8,7 +9,7 @@ import { Acao, Estado, estadoInicial, reducer } from '../store';
  */
 
 function aplicar(estado: Estado, ...acoes: Acao[]): Estado {
-  return acoes.reduce(reducer, estado);
+  return acoes.reduce(criarReducer(dependenciasDeTeste()), estado);
 }
 
 describe('semana', () => {
@@ -116,18 +117,64 @@ describe('lançamento em lote', () => {
 });
 
 describe('fechamento da semana', () => {
-  it('percorre os 3 passos e volta para a home fechada', () => {
-    const fechado = aplicar(
-      estadoInicial,
+  const fechar = (estado: Estado) =>
+    aplicar(
+      estado,
       { tipo: 'FECHAR_INICIAR' },
       { tipo: 'FECHAR_PASSO', passo: 3 },
       { tipo: 'FECHAR_INTENCAO', id: 'delivery', nome: 'Menos delivery' },
       { tipo: 'FECHAR_CONCLUIR' },
     );
-    expect(fechado.semanaFechada).toBe(true);
+
+  it('percorre os 3 passos e volta para a home fechada', () => {
+    const fechado = fechar(estadoInicial);
+    expect(semanaEstaFechada(fechado)).toBe(true);
     expect(fechado.tela).toBe('home');
     expect(fechado.fechando).toBe(false);
     expect(fechado.toast?.sub).toContain('menos delivery');
+  });
+
+  it('guarda QUAL semana foi fechada, não um sim/não', () => {
+    expect(fechar(estadoInicial).semanaFechada).toBe(inicioDaSemana(estadoInicial.hoje));
+  });
+
+  it('virou a semana, o ritual reabre sozinho', () => {
+    const fechado = fechar(estadoInicial);
+    // Segunda-feira seguinte: o fechamento gravado é de outra semana.
+    const proximaSemana = somarDias(inicioDaSemana(estadoInicial.hoje), 7);
+    const depois = aplicar(fechado, { tipo: 'DIA_MUDOU', dia: proximaSemana });
+
+    expect(semanaEstaFechada(depois)).toBe(false);
+    // O registro do fechamento anterior continua lá — não foi apagado, só deixou
+    // de valer para a semana corrente.
+    expect(depois.semanaFechada).toBe(inicioDaSemana(estadoInicial.hoje));
+  });
+
+  it('ainda na mesma semana, continua fechada no dia seguinte', () => {
+    const fechado = fechar(estadoInicial);
+    const amanha = somarDias(estadoInicial.hoje, 1);
+    const depois = aplicar(fechado, { tipo: 'DIA_MUDOU', dia: amanha });
+    expect(semanaEstaFechada(depois)).toBe(inicioDaSemana(amanha) === fechado.semanaFechada);
+  });
+});
+
+describe('virada do dia', () => {
+  it('move `hoje` e nada mais', () => {
+    const amanha = somarDias(estadoInicial.hoje, 1);
+    const depois = aplicar(estadoInicial, { tipo: 'DIA_MUDOU', dia: amanha });
+    expect(depois.hoje).toBe(amanha);
+    expect(depois.transacoes).toBe(estadoInicial.transacoes);
+  });
+
+  it('mesmo dia não cria estado novo', () => {
+    const depois = aplicar(estadoInicial, { tipo: 'DIA_MUDOU', dia: estadoInicial.hoje });
+    expect(depois).toBe(estadoInicial);
+  });
+
+  it('o dia novo entra na conta da semana', () => {
+    const amanha = somarDias(estadoInicial.hoje, 1);
+    const depois = aplicar(estadoInicial, { tipo: 'DIA_MUDOU', dia: amanha });
+    expect(semana(depois).pendentes).toContain(amanha);
   });
 });
 

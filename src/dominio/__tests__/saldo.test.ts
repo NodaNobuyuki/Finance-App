@@ -1,6 +1,10 @@
+import { AGORA } from '../datas';
 import { saldoDaConta, saldoTotal, somaPorCategoria, totalEntradas, totalSaidas } from '../saldo';
-import * as seed from '../seed';
+import { semente } from '../seed';
 import { Conta, Transacao } from '../tipos';
+
+/** A demo ancorada em `AGORA` — os saldos abaixo são os do protótipo. */
+const demo = semente(AGORA);
 
 function tx(contaId: string, valorCentavos: number, ocorridoEm = '2026-08-01'): Transacao {
   return {
@@ -43,8 +47,8 @@ describe('saldoDaConta', () => {
 
 describe('saldoTotal', () => {
   it('é a soma dos saldos derivados de cada conta', () => {
-    const somaPorConta = seed.contas.reduce((a, c) => a + saldoDaConta(c, seed.transacoes), 0);
-    expect(saldoTotal(seed.contas, seed.transacoes)).toBe(somaPorConta);
+    const somaPorConta = demo.contas.reduce((a, c) => a + saldoDaConta(c, demo.transacoes), 0);
+    expect(saldoTotal(demo.contas, demo.transacoes)).toBe(somaPorConta);
   });
 
   it('reproduz os saldos que o protótipo mostrava', () => {
@@ -54,15 +58,15 @@ describe('saldoTotal', () => {
       cartao: -142030,
       poupanca: 462000,
     };
-    for (const c of seed.contas) {
-      expect(saldoDaConta(c, seed.transacoes)).toBe(esperado[c.id]);
+    for (const c of demo.contas) {
+      expect(saldoDaConta(c, demo.transacoes)).toBe(esperado[c.id]);
     }
-    expect(saldoTotal(seed.contas, seed.transacoes)).toBe(1248235);
+    expect(saldoTotal(demo.contas, demo.transacoes)).toBe(1248235);
   });
 
   it('um lançamento novo move o saldo — nunca fica dessincronizado', () => {
-    const antes = saldoTotal(seed.contas, seed.transacoes);
-    const depois = saldoTotal(seed.contas, [...seed.transacoes, tx('cartao', -5000)]);
+    const antes = saldoTotal(demo.contas, demo.transacoes);
+    const depois = saldoTotal(demo.contas, [...demo.transacoes, tx('cartao', -5000)]);
     expect(depois).toBe(antes - 5000);
   });
 });
@@ -74,8 +78,8 @@ describe('entradas e saídas', () => {
   });
 
   it('todo total é inteiro', () => {
-    expect(Number.isInteger(totalSaidas(seed.transacoes))).toBe(true);
-    expect(Number.isInteger(totalEntradas(seed.transacoes))).toBe(true);
+    expect(Number.isInteger(totalSaidas(demo.transacoes))).toBe(true);
+    expect(Number.isInteger(totalEntradas(demo.transacoes))).toBe(true);
   });
 });
 

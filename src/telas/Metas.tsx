@@ -1,6 +1,8 @@
 import React from 'react';
 import { View } from 'react-native';
 import { Barra, Disco, Hero, Toque, Txt } from '../componentes/basicos';
+import { Vazio } from '../componentes/Vazio';
+import { icones } from '../dominio/categorias';
 import { formatar } from '../dominio/dinheiro';
 import { metas, totalGuardado } from '../estado/derivados';
 import { useLoja } from '../estado/store';
@@ -26,6 +28,18 @@ export function Metas() {
       </Hero>
 
       <View style={{ paddingHorizontal: 22, paddingTop: 22, paddingBottom: 26, gap: 26 }}>
+        {lista.length === 0 ? (
+          <Vazio
+            icone={icones.metas}
+            titulo="Nenhuma meta ainda"
+            texto="Meta é o que transforma gasto evitado em algo concreto. Sem uma, o dinheiro que sobra não vira nada."
+            acao={{
+              rotulo: 'Simular quanto rende',
+              aoTocar: () => despachar({ tipo: 'IR_PARA', tela: 'simulador' }),
+            }}
+          />
+        ) : null}
+
         {lista.map((m) => {
           const cor = resolverCor(m.cor, paleta);
           return (

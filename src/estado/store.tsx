@@ -1,6 +1,15 @@
-import React, { createContext, useContext, useMemo, useReducer } from 'react';
-import { categoria } from '../dominio/categorias';
-import { AGORA, DiaISO, DiaRitualId, inicioDaSemana, rotuloCurto } from '../dominio/datas';
+import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
+import { AppState } from 'react-native';
+import { categoria, icones } from '../dominio/categorias';
+import { definicoesDesafios, progressoDe } from '../dominio/desafios';
+import {
+  AGORA,
+  DiaISO,
+  DiaRitualId,
+  hojeReal,
+  inicioDaSemana,
+  rotuloCurto,
+} from '../dominio/datas';
 import {
   Centavos,
   deDigitos,
@@ -9,17 +18,20 @@ import {
   formatar,
   removerDigito,
 } from '../dominio/dinheiro';
-import * as seed from '../dominio/seed';
+import { GerarId, idsSequenciais, uuidV7 } from '../dominio/ids';
+import { Semente, semente, vazia } from '../dominio/seed';
 import {
   Aporte,
   Conta,
   Contexto,
-  Desafio,
   Meta,
+  Perfil,
+  ProgressoDesafio,
   SemanaHistorica,
   Tela,
   Transacao,
 } from '../dominio/tipos';
+import { CorRef, token } from '../tema/paletas';
 
 /* ────────────────────────────────────────────────────────────────
    Estado
@@ -52,6 +64,30 @@ export type Toast = {
 export type Folha =
   null | { tipo: 'nova' } | { tipo: 'aporte'; metaId: string } | { tipo: 'ritual' };
 
+/**
+ * Rascunho do primeiro uso. Não é persistido: quem fecha o app no meio começa
+ * de novo, e é melhor assim do que reabrir num passo 2 sem contexto.
+ */
+export type Onboarding = {
+  passo: 1 | 2 | 3;
+  nome: string;
+  contaNome: string;
+  contaTipo: Conta['tipo'];
+  contaDigitos: string;
+  metaNome: string;
+  metaDigitos: string;
+};
+
+const ONBOARDING_VAZIO: Onboarding = {
+  passo: 1,
+  nome: '',
+  contaNome: 'Conta corrente',
+  contaTipo: 'corrente',
+  contaDigitos: '',
+  metaNome: '',
+  metaDigitos: '',
+};
+
 export type Estado = {
   hoje: DiaISO;
   tela: Tela;
@@ -60,17 +96,23 @@ export type Estado = {
      Tudo o que é dado do usuário mora aqui, e só aqui. Nada disto pode
      voltar a ser constante de módulo: o que não está no estado não tem
      como ser persistido nem recarregado. */
+  perfil: Perfil;
   transacoes: Transacao[];
   contas: Conta[];
   metas: Meta[];
   /** Eventos de "guardei dinheiro". O guardado de cada meta é derivado deles. */
   aportes: Aporte[];
-  desafios: Desafio[];
+  /** Só o que é do usuário; a definição do desafio é catálogo. */
+  progressoDesafios: ProgressoDesafio[];
   historicoSemanas: SemanaHistorica[];
   /** Dias que o usuário declarou "não gastei" — contam como registro. */
   diasSemGasto: DiaISO[];
   orcamentoMensalCentavos: Centavos;
   contexto: Contexto;
+
+  /** Já passou pelo primeiro uso. Persistido: só acontece uma vez. */
+  onboardingConcluido: boolean;
+  onboarding: Onboarding;
 
   mostrarSaldo: boolean;
   filtroConta: string;
@@ -83,7 +125,15 @@ export type Estado = {
   ritualPrimeira: boolean;
   lembrete: string;
 
-  semanaFechada: boolean;
+  /**
+   * Início (segunda-feira) da semana que o usuário fechou, ou `null`.
+   *
+   * Já foi `boolean`. Em memória isso passava, porque o app reabria zerado; com
+   * persistência, um `true` gravado congela o ritual para sempre — nenhuma
+   * semana seguinte volta a pedir fechamento. Guardar QUAL semana faz a virada
+   * acontecer sozinha: ver `semanaEstaFechada` em `derivados.ts`.
+   */
+  semanaFechada: DiaISO | null;
   fechando: boolean;
   fecharPasso: 1 | 2 | 3;
   intencao: string;
@@ -109,48 +159,83 @@ const RASCUNHO_VAZIO: Rascunho = {
   descricao: '',
 };
 
-/** Único ponto do app que lê `seed`: é a semente do estado, não fonte de consulta. */
-export const estadoInicial: Estado = {
-  hoje: AGORA,
-  tela: 'home',
+/**
+ * Estado de partida a partir de uma semente, ancorado num dia.
+ *
+ * Recebe `hoje` em vez de consultar o relógio para o teste continuar
+ * determinístico; o app real passa `hojeReal()`.
+ */
+function estadoDe(hoje: DiaISO, s: Semente, onboardingConcluido: boolean): Estado {
+  return {
+    hoje,
+    tela: 'home',
 
-  transacoes: seed.transacoes,
-  contas: seed.contas,
-  metas: seed.metas,
-  aportes: seed.aportes,
-  desafios: seed.desafios,
-  historicoSemanas: seed.historicoSemanas,
-  diasSemGasto: [],
-  orcamentoMensalCentavos: seed.orcamentoMensalCentavos,
-  contexto: seed.contexto,
+    perfil: s.perfil,
+    transacoes: s.transacoes,
+    contas: s.contas,
+    metas: s.metas,
+    aportes: s.aportes,
+    progressoDesafios: s.progressoDesafios,
+    historicoSemanas: s.historicoSemanas,
+    diasSemGasto: [],
+    orcamentoMensalCentavos: s.orcamentoMensalCentavos,
+    contexto: s.contexto,
 
-  mostrarSaldo: true,
-  filtroConta: 'todas',
-  filtroCategoria: 'todas',
-  abaCategorias: 'despesa',
-  insightIdx: 0,
+    onboardingConcluido,
+    onboarding: ONBOARDING_VAZIO,
 
-  ritualDiaFechamento: 'domingo',
-  metaSemanal: 4,
-  ritualPrimeira: false,
-  lembrete: 'domingo',
+    mostrarSaldo: true,
+    filtroConta: 'todas',
+    filtroCategoria: 'todas',
+    abaCategorias: 'despesa',
+    insightIdx: 0,
 
-  semanaFechada: false,
-  fechando: false,
-  fecharPasso: 1,
-  intencao: '',
-  intencaoSel: '',
+    ritualDiaFechamento: 'domingo',
+    metaSemanal: 4,
+    ritualPrimeira: false,
+    lembrete: 'domingo',
 
-  lote: {},
+    semanaFechada: null,
+    fechando: false,
+    fecharPasso: 1,
+    intencao: '',
+    intencaoSel: '',
 
-  folha: null,
-  rascunho: RASCUNHO_VAZIO,
-  simDigitos: '',
-  simTaxaId: 'cdi',
+    lote: {},
 
-  toast: null,
-  seq: 0,
-};
+    folha: null,
+    rascunho: RASCUNHO_VAZIO,
+    simDigitos: '',
+    simTaxaId: 'cdi',
+
+    toast: null,
+    seq: 0,
+  };
+}
+
+/**
+ * App recém-instalado: nada dentro, onboarding pendente.
+ *
+ * É este o padrão do boot. A demo virou escolha explícita — semear o SQLite
+ * com a Marina no primeiro uso entregaria dado de mentira como se fosse dele.
+ */
+export function criarEstadoVazio(hoje: DiaISO): Estado {
+  return estadoDe(hoje, vazia(), false);
+}
+
+/** Dados de demonstração, como modo explícito. */
+export function criarEstadoDemo(hoje: DiaISO): Estado {
+  return estadoDe(hoje, semente(hoje), true);
+}
+
+/**
+ * Estado da demo ancorado em `AGORA`. É o que a maior parte dos testes usa —
+ * determinístico por construção.
+ */
+export const estadoInicial: Estado = criarEstadoDemo(AGORA);
+
+/** Par vazio do anterior, para exercitar as telas sem dado nenhum. */
+export const estadoVazio: Estado = criarEstadoVazio(AGORA);
 
 /* ────────────────────────────────────────────────────────────────
    Ações
@@ -199,7 +284,49 @@ export type Acao =
   | { tipo: 'SIM_DEFINIR'; digitos: string }
   | { tipo: 'SIM_GUARDAR'; metaId: string }
   | { tipo: 'SIMULAR_DO_RASCUNHO' }
+  | { tipo: 'DIA_MUDOU'; dia: DiaISO }
+  /** Recado do mundo externo — hoje, falha ao gravar no disco. */
+  | { tipo: 'AVISAR'; texto: string; sub?: string }
+  | { tipo: 'ONBOARDING_CAMPO'; campo: keyof Omit<Onboarding, 'passo'>; valor: string }
+  | { tipo: 'ONBOARDING_TIPO_CONTA'; tipo_: Conta['tipo'] }
+  | { tipo: 'ONBOARDING_PASSO'; passo: 1 | 2 | 3 }
+  | { tipo: 'ONBOARDING_CONCLUIR' }
+  | { tipo: 'CARREGAR_DEMO' }
+  | { tipo: 'APAGAR_DADOS' }
+  | { tipo: 'RESTAURAR'; estado: Estado }
   | { tipo: 'LIMPAR_TOAST'; id: number };
+
+/* ────────────────────────────────────────────────────────────────
+   Dependências
+   ──────────────────────────────────────────────────────────────── */
+
+/**
+ * O que o reducer precisa do mundo externo.
+ *
+ * Id e relógio são as duas únicas fontes de não-determinismo em toda a
+ * escrita. Chamá-las lá dentro tornaria o reducer impuro e os testes
+ * irreproduzíveis; recebê-las de fora mantém `(estado, ação) => estado` e
+ * deixa o mesmo ponto de entrada pronto para o repositório, adiante.
+ */
+export type Dependencias = {
+  gerarId: GerarId;
+  /** Epoch em ms, para `criadoEm`. */
+  agoraMs: () => number;
+};
+
+export const dependenciasReais: Dependencias = {
+  gerarId: () => uuidV7(),
+  agoraMs: () => Date.now(),
+};
+
+/** Contadores novos a cada chamada: mesma sequência de ações, mesmo resultado. */
+export function dependenciasDeTeste(): Dependencias {
+  let ms = 1_000_000;
+  return {
+    gerarId: idsSequenciais('id'),
+    agoraMs: () => (ms += 1),
+  };
+}
 
 /* ────────────────────────────────────────────────────────────────
    Auxiliares do reducer
@@ -255,7 +382,7 @@ function avisar(seq: number, texto: string, sub?: string): Toast {
 }
 
 function novaTransacao(
-  seq: number,
+  d: Dependencias,
   campos: {
     contaId: string;
     categoriaId: string;
@@ -265,7 +392,7 @@ function novaTransacao(
   },
 ): Transacao {
   return {
-    id: `tx-${seq}`,
+    id: d.gerarId(),
     contaId: campos.contaId,
     categoriaId: campos.categoriaId,
     valorCentavos: campos.valorCentavos,
@@ -274,31 +401,53 @@ function novaTransacao(
     descricaoOriginal: campos.descricao,
     // Escrita local primeiro. O sync (quando existir) lê daqui, nunca o inverso.
     origem: 'manual',
-    criadoEm: 1_000_000 + seq,
+    criadoEm: d.agoraMs(),
   };
 }
 
 function novoAporte(
-  seq: number,
+  d: Dependencias,
   campos: { metaId: string; valorCentavos: Centavos; ocorridoEm: DiaISO },
 ): Aporte {
   return {
-    id: `ap-${seq}`,
+    id: d.gerarId(),
     metaId: campos.metaId,
     valorCentavos: campos.valorCentavos,
     ocorridoEm: campos.ocorridoEm,
     origem: 'manual',
-    criadoEm: 1_000_000 + seq,
+    criadoEm: d.agoraMs(),
   };
 }
 
-/** Aplica `mudar` ao desafio de id `desafioId` e devolve a lista nova. */
-function comDesafio(
-  desafios: Desafio[],
+/**
+ * Aplica `mudar` ao progresso de um desafio, criando a linha se ela ainda não
+ * existir — o padrão do catálogo vale enquanto ninguém tocou no desafio.
+ */
+function comProgresso(
+  e: Estado,
   desafioId: string,
-  mudar: (d: Desafio) => Desafio,
-): Desafio[] {
-  return desafios.map((d) => (d.id === desafioId ? mudar(d) : d));
+  mudar: (p: ProgressoDesafio) => ProgressoDesafio,
+): ProgressoDesafio[] {
+  const definicao = definicoesDesafios.find((d) => d.id === desafioId);
+  if (!definicao) return e.progressoDesafios;
+
+  const atual = progressoDe(definicao, e.progressoDesafios);
+  const novo = mudar(atual);
+  return e.progressoDesafios.some((p) => p.id === desafioId)
+    ? e.progressoDesafios.map((p) => (p.id === desafioId ? novo : p))
+    : [...e.progressoDesafios, novo];
+}
+
+/** Cor de uma conta nova, por tipo. A paleta resolve o token na hora de pintar. */
+function corDaConta(tipo: Conta['tipo']): CorRef {
+  switch (tipo) {
+    case 'cartao':
+      return token('down');
+    case 'poupanca':
+      return token('up');
+    default:
+      return token('accent');
+  }
 }
 
 const LINHA_LOTE_VAZIA: LinhaLote = { texto: '', categoriaId: 'mercado', semGasto: false };
@@ -318,7 +467,19 @@ function ordenar(transacoes: Transacao[]): Transacao[] {
    Reducer
    ──────────────────────────────────────────────────────────────── */
 
-export function reducer(e: Estado, a: Acao): Estado {
+/**
+ * Monta o reducer com as dependências que ele precisa do mundo externo.
+ *
+ * Continua sendo `(estado, ação) => estado` puro: dado o mesmo par de
+ * dependências, a mesma sequência de ações produz sempre o mesmo estado.
+ */
+export function criarReducer(d: Dependencias) {
+  return function reducer(e: Estado, a: Acao): Estado {
+    return aplicarAcao(d, e, a);
+  };
+}
+
+function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
   switch (a.tipo) {
     case 'IR_PARA':
       // Sair para a Home encerra um fechamento em andamento — senão o Resumo
@@ -402,7 +563,7 @@ export function reducer(e: Estado, a: Acao): Estado {
       const valor = deDigitos(e.rascunho.digitos);
       if (valor <= 0) return e;
       const seq = e.seq + 1;
-      const tx = novaTransacao(seq, {
+      const tx = novaTransacao(d, {
         contaId: e.rascunho.contaId,
         categoriaId: e.rascunho.categoriaId,
         valorCentavos: e.rascunho.tipo === 'despesa' ? -valor : valor,
@@ -428,7 +589,7 @@ export function reducer(e: Estado, a: Acao): Estado {
       if (a.valorCentavos <= 0) return e;
       const seq = e.seq + 1;
       const cat = categoria(a.categoriaId);
-      const tx = novaTransacao(seq, {
+      const tx = novaTransacao(d, {
         contaId: e.rascunho.contaId,
         categoriaId: a.categoriaId,
         valorCentavos: -a.valorCentavos,
@@ -473,7 +634,7 @@ export function reducer(e: Estado, a: Acao): Estado {
         ...e,
         seq,
         aportes: [
-          novoAporte(seq, { metaId: meta.id, valorCentavos: valor, ocorridoEm: e.hoje }),
+          novoAporte(d, { metaId: meta.id, valorCentavos: valor, ocorridoEm: e.hoje }),
           ...e.aportes,
         ],
         folha: null,
@@ -495,22 +656,22 @@ export function reducer(e: Estado, a: Acao): Estado {
       return {
         ...e,
         seq,
-        desafios: comDesafio(e.desafios, a.desafioId, (d) => ({
-          ...d,
-          progresso: Math.min(d.alvo, d.progresso + 1),
+        progressoDesafios: comProgresso(e, a.desafioId, (p) => ({
+          ...p,
+          progresso: p.progresso + 1,
         })),
         toast: avisar(seq, `Dia registrado em “${a.rotulo}”`),
       };
     }
 
     case 'ACEITAR_DESAFIO': {
-      const alvo = e.desafios.find((d) => d.id === a.desafioId);
-      if (!alvo || alvo.aceito) return e;
+      const definicao = definicoesDesafios.find((d) => d.id === a.desafioId);
+      if (!definicao || progressoDe(definicao, e.progressoDesafios).aceito) return e;
       const seq = e.seq + 1;
       return {
         ...e,
         seq,
-        desafios: comDesafio(e.desafios, a.desafioId, (d) => ({ ...d, aceito: true })),
+        progressoDesafios: comProgresso(e, a.desafioId, (p) => ({ ...p, aceito: true })),
         toast: avisar(seq, `Você entrou em “${a.nome}”`),
       };
     }
@@ -544,7 +705,7 @@ export function reducer(e: Estado, a: Acao): Estado {
         if (valor <= 0) return e;
         seq += 1;
         novos.push(
-          novaTransacao(seq, {
+          novaTransacao(d, {
             contaId: e.rascunho.contaId,
             categoriaId: linha.categoriaId,
             valorCentavos: -valor,
@@ -608,7 +769,8 @@ export function reducer(e: Estado, a: Acao): Estado {
       return {
         ...e,
         seq,
-        semanaFechada: true,
+        // Guarda QUAL semana foi fechada. Virou a semana, o ritual volta sozinho.
+        semanaFechada: inicioDaSemana(e.hoje),
         fechando: false,
         tela: 'home',
         fecharPasso: 1,
@@ -647,7 +809,7 @@ export function reducer(e: Estado, a: Acao): Estado {
         ...e,
         seq,
         aportes: [
-          novoAporte(seq, { metaId: meta.id, valorCentavos: valor, ocorridoEm: e.hoje }),
+          novoAporte(d, { metaId: meta.id, valorCentavos: valor, ocorridoEm: e.hoje }),
           ...e.aportes,
         ],
         tela: 'metas',
@@ -658,6 +820,105 @@ export function reducer(e: Estado, a: Acao): Estado {
 
     case 'SIMULAR_DO_RASCUNHO':
       return { ...e, tela: 'simulador', simDigitos: e.rascunho.digitos, folha: null };
+
+    case 'DIA_MUDOU':
+      // Só o dia muda. `semanaFechada` guarda a semana, então a virada de
+      // segunda-feira reabre o ritual sem que ninguém precise zerar nada.
+      return a.dia === e.hoje ? e : { ...e, hoje: a.dia };
+
+    case 'AVISAR': {
+      const seq = e.seq + 1;
+      return { ...e, seq, toast: avisar(seq, a.texto, a.sub) };
+    }
+
+    case 'ONBOARDING_CAMPO':
+      return { ...e, onboarding: { ...e.onboarding, [a.campo]: a.valor } };
+
+    case 'ONBOARDING_TIPO_CONTA':
+      return { ...e, onboarding: { ...e.onboarding, contaTipo: a.tipo_ } };
+
+    case 'ONBOARDING_PASSO':
+      return { ...e, onboarding: { ...e.onboarding, passo: a.passo } };
+
+    case 'ONBOARDING_CONCLUIR': {
+      const o = e.onboarding;
+      const nome = o.nome.trim();
+      if (!nome) return e;
+
+      const conta: Conta = {
+        id: d.gerarId(),
+        nome: o.contaNome.trim() || 'Conta',
+        tipo: o.contaTipo,
+        saldoInicialCentavos: deDigitos(o.contaDigitos),
+        cor: corDaConta(o.contaTipo),
+      };
+
+      // Meta é opcional: quem não sabe ainda o que quer não deve ficar preso
+      // numa tela de cadastro no primeiro minuto de uso.
+      const alvo = deDigitos(o.metaDigitos);
+      const metas: Meta[] =
+        o.metaNome.trim() && alvo > 0
+          ? [
+              {
+                id: d.gerarId(),
+                nome: o.metaNome.trim(),
+                alvoCentavos: alvo,
+                guardadoInicialCentavos: 0,
+                prazo: 'sem prazo definido',
+                cor: token('accent'),
+                icone: icones.metas,
+              },
+            ]
+          : [];
+
+      const seq = e.seq + 1;
+      return {
+        ...e,
+        seq,
+        perfil: { nome },
+        contas: [conta],
+        metas,
+        onboardingConcluido: true,
+        onboarding: ONBOARDING_VAZIO,
+        rascunho: { ...RASCUNHO_VAZIO, contaId: conta.id },
+        tela: 'home',
+        toast: avisar(seq, `Tudo pronto, ${nome.split(' ')[0]}`, 'Registre seu primeiro gasto.'),
+      };
+    }
+
+    case 'CARREGAR_DEMO': {
+      const seq = e.seq + 1;
+      const demo = criarEstadoDemo(e.hoje);
+      return {
+        ...demo,
+        seq,
+        toast: avisar(seq, 'Dados de exemplo carregados', 'Dá para apagar tudo em Hábitos.'),
+      };
+    }
+
+    case 'APAGAR_DADOS': {
+      const seq = e.seq + 1;
+      const vazio = criarEstadoVazio(e.hoje);
+      return {
+        ...vazio,
+        seq,
+        // Quem já passou pelo início não volta para ele: apagar é limpar o
+        // conteúdo, não desfazer o cadastro.
+        perfil: e.perfil,
+        onboardingConcluido: e.onboardingConcluido,
+        toast: {
+          id: seq,
+          texto: 'Tudo apagado',
+          acao: { rotulo: 'Desfazer', acao: { tipo: 'RESTAURAR', estado: e } },
+          duracaoMs: 6000,
+        },
+      };
+    }
+
+    case 'RESTAURAR': {
+      const seq = e.seq + 1;
+      return { ...a.estado, seq, toast: avisar(seq, 'Dados restaurados') };
+    }
 
     case 'LIMPAR_TOAST':
       return e.toast && e.toast.id === a.id ? { ...e, toast: null } : e;
@@ -678,10 +939,13 @@ const ContextoDaLoja = createContext<Loja | null>(null);
 export function LojaProvider({
   children,
   inicial = estadoInicial,
+  deps = dependenciasReais,
 }: {
   children: React.ReactNode;
   inicial?: Estado;
+  deps?: Dependencias;
 }) {
+  const reducer = useMemo(() => criarReducer(deps), [deps]);
   const [estado, despachar] = useReducer(reducer, inicial);
   const valor = useMemo(() => ({ estado, despachar }), [estado]);
   return <ContextoDaLoja.Provider value={valor}>{children}</ContextoDaLoja.Provider>;
@@ -691,6 +955,31 @@ export function useLoja(): Loja {
   const ctx = useContext(ContextoDaLoja);
   if (!ctx) throw new Error('useLoja precisa estar dentro de <LojaProvider>');
   return ctx;
+}
+
+/**
+ * Mantém `hoje` colado no relógio.
+ *
+ * Sem isto o dia é lido uma vez no boot e congela: quem deixa o app aberto
+ * atravessa a meia-noite com a trilha da semana de ontem na tela, e o
+ * lançamento vai parar no dia errado. Confere ao montar e toda vez que o app
+ * volta do segundo plano — que é quando isso acontece na prática.
+ */
+export function useSincronizarDia(relogio: () => DiaISO = hojeReal) {
+  const { estado, despachar } = useLoja();
+  const atual = estado.hoje;
+
+  useEffect(() => {
+    const conferir = () => {
+      const dia = relogio();
+      if (dia !== atual) despachar({ tipo: 'DIA_MUDOU', dia });
+    };
+    conferir();
+    const inscricao = AppState.addEventListener('change', (situacao) => {
+      if (situacao === 'active') conferir();
+    });
+    return () => inscricao.remove();
+  }, [atual, despachar, relogio]);
 }
 
 /** Rótulo curto de um dia pendente, para as frases do card de ação. */

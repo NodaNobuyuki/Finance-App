@@ -116,10 +116,38 @@ export const categoriasReceita = Object.values(categorias)
   .filter((c) => c.tipo === 'receita')
   .map((c) => c.id);
 
+/**
+ * Placeholder para lançamento cuja categoria não existe mais.
+ *
+ * Preserva o id original para que a linha continue rastreável e possa ser
+ * recategorizada, em vez de virar um registro anônimo.
+ */
+function categoriaOrfa(id: string): Categoria {
+  return {
+    id,
+    nome: 'Sem categoria',
+    tipo: 'despesa',
+    cor: token('inkFaint'),
+    icone: 'M12 21a9 9 0 100-18 9 9 0 000 18zM12 8v5M12 16.5h.01',
+  };
+}
+
+/**
+ * Nunca lança.
+ *
+ * Já lançou, e enquanto o catálogo era fixo isso nunca acontecia. Com dado
+ * gravado em disco, basta UMA linha apontando para categoria removida para
+ * derrubar o Extrato inteiro — a tela mapeia a lista toda, e uma exceção no
+ * meio leva junto tudo que já tinha renderizado. Perder a cor de um item é
+ * incomparavelmente melhor que perder a tela.
+ */
 export function categoria(id: string): Categoria {
-  const c = categorias[id];
-  if (!c) throw new Error(`Categoria desconhecida: ${id}`);
-  return c;
+  return categorias[id] ?? categoriaOrfa(id);
+}
+
+/** O id existe no catálogo? Para quem precisa decidir, não só exibir. */
+export function categoriaExiste(id: string): boolean {
+  return id in categorias;
 }
 
 /** Ícones avulsos da interface, no mesmo formato das categorias. */

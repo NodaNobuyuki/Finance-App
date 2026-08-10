@@ -1,7 +1,8 @@
 import React from 'react';
 import { ScrollView, TextInput, View } from 'react-native';
 import { BotaoPrincipal, BotaoVoltar, Hero, Toque, Txt } from '../componentes/basicos';
-import { categoria } from '../dominio/categorias';
+import { Vazio } from '../componentes/Vazio';
+import { categoria, icones } from '../dominio/categorias';
 import { rotuloDia } from '../dominio/datas';
 import { deTextoLivre } from '../dominio/dinheiro';
 import { semana } from '../estado/derivados';
@@ -45,6 +46,18 @@ export function Lote() {
           Lance os dias em aberto de uma vez. Se não gastou nada, marque “não gastei”.
         </Txt>
       </Hero>
+
+      {pendentes.length === 0 ? (
+        <Vazio
+          icone={icones.calendarioOk}
+          titulo="Nada em aberto"
+          texto="Todos os dias desta semana já têm registro. Não há o que colocar em dia."
+          acao={{
+            rotulo: 'Ver o resumo da semana',
+            aoTocar: () => despachar({ tipo: 'IR_RESUMO', fechando: false }),
+          }}
+        />
+      ) : null}
 
       <View style={{ paddingHorizontal: 22, paddingTop: 8, paddingBottom: 26, gap: 2 }}>
         {pendentes.map((dia, i) => {
@@ -158,7 +171,7 @@ export function Lote() {
           );
         })}
 
-        <View style={{ marginTop: 20 }}>
+        <View style={{ marginTop: 20, display: pendentes.length === 0 ? 'none' : 'flex' }}>
           <BotaoPrincipal
             rotulo={
               completo

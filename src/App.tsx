@@ -13,7 +13,11 @@ import React from 'react';
 import { SafeAreaView, ScrollView, View } from 'react-native';
 import { NavInferior } from './componentes/NavInferior';
 import { Toast } from './componentes/Toast';
-import { LojaProvider, useLoja } from './estado/store';
+import { useBanco } from './dados/boot';
+import { RepositorioLocal } from './dados/repositorio';
+import { usePersistencia } from './dados/usePersistencia';
+import { mensagemParaOUsuario } from './dominio/erros';
+import { LojaProvider, useLoja, useSincronizarDia } from './estado/store';
 import { Categorias } from './telas/Categorias';
 import { Extrato } from './telas/Extrato';
 import { FecharSemana } from './telas/FecharSemana';
@@ -21,6 +25,7 @@ import { Habitos } from './telas/Habitos';
 import { Inicio } from './telas/Inicio';
 import { Lote } from './telas/Lote';
 import { Metas } from './telas/Metas';
+import { Onboarding } from './telas/Onboarding';
 import { Resumo } from './telas/Resumo';
 import { Simulador } from './telas/Simulador';
 import { Aporte } from './telas/folhas/Aporte';
@@ -68,9 +73,26 @@ function FolhaAtual() {
   }
 }
 
-function Casca() {
-  const { estado } = useLoja();
+function Casca({ repositorio }: { repositorio: RepositorioLocal }) {
+  const { estado, despachar } = useLoja();
   const { t, paleta } = useTema();
+
+  useSincronizarDia();
+  usePersistencia(repositorio, (erro) => {
+    // Falha de disco não pode ser silenciosa: o usuário achou que registrou.
+    despachar({ tipo: 'AVISAR', texto: mensagemParaOUsuario(erro) });
+  });
+
+  // Primeiro uso ocupa a tela inteira: sem nav, sem folha, sem saída lateral.
+  // Enquanto não há uma conta, não existe nada que as outras telas possam mostrar.
+  if (!estado.onboardingConcluido) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.canvas }}>
+        <StatusBar style={paleta.escuro ? 'light' : 'dark'} />
+        <Onboarding />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.canvas }}>
@@ -106,12 +128,15 @@ export default function App() {
     IBMPlexMono_600SemiBold,
   });
 
-  if (!fontesProntas) return null;
+  const boot = useBanco();
+
+  // Fontes e banco carregam em paralelo; a splash do Expo cobre os dois.
+  if (!fontesProntas || !boot) return null;
 
   return (
     <TemaProvider>
-      <LojaProvider>
-        <Casca />
+      <LojaProvider inicial={boot.inicial}>
+        <Casca repositorio={boot.repositorio} />
       </LojaProvider>
     </TemaProvider>
   );

@@ -11,10 +11,11 @@ import {
   somarDias,
 } from '../dominio/datas';
 import { Centavos, formatar, percentual, renderPor } from '../dominio/dinheiro';
+import { DefinicaoDesafio, definicoesDesafios, progressoDe } from '../dominio/desafios';
 import { guardadoDaMeta, totalGuardado as somarGuardado } from '../dominio/metas';
 import { somaPorCategoria, totalEntradas, totalSaidas } from '../dominio/saldo';
 import { taxa } from '../dominio/taxas';
-import { Desafio, Transacao } from '../dominio/tipos';
+import { Transacao } from '../dominio/tipos';
 import { Estado } from './store';
 
 /**
@@ -92,9 +93,19 @@ export function ultimoRegistro(e: Estado): DiaISO | undefined {
   return [...diasRegistrados(e)].sort().reverse()[0];
 }
 
+/**
+ * A semana CORRENTE já foi fechada?
+ *
+ * Comparar com o início da semana é o que faz o ritual reabrir sozinho na
+ * virada de segunda — sem isso, um fechamento gravado valeria para sempre.
+ */
+export function semanaEstaFechada(e: Estado): boolean {
+  return e.semanaFechada !== null && e.semanaFechada === inicioDaSemana(e.hoje);
+}
+
 /** Hoje é o dia em que o usuário escolheu fechar a semana? */
 export function ehDiaDeFechar(e: Estado): boolean {
-  if (e.semanaFechada) return false;
+  if (semanaEstaFechada(e)) return false;
   const escolhido = diasRitual.find((d) => d.id === e.ritualDiaFechamento);
   if (!escolhido) return false;
   const dow = new Date(`${e.hoje}T00:00:00Z`).getUTCDay();
@@ -271,7 +282,7 @@ export type AcaoDoDia = {
 export function acaoDoDia(e: Estado): AcaoDoDia {
   const s = semana(e);
 
-  if (e.semanaFechada) {
+  if (semanaEstaFechada(e)) {
     return {
       variante: 'calmo',
       icone: 'calendarioOk',
@@ -329,7 +340,11 @@ export function statusDoRegistro(e: Estado): { titulo: string; sub: string; emDi
         ? '1 dia sem registro'
         : `${s.pendentes.length} dias sem registro`,
     sub: s.emDia
-      ? `Último registro hoje · ${e.contexto.semanasEmDia} semanas seguidas em dia`
+      ? // Sem histórico, não há constância para anunciar. Quem instalou hoje
+        // não pode ler "5 semanas seguidas em dia".
+        e.contexto.semanasEmDia > 0
+        ? `Último registro hoje · ${e.contexto.semanasEmDia} semanas seguidas em dia`
+        : 'Último registro hoje'
       : `Último registro: ${ultimo ? rotuloCurto(ultimo, e.hoje) : '—'}`,
   };
 }
@@ -419,37 +434,48 @@ export type DesafioView = {
   automatico: boolean;
 };
 
-export function desafios(e: Estado): { ativos: DesafioView[]; disponiveis: Desafio[] } {
+/**
+ * Junta o catálogo (definição) com o que é do usuário (progresso).
+ *
+ * Desafio publicado numa versão nova entra por aqui já com o padrão certo,
+ * porque `progressoDe` cai no default quando não há linha gravada.
+ */
+export function desafios(e: Estado): { ativos: DesafioView[]; disponiveis: DefinicaoDesafio[] } {
   const s = semana(e);
+  const ativos: DesafioView[] = [];
+  const disponiveis: DefinicaoDesafio[] = [];
 
-  const ativos = e.desafios
-    .filter((d) => d.aceito)
-    .map((d) => {
-      // Desafio automático espelha os registros da semana; o resto conta o
-      // progresso que o próprio usuário marcou.
-      const atual = Math.min(d.alvo, d.automatico ? s.registros : d.progresso);
-      const completo = atual >= d.alvo;
-      return {
-        id: d.id,
-        nome: d.nome,
-        sub: completo ? 'desafio concluído' : d.sub,
-        categoriaId: d.categoriaId,
-        atual,
-        alvo: d.alvo,
-        pct: Math.round((atual / d.alvo) * 100),
-        completo,
-        progressoLabel: `${atual} de ${d.alvo} ${d.unidade}`,
-        acaoLabel: completo ? 'Concluído' : d.acao,
-        automatico: d.automatico === true,
-      };
+  for (const d of definicoesDesafios) {
+    const p = progressoDe(d, e.progressoDesafios);
+    if (!p.aceito) {
+      disponiveis.push(d);
+      continue;
+    }
+    // Desafio automático espelha os registros da semana; o resto conta o
+    // progresso que o próprio usuário marcou.
+    const atual = Math.min(d.alvo, d.automatico ? s.registros : p.progresso);
+    const completo = atual >= d.alvo;
+    ativos.push({
+      id: d.id,
+      nome: d.nome,
+      sub: completo ? 'desafio concluído' : d.sub,
+      categoriaId: d.categoriaId,
+      atual,
+      alvo: d.alvo,
+      pct: Math.round((atual / d.alvo) * 100),
+      completo,
+      progressoLabel: `${atual} de ${d.alvo} ${d.unidade}`,
+      acaoLabel: completo ? 'Concluído' : d.acao,
+      automatico: d.automatico === true,
     });
+  }
 
-  return { ativos, disponiveis: e.desafios.filter((d) => !d.aceito) };
+  return { ativos, disponiveis };
 }
 
 export function economizado(e: Estado): Centavos {
-  return e.desafios
-    .filter((d) => d.aceito)
+  return definicoesDesafios
+    .filter((d) => progressoDe(d, e.progressoDesafios).aceito)
     .reduce((a, d) => a + d.economiaCentavos, e.contexto.economiaBaseCentavos);
 }
 

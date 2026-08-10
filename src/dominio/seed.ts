@@ -1,17 +1,32 @@
 import { hex, token } from '../tema/paletas';
-import { Aporte, Conta, Contexto, Desafio, Meta, SemanaHistorica, Transacao } from './tipos';
+import { DiaISO, inicioDaSemana, somarDias } from './datas';
+import {
+  Aporte,
+  Conta,
+  Contexto,
+  Meta,
+  Perfil,
+  ProgressoDesafio,
+  SemanaHistorica,
+  Transacao,
+} from './tipos';
 
 /**
  * Dados de demonstração. Todos os valores já em centavos inteiros.
  *
  * Este módulo é a SEMENTE do estado, não uma fonte consultada em runtime:
- * quem lê daqui é `estadoInicial`, em `src/estado/store.tsx`, e mais ninguém.
- * Tela, componente e derivado leem sempre de `estado.*`. Um `no-restricted-imports`
- * no ESLint segura essa regra.
+ * quem lê daqui é `criarEstadoInicial`, em `src/estado/store.tsx`, e mais
+ * ninguém. Tela, componente e derivado leem sempre de `estado.*`. Um
+ * `no-restricted-imports` no ESLint segura essa regra.
  *
  * O motivo é persistência: o que não está em `Estado` não tem como ser gravado
  * nem recarregado. Enquanto contas, metas e desafios morarem neste arquivo,
  * eles são imutáveis por construção.
+ *
+ * As datas são RELATIVAS ao dia recebido, nunca fixas. Com o relógio real
+ * ligado, semente de data cravada envelhece: em um mês a demo abre num mês sem
+ * lançamento nenhum, mostrando a semana toda em aberto. `semente(AGORA)`
+ * reproduz exatamente o fixture antigo, que é o que os testes travam.
  */
 
 /**
@@ -19,7 +34,7 @@ import { Aporte, Conta, Contexto, Desafio, Meta, SemanaHistorica, Transacao } fr
  * O saldo exibido sai de `saldoDaConta()` somando as transações por cima —
  * é por isso que estes números não batem com o que a tela mostra.
  */
-export const contas: Conta[] = [
+const contas: Conta[] = [
   {
     id: 'carteira',
     nome: 'Carteira',
@@ -50,46 +65,53 @@ export const contas: Conta[] = [
   },
 ];
 
-let seq = 0;
-function tx(
-  ocorridoEm: string,
-  descricao: string,
-  categoriaId: string,
-  valorCentavos: number,
-  contaId: string,
-): Transacao {
-  seq += 1;
-  return {
-    id: `seed-${seq}`,
-    contaId,
-    categoriaId,
-    valorCentavos,
-    ocorridoEm,
-    descricao,
-    descricaoOriginal: descricao,
-    origem: 'manual',
-    criadoEm: seq,
+/**
+ * Transações da demo, posicionadas por quantos dias atrás caem — nunca por
+ * data absoluta. `atras` 2, 3 e 4 reproduzem 03, 02 e 01 de agosto quando
+ * `hoje` é a âncora `AGORA`.
+ */
+function transacoesDemo(hoje: DiaISO): Transacao[] {
+  let seq = 0;
+  const tx = (
+    atras: number,
+    descricao: string,
+    categoriaId: string,
+    valorCentavos: number,
+    contaId: string,
+  ): Transacao => {
+    seq += 1;
+    return {
+      id: `seed-${seq}`,
+      contaId,
+      categoriaId,
+      valorCentavos,
+      ocorridoEm: somarDias(hoje, -atras),
+      descricao,
+      descricaoOriginal: descricao,
+      origem: 'manual',
+      criadoEm: seq,
+    };
   };
+
+  return [
+    tx(2, 'Mercado Extra', 'mercado', -28790, 'cartao'),
+    tx(2, 'Café da manhã', 'restaurante', -1850, 'carteira'),
+    tx(2, 'Uber para o centro', 'transporte', -2430, 'cartao'),
+    tx(3, 'Freela — identidade visual', 'freela', 162000, 'corrente'),
+    tx(3, 'Aluguel', 'casa', -185000, 'corrente'),
+    tx(3, 'Conta de luz', 'contas', -21370, 'corrente'),
+    tx(3, 'Netflix', 'assinaturas', -4490, 'cartao'),
+    tx(3, 'Cinema', 'lazer', -7600, 'carteira'),
+    tx(4, 'Salário do mês', 'salario', 680000, 'corrente'),
+    tx(4, 'Posto Shell', 'transporte', -22000, 'cartao'),
+    tx(4, 'Farmácia São Paulo', 'saude', -13240, 'cartao'),
+    tx(4, 'Mercado Dia', 'mercado', -15820, 'carteira'),
+    tx(4, 'Curso de inglês', 'educacao', -8990, 'cartao'),
+    tx(4, 'Academia', 'saude', -11990, 'corrente'),
+  ];
 }
 
-export const transacoes: Transacao[] = [
-  tx('2026-08-03', 'Mercado Extra', 'mercado', -28790, 'cartao'),
-  tx('2026-08-03', 'Café da manhã', 'restaurante', -1850, 'carteira'),
-  tx('2026-08-03', 'Uber para o centro', 'transporte', -2430, 'cartao'),
-  tx('2026-08-02', 'Freela — identidade visual', 'freela', 162000, 'corrente'),
-  tx('2026-08-02', 'Aluguel', 'casa', -185000, 'corrente'),
-  tx('2026-08-02', 'Conta de luz', 'contas', -21370, 'corrente'),
-  tx('2026-08-02', 'Netflix', 'assinaturas', -4490, 'cartao'),
-  tx('2026-08-02', 'Cinema', 'lazer', -7600, 'carteira'),
-  tx('2026-08-01', 'Salário de agosto', 'salario', 680000, 'corrente'),
-  tx('2026-08-01', 'Posto Shell', 'transporte', -22000, 'cartao'),
-  tx('2026-08-01', 'Farmácia São Paulo', 'saude', -13240, 'cartao'),
-  tx('2026-08-01', 'Mercado Dia', 'mercado', -15820, 'carteira'),
-  tx('2026-08-01', 'Curso de inglês', 'educacao', -8990, 'cartao'),
-  tx('2026-08-01', 'Academia', 'saude', -11990, 'corrente'),
-];
-
-export const metas: Meta[] = [
+const metas: Meta[] = [
   {
     id: 'chile',
     nome: 'Viagem para o Chile',
@@ -119,106 +141,80 @@ export const metas: Meta[] = [
   },
 ];
 
-/** Nenhum aporte de partida: o guardado de cada meta começa na abertura dela. */
-export const aportes: Aporte[] = [];
-
-export const desafios: Desafio[] = [
-  {
-    id: 'reg4',
-    nome: 'Registrar 4 vezes nesta semana',
-    sub: 'a semana fecha domingo',
-    subOff: '',
-    alvo: 4,
-    unidade: 'registros',
-    acao: 'Registrar agora',
-    progresso: 0,
-    automatico: true,
-    aceito: true,
-    categoriaId: 'salario',
-    economiaCentavos: 0,
-  },
-  {
-    id: 'catg',
-    nome: 'Categorizar tudo do mês',
-    sub: '2 lançamentos sem categoria',
-    subOff: '',
-    alvo: 14,
-    unidade: 'lançamentos',
-    acao: 'Revisar 1',
-    progresso: 12,
-    aceito: true,
-    categoriaId: 'contas',
-    economiaCentavos: 0,
-  },
-  {
-    id: 'assin',
-    nome: 'Revisar as assinaturas',
-    sub: '3 assinaturas ativas',
-    subOff: '',
-    alvo: 3,
-    unidade: 'assinaturas',
-    acao: 'Revisar 1',
-    progresso: 1,
-    aceito: true,
-    categoriaId: 'assinaturas',
-    economiaCentavos: 0,
-  },
-  {
-    id: 'delivery',
-    nome: 'Semana sem delivery',
-    sub: 'termina domingo, 9 de agosto',
-    subOff: 'opcional · R$ 312 em julho',
-    alvo: 7,
-    unidade: 'dias',
-    acao: 'Marcar hoje',
-    progresso: 0,
-    aceito: false,
-    categoriaId: 'restaurante',
-    economiaCentavos: 31200,
-  },
-  {
-    id: 'cafe',
-    nome: '5 dias sem café fora',
-    sub: 'termina sexta',
-    subOff: 'opcional · R$ 12 por dia',
-    alvo: 5,
-    unidade: 'dias',
-    acao: 'Marcar hoje',
-    progresso: 0,
-    aceito: false,
-    categoriaId: 'restaurante',
-    economiaCentavos: 6000,
-  },
-  {
-    id: 'uber',
-    nome: 'Semana sem app de transporte',
-    sub: 'termina domingo',
-    subOff: 'opcional · R$ 244 em julho',
-    alvo: 7,
-    unidade: 'dias',
-    acao: 'Marcar hoje',
-    progresso: 0,
-    aceito: false,
-    categoriaId: 'transporte',
-    economiaCentavos: 24400,
-  },
+/**
+ * Progresso de demonstração. Só faz sentido na demo: quem instala o app hoje
+ * começa tudo em zero, e é a ausência de linha que faz valer o padrão do
+ * catálogo (`progressoDe`).
+ */
+const progressoDesafios: ProgressoDesafio[] = [
+  { id: 'catg', aceito: true, progresso: 12 },
+  { id: 'assin', aceito: true, progresso: 1 },
 ];
 
-/** Histórico de semanas fechadas, anterior aos dados de transação. */
-export const historicoSemanas: SemanaHistorica[] = [
-  { inicio: '2026-06-30', registros: 4 },
-  { inicio: '2026-07-07', registros: 4 },
-  { inicio: '2026-07-14', registros: 3 },
-  { inicio: '2026-07-21', registros: 4 },
-  { inicio: '2026-07-28', registros: 4 },
-];
+/** Histórico de semanas fechadas — as 5 semanas anteriores à corrente. */
+function historicoDemo(hoje: DiaISO): SemanaHistorica[] {
+  const estaSemana = inicioDaSemana(hoje);
+  return [4, 4, 3, 4, 4].map((registros, i) => ({
+    inicio: somarDias(estaSemana, -7 * (5 - i)),
+    registros,
+  }));
+}
 
 /** Teto de gasto do mês. Vira `budgets.limit_cents` quando houver backend. */
-export const orcamentoMensalCentavos = 500000;
+const orcamentoMensalCentavos = 500000;
 
 /** Números de contexto que ainda não saem das transações carregadas. */
-export const contexto: Contexto = {
+const contexto: Contexto = {
   semanasEmDia: 5,
   lancamentosMesAnterior: 18,
   economiaBaseCentavos: 18000,
 };
+
+/** O que a demo carrega, ancorado no dia recebido. */
+export type Semente = {
+  perfil: Perfil;
+  contas: Conta[];
+  transacoes: Transacao[];
+  metas: Meta[];
+  aportes: Aporte[];
+  progressoDesafios: ProgressoDesafio[];
+  historicoSemanas: SemanaHistorica[];
+  orcamentoMensalCentavos: number;
+  contexto: Contexto;
+};
+
+export function semente(hoje: DiaISO): Semente {
+  return {
+    perfil: { nome: 'Marina' },
+    contas,
+    transacoes: transacoesDemo(hoje),
+    metas,
+    // Nenhum aporte de partida: o guardado de cada meta começa na abertura dela.
+    aportes: [],
+    progressoDesafios,
+    historicoSemanas: historicoDemo(hoje),
+    orcamentoMensalCentavos,
+    contexto,
+  };
+}
+
+/**
+ * O que um app recém-instalado carrega: nada.
+ *
+ * Os números de contexto vão a zero de propósito. Eles são placeholders de
+ * tela, e a demo os traz preenchidos — entregar "5 semanas seguidas em dia"
+ * para quem abriu o app agora é mentira, não é dado de partida.
+ */
+export function vazia(): Semente {
+  return {
+    perfil: { nome: '' },
+    contas: [],
+    transacoes: [],
+    metas: [],
+    aportes: [],
+    progressoDesafios: [],
+    historicoSemanas: [],
+    orcamentoMensalCentavos: 0,
+    contexto: { semanasEmDia: 0, lancamentosMesAnterior: 0, economiaBaseCentavos: 0 },
+  };
+}

@@ -1,8 +1,8 @@
 import { atalhosRapidos } from '../derivados';
-import { Acao, Estado, estadoInicial, reducer } from '../store';
+import { Acao, criarReducer, dependenciasDeTeste, Estado, estadoInicial } from '../store';
 
 function aplicar(estado: Estado, ...acoes: Acao[]): Estado {
-  return acoes.reduce(reducer, estado);
+  return acoes.reduce(criarReducer(dependenciasDeTeste()), estado);
 }
 
 describe('atalhos de registro em um toque', () => {

@@ -68,24 +68,22 @@ export type Aporte = {
   criadoEm: number;
 };
 
-export type Desafio = {
+/**
+ * O que é do usuário num desafio. A definição — nome, alvo, ação — é catálogo
+ * e mora em `dominio/desafios.ts`; aqui fica só o que ele fez.
+ */
+export type ProgressoDesafio = {
+  /** O id da definição no catálogo. */
   id: string;
-  nome: string;
-  sub: string;
-  /** Subtítulo quando o desafio ainda é opcional (não foi aceito). */
-  subOff: string;
-  alvo: number;
-  unidade: string;
-  acao: string;
+  /** Entrou no desafio. Sem linha gravada, vale o padrão da definição. */
+  aceito: boolean;
   /** Quanto já foi cumprido. Em desafio automático, é ignorado. */
   progresso: number;
-  /** Progresso vem dos registros da semana, não de toque manual. */
-  automatico?: boolean;
-  /** O usuário entrou no desafio (ou ele já vem aceito de fábrica). */
-  aceito: boolean;
-  categoriaId: string;
-  /** Quanto o desafio evitou de gasto, em centavos. */
-  economiaCentavos: Centavos;
+};
+
+/** Quem usa o app. Hoje só o nome; entra por onboarding. */
+export type Perfil = {
+  nome: string;
 };
 
 /** Uma semana já encerrada, para a trilha de constância. */
