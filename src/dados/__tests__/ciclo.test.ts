@@ -81,9 +81,9 @@ describe('fechar e reabrir', () => {
   it('o guardado da meta sobrevive ao aporte', async () => {
     const motor = criarMotorNode();
     const antes = await sessao(motor, [
-      { tipo: 'ABRIR_APORTE', metaId: 'reserva' },
+      { tipo: 'ABRIR_MOVIMENTO_META', metaId: 'reserva' },
       { tipo: 'DEFINIR_DIGITOS', digitos: '25000' },
-      { tipo: 'CONFIRMAR_APORTE' },
+      { tipo: 'CONFIRMAR_MOVIMENTO_META' },
     ]);
     const depois = await sessao(motor);
 

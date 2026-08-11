@@ -19,7 +19,7 @@ import {
   removerDigito,
 } from '../dominio/dinheiro';
 import { GerarId, idsSequenciais, uuidV7 } from '../dominio/ids';
-import { contaPadraoDeMeta } from '../dominio/metas';
+import { contaPadraoDeMeta, guardadoDaMeta } from '../dominio/metas';
 import { Semente, semente, vazia } from '../dominio/seed';
 import {
   Conta,
@@ -63,7 +63,10 @@ export type Toast = {
 export type Folha =
   | null
   | { tipo: 'nova' }
-  | { tipo: 'aporte'; metaId: string }
+  /** Guardar ou retirar de uma meta — as duas pontas do mesmo movimento. */
+  | { tipo: 'movimentoMeta'; metaId: string; retirar: boolean }
+  /** Transferência entre duas contas quaisquer, sem meta envolvida. */
+  | { tipo: 'transferencia' }
   | { tipo: 'ritual' }
   | { tipo: 'conta' }
   | { tipo: 'meta' };
@@ -191,6 +194,12 @@ export type Estado = {
 
   folha: Folha;
   rascunho: Rascunho;
+  /**
+   * Destino da transferência entre contas. Origem e valor saem do `rascunho`,
+   * que já tem a conta e o teclado ligados — um rascunho paralelo só para isto
+   * duplicaria a fiação do teclado numérico inteira.
+   */
+  transferenciaDestinoId: string;
   cadastroConta: CadastroConta;
   cadastroMeta: CadastroMeta;
   simDigitos: string;
@@ -253,6 +262,7 @@ function estadoDe(hoje: DiaISO, s: Semente, onboardingConcluido: boolean): Estad
 
     folha: null,
     rascunho: RASCUNHO_VAZIO,
+    transferenciaDestinoId: '',
     cadastroConta: CADASTRO_CONTA_VAZIO,
     cadastroMeta: CADASTRO_META_VAZIO,
     simDigitos: '',
@@ -299,7 +309,10 @@ export type Acao =
   | { tipo: 'FILTRO_CATEGORIA'; categoria: string }
   | { tipo: 'ABA_CATEGORIAS'; aba: 'despesa' | 'receita' }
   | { tipo: 'ABRIR_NOVA'; categoriaId?: string; tipoLancamento?: 'despesa' | 'receita' }
-  | { tipo: 'ABRIR_APORTE'; metaId: string }
+  | { tipo: 'ABRIR_MOVIMENTO_META'; metaId: string; retirar?: boolean }
+  | { tipo: 'ABRIR_TRANSFERENCIA' }
+  | { tipo: 'TRANSFERENCIA_DESTINO'; contaId: string }
+  | { tipo: 'CONFIRMAR_TRANSFERENCIA' }
   | { tipo: 'ABRIR_RITUAL' }
   | { tipo: 'FECHAR_FOLHA' }
   /** Sem `contaId`, é criação; com, é edição da conta existente. */
@@ -324,7 +337,7 @@ export type Acao =
   | { tipo: 'SALVAR_TRANSACAO' }
   | { tipo: 'REGISTRO_RAPIDO'; categoriaId: string; valorCentavos: Centavos }
   | { tipo: 'DESFAZER'; transacaoIds: string[]; diasSemGasto: DiaISO[] }
-  | { tipo: 'CONFIRMAR_APORTE' }
+  | { tipo: 'CONFIRMAR_MOVIMENTO_META' }
   | { tipo: 'AVANCAR_DESAFIO'; desafioId: string; automatico: boolean; rotulo: string }
   | { tipo: 'ACEITAR_DESAFIO'; desafioId: string; nome: string }
   | { tipo: 'LOTE_VALOR'; dia: DiaISO; texto: string }
@@ -481,21 +494,30 @@ function novaTransacao(
  * foi para lugar nenhum, ele só passou a ter dono. Mostrar o saldo caindo aí
  * seria inventar uma movimentação que não houve.
  */
-function parDeAporte(
+function parDeTransferencia(
   d: Dependencias,
   campos: {
     contaOrigemId: string;
-    meta: Meta;
+    contaDestinoId: string;
     valorCentavos: Centavos;
     ocorridoEm: DiaISO;
+    descricao: string;
+    /**
+     * Em qual ponta cravar o `metaId` — sempre a que fica na conta da meta.
+     *
+     * Guardar marca o DESTINO (entrada positiva, guardado sobe); retirar marca
+     * a ORIGEM (saída negativa, guardado desce). Transferência entre contas
+     * quaisquer não marca nenhuma. É a mesma soma com sinal em `metas.ts` que
+     * atende aos três casos, sem ramo especial.
+     */
+    meta?: { id: string; lado: 'origem' | 'destino' };
   },
 ): [Transacao, Transacao] {
   const transferenciaId = d.gerarId();
-  const descricao = `Guardado em ${campos.meta.nome}`;
   const comum = {
     categoriaId: CATEGORIA_TRANSFERENCIA,
     ocorridoEm: campos.ocorridoEm,
-    descricao,
+    descricao: campos.descricao,
     transferenciaId,
   };
 
@@ -504,12 +526,13 @@ function parDeAporte(
       ...comum,
       contaId: campos.contaOrigemId,
       valorCentavos: -campos.valorCentavos,
+      metaId: campos.meta?.lado === 'origem' ? campos.meta.id : undefined,
     }),
     novaTransacao(d, {
       ...comum,
-      contaId: campos.meta.contaId,
+      contaId: campos.contaDestinoId,
       valorCentavos: campos.valorCentavos,
-      metaId: campos.meta.id,
+      metaId: campos.meta?.lado === 'destino' ? campos.meta.id : undefined,
     }),
   ];
 }
@@ -610,12 +633,39 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       };
     }
 
-    case 'ABRIR_APORTE':
+    case 'ABRIR_MOVIMENTO_META': {
+      const retirar = a.retirar === true;
+      const meta = e.metas.find((m) => m.id === a.metaId);
       return {
         ...e,
-        folha: { tipo: 'aporte', metaId: a.metaId },
-        rascunho: { ...e.rascunho, digitos: '' },
+        folha: { tipo: 'movimentoMeta', metaId: a.metaId, retirar },
+        // Ao retirar, a conta escolhida é o DESTINO — a origem é a conta da
+        // meta, que não é escolha. Sai da conta da meta e vai para onde a
+        // pessoa apontar; guardar é o contrário.
+        rascunho: {
+          ...e.rascunho,
+          digitos: '',
+          contaId:
+            retirar && meta && e.rascunho.contaId === meta.contaId
+              ? (e.contas.find((c) => c.id !== meta.contaId)?.id ?? e.rascunho.contaId)
+              : e.rascunho.contaId,
+        },
       };
+    }
+
+    case 'ABRIR_TRANSFERENCIA': {
+      const origem = e.contas.find((c) => c.id === e.rascunho.contaId) ?? e.contas[0];
+      const destino = e.contas.find((c) => c.id !== origem?.id);
+      return {
+        ...e,
+        folha: { tipo: 'transferencia' },
+        rascunho: { ...e.rascunho, digitos: '', contaId: origem?.id ?? '' },
+        transferenciaDestinoId: destino?.id ?? '',
+      };
+    }
+
+    case 'TRANSFERENCIA_DESTINO':
+      return { ...e, transferenciaDestinoId: a.contaId };
 
     case 'ABRIR_RITUAL':
       return { ...e, folha: { tipo: 'ritual' }, ritualPrimeira: false };
@@ -952,25 +1002,44 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       };
     }
 
-    case 'CONFIRMAR_APORTE': {
-      if (!e.folha || e.folha.tipo !== 'aporte') return e;
-      const { metaId } = e.folha;
+    case 'CONFIRMAR_MOVIMENTO_META': {
+      if (!e.folha || e.folha.tipo !== 'movimentoMeta') return e;
+      const { metaId, retirar } = e.folha;
       const valor = deDigitos(e.rascunho.digitos);
       if (valor <= 0) return e;
       const meta = e.metas.find((m) => m.id === metaId);
       if (!meta) return e;
 
-      // `rascunho.contaId` é a conta de origem — a mesma escolha do lançamento,
-      // feita no mesmo lugar. Um campo próprio só duplicaria estado.
-      const par = parDeAporte(d, {
-        contaOrigemId: e.rascunho.contaId,
-        meta,
+      const seq = e.seq + 1;
+
+      // Não dá para retirar o que não está guardado: o guardado ficaria
+      // negativo e a meta passaria a dever dinheiro a si mesma.
+      const guardado = guardadoDaMeta(meta, e.transacoes);
+      if (retirar && valor > guardado) {
+        return {
+          ...e,
+          seq,
+          toast: avisar(
+            seq,
+            `${meta.nome} tem ${formatar(guardado)} guardados`,
+            'Não dá para retirar mais do que está lá.',
+          ),
+        };
+      }
+
+      // `rascunho.contaId` é a outra ponta — origem ao guardar, destino ao
+      // retirar. A conta da meta é sempre a ponta fixa, e é ela que leva o
+      // `metaId`: entrada positiva ao guardar, saída negativa ao retirar.
+      const par = parDeTransferencia(d, {
+        contaOrigemId: retirar ? meta.contaId : e.rascunho.contaId,
+        contaDestinoId: retirar ? e.rascunho.contaId : meta.contaId,
         valorCentavos: valor,
         ocorridoEm: e.hoje,
+        descricao: retirar ? `Retirado de ${meta.nome}` : `Guardado em ${meta.nome}`,
+        meta: { id: meta.id, lado: retirar ? 'origem' : 'destino' },
       });
 
-      const seq = e.seq + 1;
-      const destino = e.contas.find((c) => c.id === meta.contaId);
+      const outraPonta = e.contas.find((c) => c.id === e.rascunho.contaId);
       return {
         ...e,
         seq,
@@ -979,8 +1048,51 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         rascunho: { ...e.rascunho, digitos: '' },
         toast: {
           id: seq,
-          texto: `${formatar(valor)} guardados em ${meta.nome}`,
-          sub: destino ? `Saíram da conta e foram para ${destino.nome}.` : undefined,
+          texto: retirar
+            ? `${formatar(valor)} retirados de ${meta.nome}`
+            : `${formatar(valor)} guardados em ${meta.nome}`,
+          sub: outraPonta
+            ? retirar
+              ? `Voltaram para ${outraPonta.nome}.`
+              : `Saíram de ${outraPonta.nome}.`
+            : undefined,
+          acao: {
+            rotulo: 'Desfazer',
+            acao: { tipo: 'DESFAZER', transacaoIds: par.map((t) => t.id), diasSemGasto: [] },
+          },
+          duracaoMs: 6000,
+        },
+      };
+    }
+
+    case 'CONFIRMAR_TRANSFERENCIA': {
+      const valor = deDigitos(e.rascunho.digitos);
+      if (valor <= 0) return e;
+
+      const origem = e.contas.find((c) => c.id === e.rascunho.contaId);
+      const destino = e.contas.find((c) => c.id === e.transferenciaDestinoId);
+      // Transferir para a própria conta não move nada: seria um par que soma
+      // zero na mesma linha, poluindo o Extrato para não dizer nada.
+      if (!origem || !destino || origem.id === destino.id) return e;
+
+      const par = parDeTransferencia(d, {
+        contaOrigemId: origem.id,
+        contaDestinoId: destino.id,
+        valorCentavos: valor,
+        ocorridoEm: e.hoje,
+        descricao: `${origem.nome} → ${destino.nome}`,
+      });
+
+      const seq = e.seq + 1;
+      return {
+        ...e,
+        seq,
+        transacoes: ordenar([...par, ...e.transacoes]),
+        folha: null,
+        rascunho: { ...e.rascunho, digitos: '' },
+        toast: {
+          id: seq,
+          texto: `${formatar(valor)} de ${origem.nome} para ${destino.nome}`,
           acao: {
             rotulo: 'Desfazer',
             acao: { tipo: 'DESFAZER', transacaoIds: par.map((t) => t.id), diasSemGasto: [] },
@@ -1154,11 +1266,13 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
 
       // É o fecho do loop de custo de oportunidade: o gasto que a pessoa
       // simulou vira dinheiro de verdade saindo da conta e indo para a meta.
-      const par = parDeAporte(d, {
+      const par = parDeTransferencia(d, {
         contaOrigemId: e.rascunho.contaId,
-        meta,
+        contaDestinoId: meta.contaId,
         valorCentavos: valor,
         ocorridoEm: e.hoje,
+        descricao: `Guardado em ${meta.nome}`,
+        meta: { id: meta.id, lado: 'destino' },
       });
 
       const seq = e.seq + 1;

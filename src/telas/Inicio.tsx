@@ -366,10 +366,33 @@ export function Inicio() {
             );
           })}
 
-          <Toque
-            aoTocar={() => despachar({ tipo: 'ABRIR_CONTA' })}
-            rotuloAcessivel="Nova conta"
-          >
+          {/* Transferir só faz sentido com duas contas — com uma, não há para
+              onde mover. */}
+          {estado.contas.length > 1 ? (
+            <Toque
+              aoTocar={() => despachar({ tipo: 'ABRIR_TRANSFERENCIA' })}
+              rotuloAcessivel="Transferir entre contas"
+            >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 5,
+                  borderRadius: 999,
+                  backgroundColor: t.surfaceMuted,
+                  paddingVertical: 6,
+                  paddingHorizontal: 11,
+                }}
+              >
+                <Icone path={icones.transferir} tamanho={13} cor={t.inkSoft} espessura={1.8} />
+                <Txt tamanho={11.5} peso={600} cor={t.inkSoft}>
+                  Transferir
+                </Txt>
+              </View>
+            </Toque>
+          ) : null}
+
+          <Toque aoTocar={() => despachar({ tipo: 'ABRIR_CONTA' })} rotuloAcessivel="Nova conta">
             <View
               style={{
                 flexDirection: 'row',

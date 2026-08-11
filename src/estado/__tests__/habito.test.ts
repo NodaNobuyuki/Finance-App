@@ -282,9 +282,9 @@ describe('aporte na meta', () => {
   const guardar = (metaId: string, digitos: string, contaOrigemId = 'corrente') =>
     aplicar(
       { ...estadoInicial, rascunho: { ...estadoInicial.rascunho, contaId: contaOrigemId } },
-      { tipo: 'ABRIR_APORTE', metaId },
+      { tipo: 'ABRIR_MOVIMENTO_META', metaId },
       { tipo: 'DEFINIR_DIGITOS', digitos },
-      { tipo: 'CONFIRMAR_APORTE' },
+      { tipo: 'CONFIRMAR_MOVIMENTO_META' },
     );
 
   const novas = (depois: Estado) =>
@@ -378,6 +378,164 @@ describe('aporte na meta', () => {
   it('ignora meta inexistente em vez de criar transferência órfã', () => {
     const depois = guardar('meta-que-nao-existe', '10000');
     expect(depois.transacoes).toHaveLength(estadoInicial.transacoes.length);
+  });
+});
+
+describe('retirar da meta', () => {
+  /**
+   * O caminho de volta. Sem ele, quem guardasse por engano ficava preso assim
+   * que o toast de desfazer sumisse — dinheiro que entra e nunca sai.
+   *
+   * É a mesma transferência invertida: a conta da meta vira a ORIGEM, e é ela
+   * que leva o `metaId`, agora com valor negativo.
+   */
+  const guardar = (digitos: string) =>
+    aplicar(
+      { ...estadoInicial, rascunho: { ...estadoInicial.rascunho, contaId: 'corrente' } },
+      { tipo: 'ABRIR_MOVIMENTO_META', metaId: 'reserva' },
+      { tipo: 'DEFINIR_DIGITOS', digitos },
+      { tipo: 'CONFIRMAR_MOVIMENTO_META' },
+    );
+
+  const retirar = (estado: Estado, digitos: string, paraContaId = 'corrente') =>
+    aplicar(
+      estado,
+      { tipo: 'ABRIR_MOVIMENTO_META', metaId: 'reserva', retirar: true },
+      { tipo: 'RASCUNHO_CONTA', contaId: paraContaId },
+      { tipo: 'DEFINIR_DIGITOS', digitos },
+      { tipo: 'CONFIRMAR_MOVIMENTO_META' },
+    );
+
+  it('a saída marca a meta e derruba o guardado', () => {
+    const antes = totalGuardado(estadoInicial);
+    const depois = retirar(estadoInicial, '10000');
+
+    expect(totalGuardado(depois)).toBe(antes - 10000);
+
+    const par = depois.transacoes.filter(
+      (t) => !estadoInicial.transacoes.some((x) => x.id === t.id),
+    );
+    const daMeta = par.find((t) => t.metaId === 'reserva')!;
+    expect(daMeta.valorCentavos).toBe(-10000);
+    expect(daMeta.contaId).toBe('poupanca');
+  });
+
+  it('o dinheiro volta para a conta escolhida', () => {
+    const corrente = estadoInicial.contas.find((c) => c.id === 'corrente')!;
+    const depois = retirar(estadoInicial, '10000');
+
+    expect(saldoDaConta(corrente, depois.transacoes)).toBe(
+      saldoDaConta(corrente, estadoInicial.transacoes) + 10000,
+    );
+  });
+
+  it('o patrimônio não muda, e retirar não vira receita', () => {
+    const depois = retirar(estadoInicial, '10000');
+    expect(saldoTotal(depois.contas, depois.transacoes)).toBe(
+      saldoTotal(estadoInicial.contas, estadoInicial.transacoes),
+    );
+    expect(resumoDoMes(depois).receitas).toBe(resumoDoMes(estadoInicial).receitas);
+  });
+
+  it('guardar e retirar o mesmo valor volta tudo ao ponto de partida', () => {
+    const ida = guardar('10000');
+    const volta = retirar(ida, '10000');
+
+    expect(totalGuardado(volta)).toBe(totalGuardado(estadoInicial));
+    expect(saldoTotal(volta.contas, volta.transacoes)).toBe(
+      saldoTotal(estadoInicial.contas, estadoInicial.transacoes),
+    );
+    // As quatro linhas continuam no Extrato: o dinheiro andou de verdade, e o
+    // histórico não some porque o saldo voltou.
+    expect(volta.transacoes).toHaveLength(estadoInicial.transacoes.length + 4);
+  });
+
+  it('não deixa retirar mais do que está guardado', () => {
+    // O guardado ficaria negativo e a meta passaria a dever a si mesma.
+    const reserva = metas(estadoInicial).find((m) => m.id === 'reserva')!;
+    const demais = retirar(estadoInicial, String(reserva.guardadoCentavos + 100));
+
+    expect(totalGuardado(demais)).toBe(totalGuardado(estadoInicial));
+    expect(demais.transacoes).toHaveLength(estadoInicial.transacoes.length);
+    expect(demais.toast?.texto).toContain('guardados');
+  });
+
+  it('retirar exatamente tudo é permitido', () => {
+    const reserva = metas(estadoInicial).find((m) => m.id === 'reserva')!;
+    const depois = retirar(estadoInicial, String(reserva.guardadoCentavos));
+
+    expect(metas(depois).find((m) => m.id === 'reserva')!.guardadoCentavos).toBe(0);
+  });
+
+  it('desfazer devolve o guardado', () => {
+    const depois = retirar(estadoInicial, '10000');
+    const desfeito = aplicar(depois, depois.toast!.acao!.acao);
+    expect(totalGuardado(desfeito)).toBe(totalGuardado(estadoInicial));
+  });
+});
+
+describe('transferência entre contas', () => {
+  const transferir = (de: string, para: string, digitos: string) =>
+    aplicar(
+      estadoInicial,
+      { tipo: 'ABRIR_TRANSFERENCIA' },
+      { tipo: 'RASCUNHO_CONTA', contaId: de },
+      { tipo: 'TRANSFERENCIA_DESTINO', contaId: para },
+      { tipo: 'DEFINIR_DIGITOS', digitos },
+      { tipo: 'CONFIRMAR_TRANSFERENCIA' },
+    );
+
+  it('tira de uma conta e põe na outra', () => {
+    // Pagar a fatura do cartão é exatamente isto.
+    const corrente = estadoInicial.contas.find((c) => c.id === 'corrente')!;
+    const cartao = estadoInicial.contas.find((c) => c.id === 'cartao')!;
+    const depois = transferir('corrente', 'cartao', '50000');
+
+    expect(saldoDaConta(corrente, depois.transacoes)).toBe(
+      saldoDaConta(corrente, estadoInicial.transacoes) - 50000,
+    );
+    expect(saldoDaConta(cartao, depois.transacoes)).toBe(
+      saldoDaConta(cartao, estadoInicial.transacoes) + 50000,
+    );
+  });
+
+  it('não é gasto nem ganho, e o patrimônio fica igual', () => {
+    const depois = transferir('corrente', 'poupanca', '50000');
+
+    expect(saldoTotal(depois.contas, depois.transacoes)).toBe(
+      saldoTotal(estadoInicial.contas, estadoInicial.transacoes),
+    );
+    expect(resumoDoMes(depois).despesas).toBe(resumoDoMes(estadoInicial).despesas);
+    expect(resumoDoMes(depois).receitas).toBe(resumoDoMes(estadoInicial).receitas);
+    expect(orcamento(depois).gasto).toBe(orcamento(estadoInicial).gasto);
+  });
+
+  it('não marca meta nenhuma — é dinheiro sem dono definido', () => {
+    const depois = transferir('corrente', 'poupanca', '50000');
+    const par = depois.transacoes.filter(
+      (t) => !estadoInicial.transacoes.some((x) => x.id === t.id),
+    );
+
+    expect(par).toHaveLength(2);
+    expect(par.every((t) => t.metaId === undefined)).toBe(true);
+    expect(totalGuardado(depois)).toBe(totalGuardado(estadoInicial));
+  });
+
+  it('recusa origem e destino iguais', () => {
+    const depois = transferir('corrente', 'corrente', '50000');
+    expect(depois.transacoes).toHaveLength(estadoInicial.transacoes.length);
+  });
+
+  it('abre já com duas contas diferentes escolhidas', () => {
+    const aberta = aplicar(estadoInicial, { tipo: 'ABRIR_TRANSFERENCIA' });
+    expect(aberta.transferenciaDestinoId).not.toBe(aberta.rascunho.contaId);
+    expect(aberta.contas.some((c) => c.id === aberta.transferenciaDestinoId)).toBe(true);
+  });
+
+  it('desfazer remove as duas pontas', () => {
+    const depois = transferir('corrente', 'poupanca', '50000');
+    const desfeito = aplicar(depois, depois.toast!.acao!.acao);
+    expect(desfeito.transacoes).toHaveLength(estadoInicial.transacoes.length);
   });
 });
 

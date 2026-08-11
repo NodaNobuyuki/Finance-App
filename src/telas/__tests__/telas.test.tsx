@@ -21,11 +21,12 @@ import { Metas } from '../Metas';
 import { Onboarding } from '../Onboarding';
 import { Resumo } from '../Resumo';
 import { Simulador } from '../Simulador';
-import { Aporte } from '../folhas/Aporte';
 import { CadastroConta } from '../folhas/CadastroConta';
 import { CadastroMeta } from '../folhas/CadastroMeta';
+import { MovimentoMeta } from '../folhas/MovimentoMeta';
 import { NovaTransacao } from '../folhas/NovaTransacao';
 import { Ritual } from '../folhas/Ritual';
+import { Transferencia } from '../folhas/Transferencia';
 
 async function montar(no: React.ReactNode, estado: Estado = estadoInicial, paleta?: PaletaId) {
   return render(
@@ -52,7 +53,17 @@ const TELAS: {
   { nome: 'resumo', no: <Resumo />, texto: 'Resumo da semana' },
   { nome: 'fechar', no: <FecharSemana />, texto: 'Fechar a semana' },
   { nome: 'nova transação', no: <NovaTransacao />, texto: 'Nova transação' },
-  { nome: 'aporte', no: <Aporte metaId="reserva" />, texto: 'Adicionar à meta' },
+  {
+    nome: 'guardar na meta',
+    no: <MovimentoMeta metaId="reserva" retirar={false} />,
+    texto: 'Adicionar à meta',
+  },
+  {
+    nome: 'retirar da meta',
+    no: <MovimentoMeta metaId="reserva" retirar />,
+    texto: 'Retirar da meta',
+  },
+  { nome: 'transferência', no: <Transferencia />, texto: 'Transferir' },
   { nome: 'ritual', no: <Ritual />, texto: 'Seu ritual' },
   { nome: 'nova conta', no: <CadastroConta />, texto: 'Nova conta' },
   { nome: 'nova meta', no: <CadastroMeta />, texto: 'Nova meta' },

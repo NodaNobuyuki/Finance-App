@@ -149,24 +149,50 @@ export function Metas() {
                 </View>
               </View>
 
-              <Toque
-                aoTocar={() => despachar({ tipo: 'ABRIR_APORTE', metaId: m.id })}
-                estilo={{ alignSelf: 'flex-start' }}
-                rotuloAcessivel={`Adicionar valor a ${m.nome}`}
-              >
-                <View
-                  style={{
-                    borderRadius: 999,
-                    paddingVertical: 9,
-                    paddingHorizontal: 16,
-                    backgroundColor: t.accentSoft,
-                  }}
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <Toque
+                  aoTocar={() => despachar({ tipo: 'ABRIR_MOVIMENTO_META', metaId: m.id })}
+                  rotuloAcessivel={`Adicionar valor a ${m.nome}`}
                 >
-                  <Txt tamanho={12.5} peso={600} cor={t.accent}>
-                    Adicionar valor
-                  </Txt>
-                </View>
-              </Toque>
+                  <View
+                    style={{
+                      borderRadius: 999,
+                      paddingVertical: 9,
+                      paddingHorizontal: 16,
+                      backgroundColor: t.accentSoft,
+                    }}
+                  >
+                    <Txt tamanho={12.5} peso={600} cor={t.accent}>
+                      Adicionar valor
+                    </Txt>
+                  </View>
+                </Toque>
+
+                {/* Só aparece quando há o que retirar: botão que não pode fazer
+                    nada é promessa vazia. */}
+                {m.guardadoCentavos > 0 ? (
+                  <Toque
+                    aoTocar={() =>
+                      despachar({ tipo: 'ABRIR_MOVIMENTO_META', metaId: m.id, retirar: true })
+                    }
+                    rotuloAcessivel={`Retirar valor de ${m.nome}`}
+                  >
+                    <View
+                      style={{
+                        borderRadius: 999,
+                        paddingVertical: 9,
+                        paddingHorizontal: 16,
+                        borderWidth: 1,
+                        borderColor: t.lineInput,
+                      }}
+                    >
+                      <Txt tamanho={12.5} peso={600} cor={t.inkMuted}>
+                        Retirar
+                      </Txt>
+                    </View>
+                  </Toque>
+                ) : null}
+              </View>
             </View>
           );
         })}

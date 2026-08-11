@@ -265,9 +265,9 @@ describe('apagar meta', () => {
     // entra em total nenhum — e continua lá para o desfazer reconstruir tudo.
     const comAporte = aplicar(
       estadoInicial,
-      { tipo: 'ABRIR_APORTE', metaId: 'reserva' },
+      { tipo: 'ABRIR_MOVIMENTO_META', metaId: 'reserva' },
       { tipo: 'DEFINIR_DIGITOS', digitos: '30000' },
-      { tipo: 'CONFIRMAR_APORTE' },
+      { tipo: 'CONFIRMAR_MOVIMENTO_META' },
     );
     const antes = totalGuardado(comAporte);
 

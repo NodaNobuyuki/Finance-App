@@ -189,4 +189,5 @@ export const icones = {
   desfazer: 'M3 8h11a5 5 0 010 10H8M3 8l4-4M3 8l4 4',
   lixeira: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6',
   lapis: 'M4 20h4L19 9a2.1 2.1 0 00-3-3L5 17zM14 6l4 4',
+  transferir: 'M4 8h13M13 4l4 4-4 4M20 16H7M11 12l-4 4 4 4',
 } as const;

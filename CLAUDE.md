@@ -184,7 +184,7 @@ src/
 
 ## Estado atual
 
-**App Expo rodando** (`src/`), portado do protótipo `design/Poupa Hábitos.dc.html`. 9 telas — Início, Extrato, Metas, Categorias, Hábitos, Simulador, Lote, Resumo, Fechar semana — mais 3 folhas: Nova transação, Aporte e Ritual. 13 paletas, teclado numérico próprio, toast com undo.
+**App Expo rodando** (`src/`), portado do protótipo `design/Poupa Hábitos.dc.html`. 9 telas — Início, Extrato, Metas, Categorias, Hábitos, Simulador, Lote, Resumo, Fechar semana — mais 6 folhas: Nova transação, Movimento de meta (guardar/retirar), Transferência, Ritual, Cadastro de conta e Cadastro de meta. 13 paletas, teclado numérico próprio, toast com undo.
 
 ```
 src/dominio/    dinheiro (centavos), saldo derivado, guardado das metas,
@@ -196,7 +196,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = lint + tipos + 337 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = lint + tipos + 356 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
@@ -303,12 +303,29 @@ Guardar a partir da mesma conta em que a meta guarda não muda saldo nenhum, e e
 
 `categorias.transferencia` tem `tipo: 'transferencia'`, e é isso que a mantém fora de `categoriasDespesa`/`categoriasReceita` — logo fora do seletor de lançamento e da tela Categorias, onde ela não faz sentido.
 
+### Uma função para os três movimentos
+
+`parDeTransferencia(d, { contaOrigemId, contaDestinoId, valor, descricao, meta? })` atende guardar, retirar e transferir entre contas. O que muda entre eles é só **em qual ponta o `metaId` é cravado** — sempre a que fica na conta da meta:
+
+| | origem | destino | `metaId` em |
+|---|---|---|---|
+| guardar | conta escolhida | conta da meta | destino (entrada, +) |
+| retirar | conta da meta | conta escolhida | origem (saída, −) |
+| transferir | conta escolhida | conta escolhida | nenhuma |
+
+Como `guardadoDaMeta` soma **com sinal**, os três casos caem na mesma conta sem ramo especial: a saída marcada derruba o guardado exatamente como a entrada o levanta. Foi essa soma com sinal, escolhida quando o aporte virou transferência, que fez "retirar da meta" custar uma folha em vez de um modelo novo.
+
+**Retirar valida contra o guardado**, não contra o saldo da conta: tirar mais do que está reservado deixaria o guardado negativo — meta devendo a si mesma. É recado de domínio no toast.
+
+**Transferir recusa origem igual a destino.** Seria um par somando zero na mesma conta, duas linhas no Extrato para não dizer nada. Guardar na própria conta da meta é diferente e continua permitido: ali o par documenta que o dinheiro passou a estar reservado.
+
+A folha `MovimentoMeta` faz os dois sentidos (`retirar: boolean`) porque é uma transferência só de cabeça para baixo; `PilulasDeConta` é a escolha de conta que as três folhas compartilham, junto com a linha que avisa o que vai acontecer com o saldo.
+
 **Pendências abertas:**
-- Transferência só existe como aporte. Par de transações entre duas contas quaisquer (pagar fatura do cartão) usa a mesma mecânica e ainda não tem tela
-- Não há como retirar da meta. `guardadoDaMeta` soma com sinal, então a saída já funciona no domínio — falta a ação e a folha
 - Categoria órfã aparece como "Sem categoria" mas não há como recategorizar o lançamento
 - Tela Categorias abre o extrato filtrado, mas não virou tela de orçamento
-- Setas de mês no Extrato e "Nova categoria" são decorativas
+- **O Extrato mente sobre o mês:** o cabeçalho anuncia "Agosto 2026" entre duas setas, mas as setas são `Txt` (não `Toque`) e `transacoesFiltradas` não filtra por mês nenhum — a lista traz tudo. Piorou com a transferência, que soma duas linhas por movimento
+- "Nova categoria" é decorativa
 - Categorias ainda são catálogo fixo. Viram dado do usuário (e vão para o `Estado` e para o banco) quando "Nova categoria" funcionar
 - Sobraram dois placeholders em `contexto`, e eles têm o mesmo defeito que `semanasEmDia` tinha: nascem da semente e nada os atualiza. `lancamentosMesAnterior` é derivável em cinco linhas (contar transações do mês anterior); `economiaBaseCentavos` é número inventado da demo e some quando `economizado()` passar a somar só o que existe. Aí o tipo `Contexto` inteiro desaparece
 - Sem retentativa ativa de gravação: o reenvio pega carona na próxima mudança. Um outbox resolve, se virar problema

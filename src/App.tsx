@@ -28,11 +28,12 @@ import { Metas } from './telas/Metas';
 import { Onboarding } from './telas/Onboarding';
 import { Resumo } from './telas/Resumo';
 import { Simulador } from './telas/Simulador';
-import { Aporte } from './telas/folhas/Aporte';
 import { CadastroConta } from './telas/folhas/CadastroConta';
 import { CadastroMeta } from './telas/folhas/CadastroMeta';
+import { MovimentoMeta } from './telas/folhas/MovimentoMeta';
 import { NovaTransacao } from './telas/folhas/NovaTransacao';
 import { Ritual } from './telas/folhas/Ritual';
+import { Transferencia } from './telas/folhas/Transferencia';
 import { TemaProvider, useTema } from './tema/TemaContext';
 
 function TelaAtual() {
@@ -66,8 +67,10 @@ function FolhaAtual() {
   switch (estado.folha.tipo) {
     case 'nova':
       return <NovaTransacao />;
-    case 'aporte':
-      return <Aporte metaId={estado.folha.metaId} />;
+    case 'movimentoMeta':
+      return <MovimentoMeta metaId={estado.folha.metaId} retirar={estado.folha.retirar} />;
+    case 'transferencia':
+      return <Transferencia />;
     case 'ritual':
       return <Ritual />;
     case 'conta':
