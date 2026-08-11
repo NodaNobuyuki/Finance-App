@@ -94,6 +94,15 @@ export function CadastroMeta() {
           }
         />
 
+        {/* Onde o dinheiro guardado fica de verdade: a entrada da transferência
+            precisa cair em alguma conta, senão guardar criaria dinheiro do nada. */}
+        <Opcoes
+          rotulo="Guardar em"
+          opcoes={estado.contas.map((c) => ({ id: c.id, nome: c.nome }))}
+          selecionada={c.contaId}
+          aoEscolher={(contaId) => despachar({ tipo: 'CADASTRO_META_CONTA', contaId })}
+        />
+
         <View style={{ gap: 9 }}>
           <Opcoes
             rotulo="Prazo"

@@ -20,7 +20,6 @@ export function criarRepositorioMemoria(): RepositorioLocal {
     transacoes: [...e.transacoes],
     contas: [...e.contas],
     metas: [...e.metas],
-    aportes: [...e.aportes],
     progressoDesafios: [...e.progressoDesafios],
     diasSemGasto: [...e.diasSemGasto],
     contexto: { ...e.contexto },

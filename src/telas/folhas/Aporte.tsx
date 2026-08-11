@@ -18,6 +18,13 @@ export function Aporte({ metaId }: { metaId: string }) {
   const meta = metas(estado).find((m) => m.id === metaId);
   const valor = deDigitos(estado.rascunho.digitos);
 
+  // Guardar é transferência: sai de uma conta e entra na conta da meta. A folha
+  // mostra as duas pontas porque o saldo da origem vai cair de verdade — antes
+  // isto não movia dinheiro nenhum e o número na tela não queria dizer nada.
+  const origem = estado.contas.find((c) => c.id === estado.rascunho.contaId);
+  const destino = estado.contas.find((c) => c.id === meta?.contaId);
+  const mesmaConta = origem !== undefined && origem.id === destino?.id;
+
   return (
     <Folha titulo="Adicionar à meta" aoFechar={() => despachar({ tipo: 'FECHAR_FOLHA' })}>
       <View style={{ flex: 1, justifyContent: 'center', gap: 22, paddingHorizontal: 16 }}>
@@ -37,6 +44,47 @@ export function Aporte({ metaId }: { metaId: string }) {
           </Txt>
           <Txt tamanho={11.5} cor={t.inkFaint}>
             {meta ? `faltam ${formatar(meta.faltamCentavos)} para a meta` : ''}
+          </Txt>
+        </View>
+
+        <View style={{ gap: 9 }}>
+          <Txt tamanho={11} peso={600} cor={t.inkMuted} alinhamento="center" espacamento={0.5}>
+            SAI DE
+          </Txt>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7, justifyContent: 'center' }}>
+            {estado.contas.map((c) => {
+              const ativa = c.id === estado.rascunho.contaId;
+              return (
+                <Toque
+                  key={c.id}
+                  aoTocar={() => despachar({ tipo: 'RASCUNHO_CONTA', contaId: c.id })}
+                  rotuloAcessivel={`Guardar a partir de ${c.nome}`}
+                >
+                  <View
+                    style={{
+                      borderRadius: 999,
+                      paddingVertical: 8,
+                      paddingHorizontal: 14,
+                      borderWidth: 1,
+                      borderColor: ativa ? t.accent : t.lineInput,
+                      backgroundColor: ativa ? t.accent : t.surface,
+                    }}
+                  >
+                    <Txt tamanho={12.5} peso={600} cor={ativa ? t.onAccent : t.inkMuted}>
+                      {c.nome}
+                    </Txt>
+                  </View>
+                </Toque>
+              );
+            })}
+          </View>
+
+          <Txt tamanho={11.5} cor={t.inkFaint} alinhamento="center" entrelinha={1.45}>
+            {destino === undefined
+              ? 'Esta meta ainda não tem onde guardar.'
+              : mesmaConta
+                ? `Fica em ${destino.nome} — o dinheiro já está lá, o saldo não muda.`
+                : `Vai para ${destino.nome}. O saldo de ${origem?.nome ?? 'origem'} cai.`}
           </Txt>
         </View>
 

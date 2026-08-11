@@ -13,7 +13,7 @@ import {
 import { Centavos, formatar, percentual, renderPor } from '../dominio/dinheiro';
 import { DefinicaoDesafio, definicoesDesafios, progressoDe } from '../dominio/desafios';
 import { guardadoDaMeta, rotuloDePrazo, totalGuardado as somarGuardado } from '../dominio/metas';
-import { somaPorCategoria, totalEntradas, totalSaidas } from '../dominio/saldo';
+import { ehTransferencia, somaPorCategoria, totalEntradas, totalSaidas } from '../dominio/saldo';
 import { taxa } from '../dominio/taxas';
 import { Transacao } from '../dominio/tipos';
 import { Estado } from './store';
@@ -213,7 +213,9 @@ export function atalhosRapidos(e: Estado): AtalhoRapido[] {
   for (const t of e.transacoes) {
     // Só o que já é hábito: o que foi lançado nesta semana ainda não conta,
     // senão os botões trocariam de lugar embaixo do dedo a cada registro.
-    if (t.valorCentavos >= 0 || t.ocorridoEm >= inicio) continue;
+    // Transferência também não vira atalho — guardar dinheiro não é um gasto
+    // recorrente para repetir com um toque.
+    if (t.valorCentavos >= 0 || t.ocorridoEm >= inicio || ehTransferencia(t)) continue;
     (porCategoria[t.categoriaId] ??= []).push(Math.abs(t.valorCentavos));
   }
 
@@ -388,7 +390,11 @@ export type ResumoSemana = {
 
 export function resumoDaSemana(e: Estado): ResumoSemana {
   const s = semana(e);
-  const daSemana = e.transacoes.filter((t) => t.ocorridoEm >= s.inicio && t.valorCentavos < 0);
+  // Sem as transferências: o resumo é sobre para onde o dinheiro foi, e guardar
+  // numa meta não é gasto — entraria como "maior despesa da semana".
+  const daSemana = e.transacoes.filter(
+    (t) => t.ocorridoEm >= s.inicio && t.valorCentavos < 0 && !ehTransferencia(t),
+  );
   const total = totalSaidas(daSemana);
   const anterior = totalSaidas(e.transacoes.filter((t) => t.ocorridoEm < s.inicio));
 
@@ -564,7 +570,7 @@ export function economizado(e: Estado): Centavos {
 
 export function metas(e: Estado) {
   return e.metas.map((m) => {
-    const guardado = guardadoDaMeta(m, e.aportes);
+    const guardado = guardadoDaMeta(m, e.transacoes);
     return {
       ...m,
       guardadoCentavos: guardado,
@@ -578,7 +584,7 @@ export function metas(e: Estado) {
 }
 
 export function totalGuardado(e: Estado): Centavos {
-  return somarGuardado(e.metas, e.aportes);
+  return somarGuardado(e.metas, e.transacoes);
 }
 
 /* ── Simulador ───────────────────────────────────────────────── */

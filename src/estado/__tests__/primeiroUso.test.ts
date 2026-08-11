@@ -26,7 +26,6 @@ describe('estado vazio', () => {
     expect(estadoVazio.contas).toEqual([]);
     expect(estadoVazio.transacoes).toEqual([]);
     expect(estadoVazio.metas).toEqual([]);
-    expect(estadoVazio.aportes).toEqual([]);
     expect(estadoVazio.progressoDesafios).toEqual([]);
     expect(estadoVazio.diasSemGasto).toEqual([]);
     expect(estadoVazio.perfil.nome).toBe('');

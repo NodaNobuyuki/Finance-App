@@ -1,5 +1,5 @@
 import { EscritaFalhou, LeituraFalhou } from '../dominio/erros';
-import { Aporte, Conta, Meta, Origem, ProgressoDesafio, Transacao } from '../dominio/tipos';
+import { Conta, Meta, Origem, ProgressoDesafio, Transacao } from '../dominio/tipos';
 import { CorRef } from '../tema/paletas';
 import { diferencaDeChaves, diferencaPorId, Diferenca, vazia } from './diff';
 import { aplicarMigracoes } from './migracoes';
@@ -42,6 +42,8 @@ type LinhaTransacao = {
   descricao: string;
   descricao_original: string | null;
   id_externo: string | null;
+  transferencia_id: string | null;
+  meta_id: string | null;
   origem: string;
   criado_em: number;
 };
@@ -53,17 +55,9 @@ type LinhaMeta = {
   guardado_inicial_centavos: number;
   /** NULL quando a meta não tem prazo — ver migration v4. */
   prazo: string | null;
+  conta_id: string;
   cor: string;
   icone: string;
-};
-
-type LinhaAporte = {
-  id: string;
-  meta_id: string;
-  valor_centavos: number;
-  ocorrido_em: string;
-  origem: string;
-  criado_em: number;
 };
 
 type LinhaProgressoDesafio = {
@@ -112,6 +106,8 @@ const TABELA_TRANSACOES: Tabela<Transacao, LinhaTransacao> = {
     'descricao',
     'descricao_original',
     'id_externo',
+    'transferencia_id',
+    'meta_id',
     'origem',
     'criado_em',
     'atualizado_em',
@@ -125,6 +121,8 @@ const TABELA_TRANSACOES: Tabela<Transacao, LinhaTransacao> = {
     t.descricao,
     t.descricaoOriginal ?? null,
     t.idExterno ?? null,
+    t.transferenciaId ?? null,
+    t.metaId ?? null,
     t.origem,
     t.criadoEm,
     agoraMs,
@@ -138,6 +136,8 @@ const TABELA_TRANSACOES: Tabela<Transacao, LinhaTransacao> = {
     descricao: l.descricao,
     ...(l.descricao_original === null ? {} : { descricaoOriginal: l.descricao_original }),
     ...(l.id_externo === null ? {} : { idExterno: l.id_externo }),
+    ...(l.transferencia_id === null ? {} : { transferenciaId: l.transferencia_id }),
+    ...(l.meta_id === null ? {} : { metaId: l.meta_id }),
     origem: l.origem as Origem,
     criadoEm: l.criado_em,
   }),
@@ -151,6 +151,7 @@ const TABELA_METAS: Tabela<Meta, LinhaMeta> = {
     'alvo_centavos',
     'guardado_inicial_centavos',
     'prazo',
+    'conta_id',
     'cor',
     'icone',
     'atualizado_em',
@@ -161,6 +162,7 @@ const TABELA_METAS: Tabela<Meta, LinhaMeta> = {
     m.alvoCentavos,
     m.guardadoInicialCentavos,
     m.prazo,
+    m.contaId,
     corParaTexto(m.cor),
     m.icone,
     agoraMs,
@@ -171,38 +173,9 @@ const TABELA_METAS: Tabela<Meta, LinhaMeta> = {
     alvoCentavos: l.alvo_centavos,
     guardadoInicialCentavos: l.guardado_inicial_centavos,
     prazo: l.prazo,
+    contaId: l.conta_id,
     cor: corDeTexto(l.cor),
     icone: l.icone,
-  }),
-};
-
-const TABELA_APORTES: Tabela<Aporte, LinhaAporte> = {
-  nome: 'aportes',
-  colunas: [
-    'id',
-    'meta_id',
-    'valor_centavos',
-    'ocorrido_em',
-    'origem',
-    'criado_em',
-    'atualizado_em',
-  ],
-  paraLinha: (a, agoraMs) => [
-    a.id,
-    a.metaId,
-    a.valorCentavos,
-    a.ocorridoEm,
-    a.origem,
-    a.criadoEm,
-    agoraMs,
-  ],
-  daLinha: (l) => ({
-    id: l.id,
-    metaId: l.meta_id,
-    valorCentavos: l.valor_centavos,
-    ocorridoEm: l.ocorrido_em,
-    origem: l.origem as Origem,
-    criadoEm: l.criado_em,
   }),
 };
 
@@ -308,13 +281,12 @@ export function criarRepositorioSQL(
           prefs.map((p) => [p.chave, JSON.parse(p.valor)]),
         ) as Preferencias;
 
-        const [contas, transacoes, metas, aportes, progressos, dias] = await Promise.all([
+        const [contas, transacoes, metas, progressos, dias] = await Promise.all([
           motor.consultar<LinhaConta>(`SELECT * FROM contas`),
           motor.consultar<LinhaTransacao>(
             `SELECT * FROM transacoes ORDER BY ocorrido_em DESC, criado_em DESC`,
           ),
           motor.consultar<LinhaMeta>(`SELECT * FROM metas`),
-          motor.consultar<LinhaAporte>(`SELECT * FROM aportes ORDER BY criado_em DESC`),
           motor.consultar<LinhaProgressoDesafio>(`SELECT * FROM progresso_desafios`),
           motor.consultar<{ dia: string }>(`SELECT dia FROM dias_sem_gasto ORDER BY dia`),
         ]);
@@ -323,7 +295,6 @@ export function criarRepositorioSQL(
           contas: contas.map(TABELA_CONTAS.daLinha),
           transacoes: transacoes.map(TABELA_TRANSACOES.daLinha),
           metas: metas.map(TABELA_METAS.daLinha),
-          aportes: aportes.map(TABELA_APORTES.daLinha),
           progressoDesafios: progressos.map(TABELA_PROGRESSO_DESAFIOS.daLinha),
           diasSemGasto: dias.map((d) => d.dia),
           ...guardadas,
@@ -345,7 +316,6 @@ export function criarRepositorioSQL(
             diferencaPorId(antes?.transacoes ?? [], depois.transacoes),
           );
           await sincronizar(TABELA_METAS, diferencaPorId(antes?.metas ?? [], depois.metas));
-          await sincronizar(TABELA_APORTES, diferencaPorId(antes?.aportes ?? [], depois.aportes));
           await sincronizar(
             TABELA_PROGRESSO_DESAFIOS,
             diferencaPorId(antes?.progressoDesafios ?? [], depois.progressoDesafios),
@@ -373,7 +343,6 @@ export function criarRepositorioSQL(
         await motor.emTransacao(async () => {
           for (const tabela of [
             'transacoes',
-            'aportes',
             'contas',
             'metas',
             'progresso_desafios',

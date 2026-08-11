@@ -198,27 +198,43 @@ describe.each(implementacoes)('repositório: %s', (_nome, criar) => {
     expect((await repo.carregar())!.diasSemGasto).toEqual(['2026-08-04']);
   });
 
-  it('aportes sobrevivem com a meta a que pertencem', async () => {
+  it('as duas pontas de uma transferência sobrevivem juntas', async () => {
+    // Meia transferência gravada seria pior que nenhuma: o saldo derivado
+    // passaria a somar um lançamento sem par.
     const estado = base();
-    const comAporte = {
-      ...estado,
-      aportes: [
-        {
-          id: 'ap-1',
-          metaId: 'reserva',
-          valorCentavos: 10000,
-          ocorridoEm: AGORA,
-          origem: 'manual' as const,
-          criadoEm: 5_000_000,
-        },
-      ],
-    };
-    await repo.salvar(null, comAporte);
+    const par: Transacao[] = [
+      { ...tx('tr-saida', -10000), transferenciaId: 'tr-1', categoriaId: 'transferencia' },
+      {
+        ...tx('tr-entrada', 10000),
+        transferenciaId: 'tr-1',
+        metaId: 'reserva',
+        categoriaId: 'transferencia',
+      },
+    ];
+    await repo.salvar(null, { ...estado, transacoes: par });
     const lido = await repo.carregar();
 
-    expect(lido!.aportes).toHaveLength(1);
-    expect(lido!.aportes[0].metaId).toBe('reserva');
-    expect(lido!.aportes[0].valorCentavos).toBe(10000);
+    const lidas = lido!.transacoes.filter((t) => t.transferenciaId === 'tr-1');
+    expect(lidas).toHaveLength(2);
+    expect(lidas.reduce((a, t) => a + t.valorCentavos, 0)).toBe(0);
+    expect(lidas.filter((t) => t.metaId === 'reserva')).toHaveLength(1);
+    // A ponta de saída não pode voltar com `metaId`: ela contaria como
+    // guardado e dobraria o total da meta.
+    expect(lidas.find((t) => t.valorCentavos < 0)!.metaId).toBeUndefined();
+  });
+
+  it('lançamento comum volta sem os campos de transferência', async () => {
+    await repo.salvar(null, { ...base(), transacoes: [tx('t1', -2500)] });
+    const lida = (await repo.carregar())!.transacoes[0];
+
+    expect(lida.transferenciaId).toBeUndefined();
+    expect(lida.metaId).toBeUndefined();
+  });
+
+  it('a meta guarda onde o dinheiro dela fica', async () => {
+    await repo.salvar(null, base());
+    const lida = (await repo.carregar())!.metas.find((m) => m.id === 'reserva')!;
+    expect(lida.contaId).toBe('poupanca');
   });
 
   it('salvar duas vezes o mesmo estado não duplica nada', async () => {

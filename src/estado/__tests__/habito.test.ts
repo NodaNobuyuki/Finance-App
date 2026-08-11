@@ -1,8 +1,11 @@
 import { inicioDaSemana, somarDias } from '../../dominio/datas';
+import { saldoDaConta, saldoTotal } from '../../dominio/saldo';
 import {
   desafios,
   historicoDeSemanas,
   metas,
+  orcamento,
+  resumoDoMes,
   semana,
   semanaEstaFechada,
   semanasEmDia,
@@ -269,43 +272,129 @@ describe('virada do dia', () => {
 });
 
 describe('aporte na meta', () => {
-  const guardar = (metaId: string, digitos: string) =>
+  /**
+   * Guardar dinheiro é uma TRANSFERÊNCIA, não um contador que sobe.
+   *
+   * Enquanto o aporte era entidade própria, guardar R$ 500 não mexia em saldo
+   * nenhum: o app prometia "transforme o gasto em aporte" e o dinheiro
+   * continuava inteiro na conta. Estes testes travam as duas pontas.
+   */
+  const guardar = (metaId: string, digitos: string, contaOrigemId = 'corrente') =>
     aplicar(
-      estadoInicial,
+      { ...estadoInicial, rascunho: { ...estadoInicial.rascunho, contaId: contaOrigemId } },
       { tipo: 'ABRIR_APORTE', metaId },
       { tipo: 'DEFINIR_DIGITOS', digitos },
       { tipo: 'CONFIRMAR_APORTE' },
     );
 
-  it('registra o aporte como evento, em centavos, e limpa o rascunho', () => {
+  const novas = (depois: Estado) =>
+    depois.transacoes.filter((t) => !estadoInicial.transacoes.some((x) => x.id === t.id));
+
+  it('cria o par de transações, ligado pelo mesmo id de transferência', () => {
     const depois = guardar('reserva', '10000');
-    expect(depois.aportes).toHaveLength(1);
-    expect(depois.aportes[0]).toMatchObject({
-      metaId: 'reserva',
-      valorCentavos: 10000,
-      ocorridoEm: estadoInicial.hoje,
-      origem: 'manual',
-    });
+    const par = novas(depois);
+
+    expect(par).toHaveLength(2);
+    expect(new Set(par.map((t) => t.transferenciaId)).size).toBe(1);
+    expect(par.every((t) => t.transferenciaId !== undefined)).toBe(true);
     expect(depois.folha).toBeNull();
     expect(depois.rascunho.digitos).toBe('');
+  });
+
+  it('sai da conta de origem e entra na conta da meta', () => {
+    const depois = guardar('reserva', '10000');
+    const [saida, entrada] = novas(depois).sort((a, b) => a.valorCentavos - b.valorCentavos);
+
+    expect(saida).toMatchObject({ contaId: 'corrente', valorCentavos: -10000 });
+    expect(entrada).toMatchObject({ contaId: 'poupanca', valorCentavos: 10000 });
+    // Só a entrada carrega o `metaId`: se a saída carregasse, ela entraria no
+    // guardado com sinal negativo e o total ficaria zerado.
+    expect(saida.metaId).toBeUndefined();
+    expect(entrada.metaId).toBe('reserva');
+  });
+
+  it('o saldo da conta de origem cai de verdade', () => {
+    // É a regressão que motivou tudo isto.
+    const corrente = estadoInicial.contas.find((c) => c.id === 'corrente')!;
+    const antes = saldoDaConta(corrente, estadoInicial.transacoes);
+    const depois = guardar('reserva', '10000');
+
+    expect(saldoDaConta(corrente, depois.transacoes)).toBe(antes - 10000);
+  });
+
+  it('o patrimônio total não muda — o dinheiro só trocou de lugar', () => {
+    const depois = guardar('reserva', '10000');
+    expect(saldoTotal(depois.contas, depois.transacoes)).toBe(
+      saldoTotal(estadoInicial.contas, estadoInicial.transacoes),
+    );
+  });
+
+  it('guardar não vira despesa do mês', () => {
+    // Sem isto o orçamento estouraria e o resumo do mês mostraria R$ 100 de
+    // gasto que ninguém gastou.
+    const depois = guardar('reserva', '10000');
+    expect(resumoDoMes(depois).despesas).toBe(resumoDoMes(estadoInicial).despesas);
+    expect(resumoDoMes(depois).receitas).toBe(resumoDoMes(estadoInicial).receitas);
+    expect(orcamento(depois).gasto).toBe(orcamento(estadoInicial).gasto);
   });
 
   it('move o guardado da meta, sem tocar nas outras', () => {
     const antes = metas(estadoInicial);
     const depois = metas(guardar('reserva', '10000'));
-    const antesReserva = antes.find((m) => m.id === 'reserva')!;
-    const depoisReserva = depois.find((m) => m.id === 'reserva')!;
 
-    expect(depoisReserva.guardadoCentavos).toBe(antesReserva.guardadoCentavos + 10000);
+    expect(depois.find((m) => m.id === 'reserva')!.guardadoCentavos).toBe(
+      antes.find((m) => m.id === 'reserva')!.guardadoCentavos + 10000,
+    );
     expect(depois.find((m) => m.id === 'chile')!.guardadoCentavos).toBe(
       antes.find((m) => m.id === 'chile')!.guardadoCentavos,
     );
     expect(totalGuardado(guardar('reserva', '10000'))).toBe(totalGuardado(estadoInicial) + 10000);
   });
 
-  it('ignora meta inexistente em vez de criar aporte órfão', () => {
+  it('guardar na mesma conta em que o dinheiro já está não mexe no saldo', () => {
+    // A meta guarda na poupança; guardar A PARTIR da poupança é só marcar o
+    // dinheiro como reservado. Mostrar o saldo caindo seria inventar uma
+    // movimentação que não houve.
+    const poupanca = estadoInicial.contas.find((c) => c.id === 'poupanca')!;
+    const antes = saldoDaConta(poupanca, estadoInicial.transacoes);
+    const depois = guardar('reserva', '10000', 'poupanca');
+
+    expect(saldoDaConta(poupanca, depois.transacoes)).toBe(antes);
+    expect(totalGuardado(depois)).toBe(totalGuardado(estadoInicial) + 10000);
+  });
+
+  it('desfazer remove as duas pontas juntas', () => {
+    const depois = guardar('reserva', '10000');
+    expect(depois.toast?.acao?.rotulo).toBe('Desfazer');
+
+    const desfeito = aplicar(depois, depois.toast!.acao!.acao);
+    expect(desfeito.transacoes).toHaveLength(estadoInicial.transacoes.length);
+    expect(totalGuardado(desfeito)).toBe(totalGuardado(estadoInicial));
+    expect(saldoTotal(desfeito.contas, desfeito.transacoes)).toBe(
+      saldoTotal(estadoInicial.contas, estadoInicial.transacoes),
+    );
+  });
+
+  it('ignora meta inexistente em vez de criar transferência órfã', () => {
     const depois = guardar('meta-que-nao-existe', '10000');
-    expect(depois.aportes).toHaveLength(0);
+    expect(depois.transacoes).toHaveLength(estadoInicial.transacoes.length);
+  });
+});
+
+describe('simulador guarda de verdade', () => {
+  it('o fecho do loop também move dinheiro', () => {
+    const depois = aplicar(
+      { ...estadoInicial, rascunho: { ...estadoInicial.rascunho, contaId: 'corrente' } },
+      { tipo: 'SIM_DEFINIR', digitos: '5000' },
+      { tipo: 'SIM_GUARDAR', metaId: 'chile' },
+    );
+    const corrente = estadoInicial.contas.find((c) => c.id === 'corrente')!;
+
+    expect(saldoDaConta(corrente, depois.transacoes)).toBe(
+      saldoDaConta(corrente, estadoInicial.transacoes) - 5000,
+    );
+    expect(totalGuardado(depois)).toBe(totalGuardado(estadoInicial) + 5000);
+    expect(depois.tela).toBe('metas');
   });
 });
 

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
 import { AppState } from 'react-native';
-import { categoria, icones } from '../dominio/categorias';
+import { categoria, CATEGORIA_TRANSFERENCIA, icones } from '../dominio/categorias';
 import { definicoesDesafios, progressoDe } from '../dominio/desafios';
 import {
   AGORA,
@@ -19,9 +19,9 @@ import {
   removerDigito,
 } from '../dominio/dinheiro';
 import { GerarId, idsSequenciais, uuidV7 } from '../dominio/ids';
+import { contaPadraoDeMeta } from '../dominio/metas';
 import { Semente, semente, vazia } from '../dominio/seed';
 import {
-  Aporte,
   Conta,
   Contexto,
   Meta,
@@ -91,6 +91,8 @@ export type CadastroMeta = {
   nome: string;
   digitos: string;
   prazo: DiaISO | null;
+  /** Onde o dinheiro guardado desta meta fica — destino do aporte. */
+  contaId: string;
 };
 
 const CADASTRO_CONTA_VAZIO: CadastroConta = {
@@ -100,7 +102,13 @@ const CADASTRO_CONTA_VAZIO: CadastroConta = {
   digitos: '',
 };
 
-const CADASTRO_META_VAZIO: CadastroMeta = { id: null, nome: '', digitos: '', prazo: null };
+const CADASTRO_META_VAZIO: CadastroMeta = {
+  id: null,
+  nome: '',
+  digitos: '',
+  prazo: null,
+  contaId: '',
+};
 
 /**
  * Rascunho do primeiro uso. Não é persistido: quem fecha o app no meio começa
@@ -138,8 +146,6 @@ export type Estado = {
   transacoes: Transacao[];
   contas: Conta[];
   metas: Meta[];
-  /** Eventos de "guardei dinheiro". O guardado de cada meta é derivado deles. */
-  aportes: Aporte[];
   /** Só o que é do usuário; a definição do desafio é catálogo. */
   progressoDesafios: ProgressoDesafio[];
   /**
@@ -218,7 +224,6 @@ function estadoDe(hoje: DiaISO, s: Semente, onboardingConcluido: boolean): Estad
     transacoes: s.transacoes,
     contas: s.contas,
     metas: s.metas,
-    aportes: s.aportes,
     progressoDesafios: s.progressoDesafios,
     diasSemGasto: s.diasSemGasto,
     orcamentoMensalCentavos: s.orcamentoMensalCentavos,
@@ -306,6 +311,7 @@ export type Acao =
   | { tipo: 'ABRIR_META'; metaId?: string }
   | { tipo: 'CADASTRO_META_CAMPO'; campo: 'nome' | 'digitos'; valor: string }
   | { tipo: 'CADASTRO_META_PRAZO'; prazo: DiaISO | null }
+  | { tipo: 'CADASTRO_META_CONTA'; contaId: string }
   | { tipo: 'SALVAR_META' }
   | { tipo: 'APAGAR_META'; metaId: string }
   | { tipo: 'RASCUNHO_TIPO'; valor: 'despesa' | 'receita' }
@@ -445,6 +451,8 @@ function novaTransacao(
     valorCentavos: Centavos;
     ocorridoEm: DiaISO;
     descricao: string;
+    transferenciaId?: string;
+    metaId?: string;
   },
 ): Transacao {
   return {
@@ -455,24 +463,55 @@ function novaTransacao(
     ocorridoEm: campos.ocorridoEm,
     descricao: campos.descricao,
     descricaoOriginal: campos.descricao,
+    transferenciaId: campos.transferenciaId,
+    metaId: campos.metaId,
     // Escrita local primeiro. O sync (quando existir) lê daqui, nunca o inverso.
     origem: 'manual',
     criadoEm: d.agoraMs(),
   };
 }
 
-function novoAporte(
+/**
+ * O par de transações de um aporte: sai da conta de origem, entra na conta da
+ * meta. As duas pontas carregam o mesmo `transferenciaId`; só a entrada carrega
+ * `metaId`, que é de onde o guardado é derivado.
+ *
+ * Quando origem e destino são a mesma conta — só uma conta cadastrada, por
+ * exemplo — o par soma zero e o saldo não se mexe. Está certo: o dinheiro não
+ * foi para lugar nenhum, ele só passou a ter dono. Mostrar o saldo caindo aí
+ * seria inventar uma movimentação que não houve.
+ */
+function parDeAporte(
   d: Dependencias,
-  campos: { metaId: string; valorCentavos: Centavos; ocorridoEm: DiaISO },
-): Aporte {
-  return {
-    id: d.gerarId(),
-    metaId: campos.metaId,
-    valorCentavos: campos.valorCentavos,
+  campos: {
+    contaOrigemId: string;
+    meta: Meta;
+    valorCentavos: Centavos;
+    ocorridoEm: DiaISO;
+  },
+): [Transacao, Transacao] {
+  const transferenciaId = d.gerarId();
+  const descricao = `Guardado em ${campos.meta.nome}`;
+  const comum = {
+    categoriaId: CATEGORIA_TRANSFERENCIA,
     ocorridoEm: campos.ocorridoEm,
-    origem: 'manual',
-    criadoEm: d.agoraMs(),
+    descricao,
+    transferenciaId,
   };
+
+  return [
+    novaTransacao(d, {
+      ...comum,
+      contaId: campos.contaOrigemId,
+      valorCentavos: -campos.valorCentavos,
+    }),
+    novaTransacao(d, {
+      ...comum,
+      contaId: campos.meta.contaId,
+      valorCentavos: campos.valorCentavos,
+      metaId: campos.meta.id,
+    }),
+  ];
 }
 
 /**
@@ -687,11 +726,17 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       const perdidas = e.transacoes.length - transacoes.length;
       const restantes = e.contas.filter((c) => c.id !== conta.id);
 
+      // Meta que guardava aqui precisa de outro destino, senão o próximo aporte
+      // criaria a entrada numa conta que não existe — dinheiro no vácuo.
+      const abrigo = contaPadraoDeMeta(restantes);
+      const metas = e.metas.map((m) => (m.contaId === conta.id ? { ...m, contaId: abrigo } : m));
+
       return {
         ...e,
         seq,
         contas: restantes,
         transacoes,
+        metas,
         folha: null,
         cadastroConta: CADASTRO_CONTA_VAZIO,
         rascunho:
@@ -719,8 +764,9 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
               nome: existente.nome,
               digitos: String(existente.alvoCentavos),
               prazo: existente.prazo,
+              contaId: existente.contaId,
             }
-          : CADASTRO_META_VAZIO,
+          : { ...CADASTRO_META_VAZIO, contaId: contaPadraoDeMeta(e.contas) },
       };
     }
 
@@ -729,6 +775,9 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
 
     case 'CADASTRO_META_PRAZO':
       return { ...e, cadastroMeta: { ...e.cadastroMeta, prazo: a.prazo } };
+
+    case 'CADASTRO_META_CONTA':
+      return { ...e, cadastroMeta: { ...e.cadastroMeta, contaId: a.contaId } };
 
     case 'SALVAR_META': {
       const c = e.cadastroMeta;
@@ -744,7 +793,16 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         // `guardadoInicialCentavos` não entra na edição de propósito: ele é
         // abertura, e o guardado atual é derivado dos aportes. Reescrevê-lo
         // aqui moveria dinheiro sem nenhum aporte por trás.
-        const meta: Meta = { ...anterior, nome, alvoCentavos: alvo, prazo: c.prazo };
+        const meta: Meta = {
+          ...anterior,
+          nome,
+          alvoCentavos: alvo,
+          prazo: c.prazo,
+          // Mudar onde a meta guarda NÃO move o que já foi guardado: as
+          // entradas antigas continuam na conta em que caíram, porque o
+          // dinheiro está lá de verdade. Só os próximos aportes vão para cá.
+          contaId: c.contaId || anterior.contaId,
+        };
         return {
           ...e,
           seq,
@@ -761,6 +819,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         alvoCentavos: alvo,
         guardadoInicialCentavos: 0,
         prazo: c.prazo,
+        contaId: c.contaId || contaPadraoDeMeta(e.contas),
         cor: token('accent'),
         icone: icones.metas,
       };
@@ -779,9 +838,11 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       if (!meta) return e;
 
       const seq = e.seq + 1;
-      // Os aportes ficam. `guardadoDaMeta` filtra por `metaId`, então aporte de
-      // meta apagada não entra em total nenhum — e continua lá para o desfazer
-      // devolver o guardado exatamente como estava.
+      // As transações ficam — inclusive as entradas com este `metaId`. O
+      // dinheiro guardado é real e continua na conta onde está; some só o
+      // rótulo. `guardadoDaMeta` filtra por `metaId`, então entrada de meta
+      // apagada não entra em guardado nenhum, e o desfazer reconstrói o total
+      // exato sem precisar guardar nada à parte.
       return {
         ...e,
         seq,
@@ -898,17 +959,34 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       if (valor <= 0) return e;
       const meta = e.metas.find((m) => m.id === metaId);
       if (!meta) return e;
+
+      // `rascunho.contaId` é a conta de origem — a mesma escolha do lançamento,
+      // feita no mesmo lugar. Um campo próprio só duplicaria estado.
+      const par = parDeAporte(d, {
+        contaOrigemId: e.rascunho.contaId,
+        meta,
+        valorCentavos: valor,
+        ocorridoEm: e.hoje,
+      });
+
       const seq = e.seq + 1;
+      const destino = e.contas.find((c) => c.id === meta.contaId);
       return {
         ...e,
         seq,
-        aportes: [
-          novoAporte(d, { metaId: meta.id, valorCentavos: valor, ocorridoEm: e.hoje }),
-          ...e.aportes,
-        ],
+        transacoes: ordenar([...par, ...e.transacoes]),
         folha: null,
         rascunho: { ...e.rascunho, digitos: '' },
-        toast: avisar(seq, `${formatar(valor)} adicionados a ${meta.nome}`),
+        toast: {
+          id: seq,
+          texto: `${formatar(valor)} guardados em ${meta.nome}`,
+          sub: destino ? `Saíram da conta e foram para ${destino.nome}.` : undefined,
+          acao: {
+            rotulo: 'Desfazer',
+            acao: { tipo: 'DESFAZER', transacaoIds: par.map((t) => t.id), diasSemGasto: [] },
+          },
+          duracaoMs: 6000,
+        },
       };
     }
 
@@ -1073,17 +1151,32 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       if (valor <= 0) return e;
       const meta = e.metas.find((m) => m.id === a.metaId);
       if (!meta) return e;
+
+      // É o fecho do loop de custo de oportunidade: o gasto que a pessoa
+      // simulou vira dinheiro de verdade saindo da conta e indo para a meta.
+      const par = parDeAporte(d, {
+        contaOrigemId: e.rascunho.contaId,
+        meta,
+        valorCentavos: valor,
+        ocorridoEm: e.hoje,
+      });
+
       const seq = e.seq + 1;
       return {
         ...e,
         seq,
-        aportes: [
-          novoAporte(d, { metaId: meta.id, valorCentavos: valor, ocorridoEm: e.hoje }),
-          ...e.aportes,
-        ],
+        transacoes: ordenar([...par, ...e.transacoes]),
         tela: 'metas',
         simDigitos: '',
-        toast: avisar(seq, `${formatar(valor)} guardados na ${meta.nome}`),
+        toast: {
+          id: seq,
+          texto: `${formatar(valor)} guardados em ${meta.nome}`,
+          acao: {
+            rotulo: 'Desfazer',
+            acao: { tipo: 'DESFAZER', transacaoIds: par.map((t) => t.id), diasSemGasto: [] },
+          },
+          duracaoMs: 6000,
+        },
       };
     }
 
@@ -1136,6 +1229,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
                 // Prazo fica para depois: mais um campo no primeiro minuto de
                 // uso é mais gente desistindo. Entra pela folha de meta.
                 prazo: null,
+                contaId: conta.id,
                 cor: token('accent'),
                 icone: icones.metas,
               },

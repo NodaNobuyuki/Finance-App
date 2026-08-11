@@ -1,6 +1,6 @@
 import { hex, token } from '../tema/paletas';
 import { DiaISO, inicioDaSemana, somarDias } from './datas';
-import { Aporte, Conta, Contexto, Meta, Perfil, ProgressoDesafio, Transacao } from './tipos';
+import { Conta, Contexto, Meta, Perfil, ProgressoDesafio, Transacao } from './tipos';
 
 /**
  * Dados de demonstração. Todos os valores já em centavos inteiros.
@@ -115,6 +115,7 @@ function metasDemo(hoje: DiaISO): Meta[] {
       alvoCentavos: 800000,
       guardadoInicialCentavos: 320000,
       prazo: somarDias(hoje, 132),
+      contaId: 'poupanca',
       cor: hex('#2f6f8f'),
       icone: 'M2 12h20M12 2c3 3 3 17 0 20M12 2c-3 3-3 17 0 20',
     },
@@ -124,6 +125,7 @@ function metasDemo(hoje: DiaISO): Meta[] {
       alvoCentavos: 1200000,
       guardadoInicialCentavos: 640000,
       prazo: somarDias(hoje, 314),
+      contaId: 'poupanca',
       cor: token('up'),
       icone: 'M12 3l8 3v6c0 5-3.4 8.2-8 9-4.6-.8-8-4-8-9V6z',
     },
@@ -133,6 +135,7 @@ function metasDemo(hoje: DiaISO): Meta[] {
       alvoCentavos: 450000,
       guardadoInicialCentavos: 285000,
       prazo: somarDias(hoje, 76),
+      contaId: 'poupanca',
       cor: token('accent'),
       icone: 'M4 5h16v10H4zM2 19h20M9 19l.6-2h4.8l.6 2',
     },
@@ -192,7 +195,6 @@ export type Semente = {
   contas: Conta[];
   transacoes: Transacao[];
   metas: Meta[];
-  aportes: Aporte[];
   progressoDesafios: ProgressoDesafio[];
   diasSemGasto: DiaISO[];
   orcamentoMensalCentavos: number;
@@ -205,8 +207,6 @@ export function semente(hoje: DiaISO): Semente {
     contas,
     transacoes: transacoesDemo(hoje),
     metas: metasDemo(hoje),
-    // Nenhum aporte de partida: o guardado de cada meta começa na abertura dela.
-    aportes: [],
     progressoDesafios,
     diasSemGasto: diasSemGastoDemo(hoje),
     orcamentoMensalCentavos,
@@ -227,7 +227,6 @@ export function vazia(): Semente {
     contas: [],
     transacoes: [],
     metas: [],
-    aportes: [],
     progressoDesafios: [],
     diasSemGasto: [],
     orcamentoMensalCentavos: 0,

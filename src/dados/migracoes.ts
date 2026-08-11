@@ -199,6 +199,65 @@ export const migracoes: Migracao[] = [
       `ALTER TABLE metas_nova RENAME TO metas`,
     ],
   },
+  {
+    versao: 5,
+    nome: 'aporte-vira-transferencia',
+    sql: [
+      // Guardar dinheiro numa meta não movia saldo nenhum: `aportes` era uma
+      // tabela à parte que só alimentava um contador. O app dizia "transforme o
+      // gasto em aporte" e o dinheiro continuava inteiro na conta.
+      //
+      // Agora aporte é transferência — duas transações com o mesmo
+      // `transferencia_id` —, e o guardado sai das transações com `meta_id`.
+      // Uma escrita só, sem dois livros-caixa para divergir.
+      `ALTER TABLE transacoes ADD COLUMN transferencia_id TEXT`,
+      `ALTER TABLE transacoes ADD COLUMN meta_id TEXT`,
+      `CREATE INDEX transacoes_por_meta ON transacoes (meta_id) WHERE meta_id IS NOT NULL`,
+      `CREATE INDEX transacoes_por_transferencia
+         ON transacoes (transferencia_id) WHERE transferencia_id IS NOT NULL`,
+
+      // A meta precisa saber ONDE o dinheiro dela fica: a entrada da
+      // transferência tem de cair em alguma conta. Poupança primeiro, cartão
+      // nunca — guardar dinheiro em fatura não significa nada.
+      `CREATE TABLE metas_nova (
+         id TEXT PRIMARY KEY NOT NULL,
+         nome TEXT NOT NULL,
+         alvo_centavos INTEGER NOT NULL,
+         guardado_inicial_centavos INTEGER NOT NULL,
+         prazo TEXT,
+         conta_id TEXT NOT NULL,
+         cor TEXT NOT NULL,
+         icone TEXT NOT NULL,
+         atualizado_em INTEGER NOT NULL
+       )`,
+
+      // Os aportes antigos viram ABERTURA da meta, não transferências.
+      // Converter em par de transações exigiria inventar uma conta de origem e
+      // um saque que nunca aconteceu — dinheiro saindo de uma conta que a
+      // pessoa nunca viu mexer. Como aporte antigo nunca moveu saldo, ele é
+      // exatamente "o que já estava guardado": o guardado exibido não muda em
+      // um centavo, e nenhum saldo é reescrito.
+      `INSERT INTO metas_nova
+         (id, nome, alvo_centavos, guardado_inicial_centavos, prazo, conta_id, cor, icone,
+          atualizado_em)
+         SELECT m.id, m.nome, m.alvo_centavos,
+                m.guardado_inicial_centavos
+                  + COALESCE((SELECT SUM(a.valor_centavos) FROM aportes a WHERE a.meta_id = m.id), 0),
+                m.prazo,
+                COALESCE(
+                  (SELECT c.id FROM contas c WHERE c.tipo = 'poupanca' LIMIT 1),
+                  (SELECT c.id FROM contas c WHERE c.tipo <> 'cartao' LIMIT 1),
+                  (SELECT c.id FROM contas c LIMIT 1),
+                  ''
+                ),
+                m.cor, m.icone, m.atualizado_em
+           FROM metas m`,
+
+      `DROP TABLE metas`,
+      `ALTER TABLE metas_nova RENAME TO metas`,
+      `DROP TABLE aportes`,
+    ],
+  },
 ];
 
 async function versaoAtual(motor: MotorSQL): Promise<number> {

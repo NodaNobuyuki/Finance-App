@@ -60,8 +60,9 @@ users            (id, email, password_hash, created_at)
 accounts         (id, user_id, name, type, initial_balance_cents, currency)
 categories       (id, user_id, name, type[income|expense], icon, color, is_default)
 transactions     (id, account_id, category_id, amount_cents, occurred_at,
-                  description, raw_description, external_id, source, created_at)
-goals            (id, user_id, name, target_cents, current_cents, deadline)
+                  description, raw_description, external_id, source, created_at,
+                  transfer_id, goal_id)
+goals            (id, user_id, name, target_cents, opening_cents, deadline, account_id)
 budgets          (id, user_id, category_id, limit_cents, period)
 recurring_rules  (id, user_id, template, frequency, next_occurrence)
 challenges       (id, user_id, type, target, progress, started_at, completed_at)
@@ -74,6 +75,8 @@ saldo = initial_balance_cents + SUM(transactions.amount_cents WHERE account_id =
 ```
 
 Isso evita o bug clássico de saldo dessincronizado. Se performance exigir, use materialized view ou cache invalidável — nunca uma coluna atualizada por trigger espalhada pelo código.
+
+O mesmo vale para o guardado da meta: `opening_cents + SUM(transactions.amount_cents WHERE goal_id = ?)`. Guardar dinheiro é uma **transferência** — duas linhas com o mesmo `transfer_id`, e só a entrada com `goal_id`. Não existe tabela de aportes, e `current_cents` não é coluna. Quem soma gasto e ganho ignora tudo que tem `transfer_id`: dinheiro mudando de lugar não é receita nem despesa.
 
 **Dedupe:** `UNIQUE (account_id, external_id)` quando houver `external_id` (FITID do OFX). Para colisão manual × importado (mesma conta, valor idêntico, data ±2 dias), **não resolva automaticamente** — apresente ao usuário uma tela de "possíveis duplicatas" e deixe ele decidir.
 
@@ -193,7 +196,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = lint + tipos + 319 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = lint + tipos + 337 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
@@ -252,7 +255,7 @@ Três regras de domínio ficaram no reducer, não na tela:
 
 **A última conta não é apagável.** Sem nenhuma, não há destino para lançamento e `rascunho.contaId` aponta para o vazio. É recado de domínio no toast, não botão desabilitado.
 
-Apagar meta é o oposto e de propósito: os aportes **ficam**. `guardadoDaMeta` filtra por `metaId`, então aporte de meta apagada não entra em total nenhum, e é isso que faz o desfazer reconstruir o guardado exato. Editar meta também não toca em `guardadoInicialCentavos` — ele é abertura, e reescrevê-lo moveria dinheiro sem aporte por trás.
+Apagar meta é o oposto e de propósito: as transações **ficam**, inclusive as entradas com aquele `metaId`. O dinheiro guardado é real e continua na conta onde está; some só o rótulo. `guardadoDaMeta` filtra por `metaId`, então entrada de meta apagada não entra em guardado nenhum, e é isso que faz o desfazer reconstruir o total exato. Editar meta também não toca em `guardadoInicialCentavos` — ele é abertura, e reescrevê-lo moveria dinheiro sem transferência por trás. Trocar a conta da meta não move o que já foi guardado: as entradas antigas ficam onde caíram, porque o dinheiro está lá de verdade.
 
 **`Meta.prazo` é `DiaISO | null`.** Era string pré-formatada (`'faltam 134 dias · 15 dez 2026'`) e envelhecia sozinha: seguia anunciando os mesmos 134 dias meses depois. O texto agora sai de `rotuloDePrazo(prazo, hoje)` a cada render — dias até 180, meses acima disso. A migration v4 reconstrói a tabela (SQLite não afrouxa `NOT NULL` por `ALTER`) e converte o texto antigo em `NULL`: 'faltam 134 dias' dependia de um "hoje" que já passou, então data chutada seria pior que meta sem prazo.
 
@@ -276,18 +279,33 @@ Isso não desfaz a regra abaixo — é a mesma divisão de categoria × transaç
 
 ### `seed` é semente do estado, não fonte de consulta
 
-Todo dado do usuário — transações, contas, metas, aportes, desafios, orçamento — mora em `Estado`. `src/dominio/seed.ts` só alimenta `estadoInicial`; tela, componente e derivado leem sempre de `estado.*`. Um `no-restricted-imports` no ESLint segura a regra.
+Todo dado do usuário — transações, contas, metas, desafios, orçamento — mora em `Estado`. `src/dominio/seed.ts` só alimenta `estadoInicial`; tela, componente e derivado leem sempre de `estado.*`. Um `no-restricted-imports` no ESLint segura a regra.
 
 O motivo é persistência: **o que não está no `Estado` não tem como ser gravado nem recarregado.** Enquanto metas e desafios eram constantes de módulo, eram imutáveis por construção, e os contadores paralelos (`aportes: Record<metaId, número>`) só existiam para contornar isso.
 
 `categorias` e `taxas` continuam sendo constantes de módulo de propósito: são catálogo, não dado de quem usa o app.
 
-**Guardado da meta é derivado, igual ao saldo:** `guardadoInicialCentavos + soma dos aportes daquela meta` (`src/dominio/metas.ts`). Como a soma filtra por `metaId`, aporte que aponta para meta apagada não entra em total nenhum.
+**Guardado da meta é derivado, igual ao saldo:** `guardadoInicialCentavos + soma das transações com aquele `metaId`` (`src/dominio/metas.ts`). Como a soma filtra por `metaId`, entrada que aponta para meta apagada não entra em guardado nenhum.
 
 **Resolvido do protótipo:** saldo derivado (com teste travando os valores), undo no toast, orçamento com cor progressiva, insight na Home, aporte de valor livre.
 
+### Aporte é transferência, não contador
+
+Guardar dinheiro numa meta cria **duas transações** com o mesmo `transferenciaId`: saída da conta de origem (`rascunho.contaId`, a mesma escolha do lançamento) e entrada na conta da meta. Só a entrada carrega `metaId` — é dela que o guardado é derivado. `Meta.contaId` diz onde o dinheiro da meta fica; sem ele a entrada não teria onde cair e guardar criaria dinheiro do nada.
+
+Antes disso `Aporte` era entidade própria, com tabela própria, e guardar R$ 500 não movia saldo nenhum: o app prometia "transforme o gasto em aporte" e o dinheiro continuava inteiro na conta. Dois livros-caixa para o mesmo evento também é o caminho conhecido para eles divergirem — agora é uma escrita só.
+
+**A regra que segura o resto: transferência move saldo e não é receita nem despesa.** `ehTransferencia()` em `saldo.ts`, e `totalEntradas`, `totalSaidas` e `somaPorCategoria` a ignoram. Sem isso, guardar R$ 500 estouraria o orçamento, apareceria como "maior gasto da semana" e viraria atalho rápido. Como o par soma zero, o patrimônio total também não se mexe — que é exatamente o que acontece ao mover dinheiro entre as próprias contas.
+
+Guardar a partir da mesma conta em que a meta guarda não muda saldo nenhum, e está certo: o dinheiro não foi a lugar algum, só passou a ter dono. Marcar dinheiro dentro de uma conta só (saldo disponível × reservado) é outro conceito, ainda não modelado.
+
+**A migration v5 dobra os aportes antigos em `guardadoInicialCentavos` e derruba a tabela.** Convertê-los em pares exigiria inventar uma conta de origem e um saque que nunca aconteceu. Como aporte antigo nunca moveu saldo, ele é literalmente "o que já estava guardado": o guardado exibido não muda em um centavo e nenhum saldo é reescrito.
+
+`categorias.transferencia` tem `tipo: 'transferencia'`, e é isso que a mantém fora de `categoriasDespesa`/`categoriasReceita` — logo fora do seletor de lançamento e da tela Categorias, onde ela não faz sentido.
+
 **Pendências abertas:**
-- Aporte não move dinheiro: guardar R$ 500 numa meta não altera saldo nenhum. Modelar como transferência exige o conceito de par de transações — decisão à parte, ainda não tomada
+- Transferência só existe como aporte. Par de transações entre duas contas quaisquer (pagar fatura do cartão) usa a mesma mecânica e ainda não tem tela
+- Não há como retirar da meta. `guardadoDaMeta` soma com sinal, então a saída já funciona no domínio — falta a ação e a folha
 - Categoria órfã aparece como "Sem categoria" mas não há como recategorizar o lançamento
 - Tela Categorias abre o extrato filtrado, mas não virou tela de orçamento
 - Setas de mês no Extrato e "Nova categoria" são decorativas

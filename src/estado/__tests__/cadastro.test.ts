@@ -272,7 +272,12 @@ describe('apagar meta', () => {
     const antes = totalGuardado(comAporte);
 
     const apagada = aplicar(comAporte, { tipo: 'APAGAR_META', metaId: 'reserva' });
-    expect(apagada.aportes).toHaveLength(comAporte.aportes.length);
+    // As transações ficam: o dinheiro guardado é real e continua na conta onde
+    // está. Some só o rótulo que dizia para qual meta ele era.
+    expect(apagada.transacoes).toHaveLength(comAporte.transacoes.length);
+    expect(saldoTotal(apagada.contas, apagada.transacoes)).toBe(
+      saldoTotal(comAporte.contas, comAporte.transacoes),
+    );
 
     const restaurada = aplicar(apagada, apagada.toast!.acao!.acao);
     expect(totalGuardado(restaurada)).toBe(antes);

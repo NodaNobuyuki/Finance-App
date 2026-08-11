@@ -88,10 +88,17 @@ describe('fechar e reabrir', () => {
     const depois = await sessao(motor);
 
     const meta = (e: typeof depois) => e.metas.find((m) => m.id === 'reserva')!;
-    expect(guardadoDaMeta(meta(depois), depois.aportes)).toBe(
-      guardadoDaMeta(meta(antes), antes.aportes),
+    expect(guardadoDaMeta(meta(depois), depois.transacoes)).toBe(
+      guardadoDaMeta(meta(antes), antes.transacoes),
     );
-    expect(depois.aportes).toHaveLength(1);
+
+    // O aporte é uma transferência: as duas pontas atravessam o fechar e
+    // reabrir juntas, senão o saldo voltaria com metade do movimento gravado.
+    const par = depois.transacoes.filter((t) => t.transferenciaId !== undefined);
+    expect(par).toHaveLength(2);
+    expect(new Set(par.map((t) => t.transferenciaId)).size).toBe(1);
+    expect(par.reduce((a, t) => a + t.valorCentavos, 0)).toBe(0);
+    expect(par.filter((t) => t.metaId === 'reserva')).toHaveLength(1);
   });
 
   it('a semana fechada continua fechada — e sabe qual era', async () => {

@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { Barra, BotaoVoltar, CartaoNumero, Disco, Hero, Toque, Txt } from '../componentes/basicos';
 import { categoria } from '../dominio/categorias';
 import { nomeDoMes } from '../dominio/datas';
+import { semTransferencias } from '../dominio/saldo';
 import {
   desafios,
   historicoDeSemanas,
@@ -94,7 +95,7 @@ export function Habitos() {
           />
           <CartaoNumero
             rotulo={`Lançamentos em ${nomeDoMes(estado.hoje)}`}
-            valor={String(transacoesDoMes(estado).length)}
+            valor={String(semTransferencias(transacoesDoMes(estado)).length)}
             nota={`${estado.contexto.lancamentosMesAnterior} no mês anterior`}
             corValor={t.up}
           />

@@ -12,6 +12,16 @@ import { criarMotorNode } from './motorNode';
 const versao = async (m: MotorSQL) =>
   (await m.consultar<{ user_version: number }>('PRAGMA user_version'))[0].user_version;
 
+/** Deixa o banco parado numa versão antiga, como um aparelho que não atualizou. */
+const ateAVersao = async (m: MotorSQL, versao: number) => {
+  await m.emTransacao(async () => {
+    for (const migracao of migracoes.filter((x) => x.versao <= versao)) {
+      for (const comando of migracao.sql) await m.executar(comando);
+    }
+    await m.executar(`PRAGMA user_version = ${versao}`);
+  });
+};
+
 const tabelas = async (m: MotorSQL) =>
   (
     await m.consultar<{ name: string }>(
@@ -46,7 +56,6 @@ describe('aplicar do zero', () => {
     const motor = criarMotorNode();
     await aplicarMigracoes(motor);
     expect(await tabelas(motor)).toEqual([
-      'aportes',
       'contas',
       'dias_sem_gasto',
       'metas',
@@ -139,10 +148,64 @@ describe('aplicar do zero', () => {
       alvo_centavos: 800000,
       guardado_inicial_centavos: 320000,
       prazo: null,
+      // Sem conta cadastrada não há destino possível; a v5 deixa vazio em vez
+      // de apontar para uma conta inventada.
+      conta_id: '',
       cor: 'hex:#2f6f8f',
       icone: 'M2 12h20',
       atualizado_em: 7,
     });
+  });
+
+  it('a v5 dobra o aporte antigo na abertura da meta, sem inventar saque', async () => {
+    const motor = criarMotorNode();
+    await ateAVersao(motor, 4);
+    await motor.executar(
+      `INSERT INTO contas (id, nome, tipo, saldo_inicial_centavos, cor, atualizado_em)
+       VALUES ('corrente', 'Corrente', 'corrente', 500000, 'x', 1),
+              ('poupanca', 'Poupança', 'poupanca', 100000, 'x', 1)`,
+    );
+    await motor.executar(
+      `INSERT INTO metas (id, nome, alvo_centavos, guardado_inicial_centavos, prazo, cor, icone,
+         atualizado_em)
+       VALUES ('reserva', 'Reserva', 1200000, 640000, NULL, 'x', 'x', 1)`,
+    );
+    await motor.executar(
+      `INSERT INTO aportes (id, meta_id, valor_centavos, ocorrido_em, origem, criado_em,
+         atualizado_em)
+       VALUES ('a1', 'reserva', 10000, '2026-08-01', 'manual', 1, 1),
+              ('a2', 'reserva', 25000, '2026-08-02', 'manual', 2, 2),
+              ('a3', 'meta-apagada', 999999, '2026-08-02', 'manual', 3, 3)`,
+    );
+
+    expect(await aplicarMigracoes(motor)).toBe(VERSAO_ESPERADA);
+
+    const [meta] = await motor.consultar<{ guardado_inicial_centavos: number; conta_id: string }>(
+      'SELECT guardado_inicial_centavos, conta_id FROM metas',
+    );
+    // O guardado exibido não muda em um centavo: 640000 + 10000 + 25000.
+    // Aporte antigo nunca moveu saldo, então ele é exatamente "o que já estava
+    // guardado" — virar par de transações exigiria inventar um saque que a
+    // pessoa nunca viu acontecer.
+    expect(meta.guardado_inicial_centavos).toBe(675000);
+    // Poupança primeiro, como destino dos próximos aportes.
+    expect(meta.conta_id).toBe('poupanca');
+
+    // Nenhum saldo foi reescrito, e nenhuma transação foi criada.
+    const [{ n }] = await motor.consultar<{ n: number }>('SELECT COUNT(*) AS n FROM transacoes');
+    expect(n).toBe(0);
+    expect(await tabelas(motor)).not.toContain('aportes');
+  });
+
+  it('a v5 abre espaço para as duas pontas da transferência', async () => {
+    const motor = criarMotorNode();
+    await aplicarMigracoes(motor);
+
+    const colunas = (
+      await motor.consultar<{ name: string }>('PRAGMA table_info(transacoes)')
+    ).map((c) => c.name);
+    expect(colunas).toContain('transferencia_id');
+    expect(colunas).toContain('meta_id');
   });
 
   it('é idempotente — rodar de novo não faz nada', async () => {
@@ -173,7 +236,7 @@ describe('dinheiro no esquema', () => {
     }
     // Se alguém renomear as colunas e este número cair para zero, o teste
     // passaria sem conferir nada.
-    expect(conferidas).toBeGreaterThanOrEqual(5);
+    expect(conferidas).toBeGreaterThanOrEqual(4);
   });
 });
 

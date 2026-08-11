@@ -1,6 +1,6 @@
 import { DiaISO, diferencaEmDias, rotuloDataCurta, rotuloMesAno } from './datas';
 import { Centavos } from './dinheiro';
-import { Aporte, Meta } from './tipos';
+import { Meta, Transacao } from './tipos';
 
 /**
  * A partir daqui o prazo é contado em meses. Abaixo disso, em dias.
@@ -34,24 +34,42 @@ export function rotuloDePrazo(prazo: DiaISO | null, hoje: DiaISO): string {
  * Guardado é sempre derivado, nunca uma coluna que alguém incrementa —
  * mesma regra do saldo de conta, pelo mesmo motivo:
  *
- *   guardado = guardadoInicialCentavos + SOMA(aportes da meta)
+ *   guardado = guardadoInicialCentavos + SOMA(transações com este `metaId`)
  *
- * Como a soma é sempre filtrada por `metaId`, aporte que aponta para meta
- * inexistente não entra em conta nenhuma. Ele fica visível como sobra, em vez
- * de inflar silenciosamente um total.
+ * Sai das TRANSAÇÕES, não de uma tabela de aportes à parte. Enquanto o aporte
+ * era entidade própria, guardar dinheiro não movia saldo nenhum: o app dizia
+ * "transforme o gasto em aporte" e o dinheiro continuava inteiro na conta.
+ * Agora aporte é transferência, e as duas pontas são transações — uma escrita
+ * só, sem dois livros-caixa para divergir.
+ *
+ * Como a soma filtra por `metaId`, entrada que aponta para meta inexistente não
+ * entra em guardado nenhum. Ela continua no saldo da conta, que é onde o
+ * dinheiro de fato está.
  */
-export function guardadoDaMeta(meta: Meta, aportes: Aporte[]): Centavos {
+export function guardadoDaMeta(meta: Meta, transacoes: Transacao[]): Centavos {
   let total = meta.guardadoInicialCentavos;
-  for (const a of aportes) {
-    if (a.metaId === meta.id) total += a.valorCentavos;
+  for (const t of transacoes) {
+    if (t.metaId === meta.id) total += t.valorCentavos;
   }
   return total;
 }
 
-export function totalGuardado(metas: Meta[], aportes: Aporte[]): Centavos {
-  return metas.reduce((soma, m) => soma + guardadoDaMeta(m, aportes), 0);
+export function totalGuardado(metas: Meta[], transacoes: Transacao[]): Centavos {
+  return metas.reduce((soma, m) => soma + guardadoDaMeta(m, transacoes), 0);
 }
 
-export function faltamParaMeta(meta: Meta, aportes: Aporte[]): Centavos {
-  return Math.max(0, meta.alvoCentavos - guardadoDaMeta(meta, aportes));
+export function faltamParaMeta(meta: Meta, transacoes: Transacao[]): Centavos {
+  return Math.max(0, meta.alvoCentavos - guardadoDaMeta(meta, transacoes));
+}
+
+/**
+ * Onde uma meta nova guarda dinheiro, quando a pessoa não escolhe.
+ *
+ * Poupança primeiro porque é onde dinheiro guardado costuma morar de verdade;
+ * cartão nunca, porque guardar dinheiro em fatura não significa nada.
+ */
+export function contaPadraoDeMeta(contas: { id: string; tipo: string }[]): string {
+  const poupanca = contas.find((c) => c.tipo === 'poupanca');
+  const naoCartao = contas.find((c) => c.tipo !== 'cartao');
+  return (poupanca ?? naoCartao ?? contas[0])?.id ?? '';
 }

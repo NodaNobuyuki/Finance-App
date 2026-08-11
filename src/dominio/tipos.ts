@@ -23,6 +23,19 @@ export type Transacao = {
   descricaoOriginal?: string;
   /** FITID do OFX ou hash estável — base do dedupe. */
   idExterno?: string;
+  /**
+   * Une as duas pontas de uma transferência: as duas linhas carregam o mesmo
+   * id. Dinheiro que muda de lugar não é receita nem despesa, então quem soma
+   * gasto do mês ignora tudo que tem este campo — ver `saldo.ts`.
+   */
+  transferenciaId?: string;
+  /**
+   * Só na ENTRADA de um aporte: para qual meta esse dinheiro foi guardado.
+   *
+   * É daqui que sai o guardado da meta. Um dia terá saída também (resgatar da
+   * meta), e a soma com sinal já funciona para os dois casos.
+   */
+  metaId?: string;
   origem: Origem;
   criadoEm: number;
 };
@@ -46,9 +59,18 @@ export type Meta = {
   /**
    * Saldo de abertura da meta — o que já estava guardado antes do app.
    * O guardado exibido nunca é este valor: é
-   * `guardadoInicialCentavos + soma dos aportes` — ver `metas.ts`.
+   * `guardadoInicialCentavos + soma das entradas com este `metaId`` — ver
+   * `metas.ts`.
    */
   guardadoInicialCentavos: Centavos;
+  /**
+   * Onde o dinheiro guardado desta meta fica de verdade.
+   *
+   * Guardar não é fazer o dinheiro sumir da conta e reaparecer num contador: é
+   * uma transferência, e transferência tem destino. Sem isto o aporte teria de
+   * criar dinheiro do nada na entrada.
+   */
+  contaId: string;
   /**
    * Data-alvo, ou `null` para meta sem prazo.
    *
@@ -59,20 +81,6 @@ export type Meta = {
   prazo: DiaISO | null;
   cor: CorRef;
   icone: string;
-};
-
-/**
- * Cada vez que o usuário guarda dinheiro numa meta. É evento, não contador:
- * some o aporte e o guardado volta sozinho ao que era.
- */
-export type Aporte = {
-  id: string;
-  metaId: string;
-  /** Centavos inteiros, sempre positivo. */
-  valorCentavos: Centavos;
-  ocorridoEm: DiaISO;
-  origem: Origem;
-  criadoEm: number;
 };
 
 /**

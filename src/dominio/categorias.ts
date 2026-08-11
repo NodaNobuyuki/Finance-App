@@ -1,6 +1,16 @@
 import { CorRef, hex, token } from '../tema/paletas';
 
-export type TipoCategoria = 'despesa' | 'receita';
+/**
+ * `transferencia` não é despesa nem receita: é dinheiro seu mudando de lugar.
+ *
+ * Existe como tipo próprio para ficar de fora de `categoriasDespesa` e
+ * `categoriasReceita` sozinha — assim ela não aparece no seletor de lançamento
+ * nem na tela Categorias, que é onde ela não faz sentido nenhum.
+ */
+export type TipoCategoria = 'despesa' | 'receita' | 'transferencia';
+
+/** Categoria das duas pontas de uma transferência. */
+export const CATEGORIA_TRANSFERENCIA = 'transferencia';
 
 export type Categoria = {
   id: string;
@@ -105,6 +115,13 @@ export const categorias: Record<string, Categoria> = {
     tipo: 'receita',
     cor: hex('#2f6f8f'),
     icone: 'M4 19V9M10 19V5M16 19v-6M22 19H2',
+  },
+  [CATEGORIA_TRANSFERENCIA]: {
+    id: CATEGORIA_TRANSFERENCIA,
+    nome: 'Transferência',
+    tipo: 'transferencia',
+    cor: token('inkSoft'),
+    icone: 'M4 8h13M13 4l4 4-4 4M20 16H7M11 12l-4 4 4 4',
   },
 };
 
