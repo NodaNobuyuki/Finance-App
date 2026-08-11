@@ -6,9 +6,12 @@ import {
   letraDoDia,
   mesDe,
   nomeDoMes,
+  primeiroDoMes,
   rotuloCurto,
   rotuloDiaMes,
+  rotuloMesCurto,
   somarDias,
+  somarMeses,
 } from '../dominio/datas';
 import { Centavos, formatar, percentual, renderPor } from '../dominio/dinheiro';
 import { DefinicaoDesafio, definicoesDesafios, progressoDe } from '../dominio/desafios';
@@ -267,7 +270,7 @@ export function insights(e: Estado): Insight[] {
   if (topo && despesas > 0) {
     lista.push({
       tag: 'Concentração',
-      texto: `${categoria(topo).nome} concentra ${percentual(
+      texto: `${categoria(e.categorias, topo).nome} concentra ${percentual(
         porCategoria[topo],
         despesas,
       )}% dos seus gastos em ${nomeDoMes(e.hoje)}.`,
@@ -404,7 +407,7 @@ export function resumoDaSemana(e: Estado): ResumoSemana {
     .slice(0, 3)
     .map((id) => ({
       categoriaId: id,
-      nome: categoria(id).nome,
+      nome: categoria(e.categorias, id).nome,
       valorCentavos: porCategoria[id],
       pct: percentual(porCategoria[id], total),
     }));
@@ -601,12 +604,43 @@ export type GrupoDoDia = {
   itens: Transacao[];
 };
 
+/** Só o mês visível, sem os filtros de conta e categoria. */
+export function transacoesDoMesVisivel(e: Estado): Transacao[] {
+  const mes = mesDe(e.mesVisivel);
+  return e.transacoes.filter((t) => mesDe(t.ocorridoEm) === mes);
+}
+
 export function transacoesFiltradas(e: Estado): Transacao[] {
-  return e.transacoes.filter(
+  return transacoesDoMesVisivel(e).filter(
     (t) =>
       (e.filtroConta === 'todas' || t.contaId === e.filtroConta) &&
       (e.filtroCategoria === 'todas' || t.categoriaId === e.filtroCategoria),
   );
+}
+
+export type NavegacaoDeMes = {
+  rotulo: string;
+  podeVoltar: boolean;
+  podeAvancar: boolean;
+};
+
+/**
+ * Limites da navegação de mês no Extrato.
+ *
+ * Para no mês corrente à frente — mês futuro não tem o que mostrar — e no mês
+ * do primeiro lançamento atrás. Sem os limites, as setas percorreriam anos
+ * vazios em qualquer direção.
+ */
+export function navegacaoDeMes(e: Estado): NavegacaoDeMes {
+  const primeiro = [...e.transacoes].sort((a, b) => (a.ocorridoEm < b.ocorridoEm ? -1 : 1))[0];
+  const limiteAntigo = primeiroDoMes(primeiro?.ocorridoEm ?? e.hoje);
+  const limiteRecente = primeiroDoMes(e.hoje);
+
+  return {
+    rotulo: rotuloMesCurto(e.mesVisivel),
+    podeVoltar: somarMeses(e.mesVisivel, -1) >= limiteAntigo,
+    podeAvancar: somarMeses(e.mesVisivel, 1) <= limiteRecente,
+  };
 }
 
 export function agruparPorDia(transacoes: Transacao[]): GrupoDoDia[] {

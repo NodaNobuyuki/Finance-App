@@ -1,4 +1,4 @@
-import { categoria, categoriaExiste, categorias } from '../categorias';
+import { categoria, categoriaExisteEm, categoriasIniciais } from '../categorias';
 import {
   BancoIndisponivel,
   ErroDeDominio,
@@ -62,25 +62,29 @@ describe('mensagemParaOUsuario', () => {
 });
 
 describe('categoria órfã', () => {
-  it('não lança para id fora do catálogo', () => {
-    expect(() => categoria('categoria-apagada')).not.toThrow();
+  // Deixou de ser hipótese: agora que a pessoa pode apagar categoria, lançamento
+  // apontando para id que não existe mais é caminho normal, não corrupção.
+  const lista = categoriasIniciais();
+
+  it('não lança para id fora da lista', () => {
+    expect(() => categoria(lista, 'categoria-apagada')).not.toThrow();
   });
 
   it('preserva o id, para a linha continuar recategorizável', () => {
-    const orfa = categoria('categoria-apagada');
+    const orfa = categoria(lista, 'categoria-apagada');
     expect(orfa.id).toBe('categoria-apagada');
     expect(orfa.nome).toBe('Sem categoria');
   });
 
-  it('não contamina o catálogo', () => {
-    const antes = Object.keys(categorias).length;
-    categoria('categoria-apagada');
-    expect(Object.keys(categorias)).toHaveLength(antes);
-    expect(categoriaExiste('categoria-apagada')).toBe(false);
-    expect(categoriaExiste('mercado')).toBe(true);
+  it('não contamina a lista', () => {
+    const antes = lista.length;
+    categoria(lista, 'categoria-apagada');
+    expect(lista).toHaveLength(antes);
+    expect(categoriaExisteEm(lista, 'categoria-apagada')).toBe(false);
+    expect(categoriaExisteEm(lista, 'mercado')).toBe(true);
   });
 
   it('continua devolvendo a categoria real quando ela existe', () => {
-    expect(categoria('mercado').nome).toBe('Mercado');
+    expect(categoria(lista, 'mercado').nome).toBe('Mercado');
   });
 });

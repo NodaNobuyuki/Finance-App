@@ -133,7 +133,7 @@ export function Lote() {
                   contentContainerStyle={{ gap: 6 }}
                 >
                   {CATEGORIAS_LOTE.map((id) => {
-                    const cat = categoria(id);
+                    const cat = categoria(estado.categorias, id);
                     const cor = resolverCor(cat.cor, paleta);
                     const ativo = linha.categoriaId === id;
                     return (

@@ -231,6 +231,30 @@ describe.each(implementacoes)('repositório: %s', (_nome, criar) => {
     expect(lida.metaId).toBeUndefined();
   });
 
+  it('categoria criada pelo usuário sobrevive, com cor e ícone', async () => {
+    const estado = base();
+    const minha = {
+      id: 'minha-1',
+      nome: 'Pet',
+      tipo: 'despesa' as const,
+      cor: { tipo: 'hex' as const, hex: '#123456' },
+      icone: 'M1 2h3',
+    };
+    await repo.salvar(null, { ...estado, categorias: [...estado.categorias, minha] });
+
+    const lida = (await repo.carregar())!.categorias.find((c) => c.id === 'minha-1')!;
+    expect(lida).toEqual(minha);
+  });
+
+  it('lista vazia volta vazia — quem repõe o catálogo é o boot, não o repositório', async () => {
+    // A regra "sem categoria nenhuma, use o catálogo de fábrica" é de domínio,
+    // não de armazenamento: se vivesse dentro de um repositório, a outra
+    // implementação divergiria em silêncio. Ver `hidratar` em `boot.ts`.
+    const estado = base();
+    await repo.salvar(null, { ...estado, categorias: [] });
+    expect((await repo.carregar())!.categorias).toEqual([]);
+  });
+
   it('a meta guarda onde o dinheiro dela fica', async () => {
     await repo.salvar(null, base());
     const lida = (await repo.carregar())!.metas.find((m) => m.id === 'reserva')!;

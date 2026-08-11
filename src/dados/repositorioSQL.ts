@@ -1,4 +1,5 @@
 import { EscritaFalhou, LeituraFalhou } from '../dominio/erros';
+import { Categoria } from '../dominio/categorias';
 import { Conta, Meta, Origem, ProgressoDesafio, Transacao } from '../dominio/tipos';
 import { CorRef } from '../tema/paletas';
 import { diferencaDeChaves, diferencaPorId, Diferenca, vazia } from './diff';
@@ -56,6 +57,14 @@ type LinhaMeta = {
   /** NULL quando a meta não tem prazo — ver migration v4. */
   prazo: string | null;
   conta_id: string;
+  cor: string;
+  icone: string;
+};
+
+type LinhaCategoria = {
+  id: string;
+  nome: string;
+  tipo: string;
   cor: string;
   icone: string;
 };
@@ -179,6 +188,19 @@ const TABELA_METAS: Tabela<Meta, LinhaMeta> = {
   }),
 };
 
+const TABELA_CATEGORIAS: Tabela<Categoria, LinhaCategoria> = {
+  nome: 'categorias',
+  colunas: ['id', 'nome', 'tipo', 'cor', 'icone', 'atualizado_em'],
+  paraLinha: (c, agoraMs) => [c.id, c.nome, c.tipo, corParaTexto(c.cor), c.icone, agoraMs],
+  daLinha: (l) => ({
+    id: l.id,
+    nome: l.nome,
+    tipo: l.tipo as Categoria['tipo'],
+    cor: corDeTexto(l.cor),
+    icone: l.icone,
+  }),
+};
+
 const TABELA_PROGRESSO_DESAFIOS: Tabela<ProgressoDesafio, LinhaProgressoDesafio> = {
   nome: 'progresso_desafios',
   colunas: ['id', 'aceito', 'progresso', 'atualizado_em'],
@@ -281,12 +303,13 @@ export function criarRepositorioSQL(
           prefs.map((p) => [p.chave, JSON.parse(p.valor)]),
         ) as Preferencias;
 
-        const [contas, transacoes, metas, progressos, dias] = await Promise.all([
+        const [contas, transacoes, metas, categorias, progressos, dias] = await Promise.all([
           motor.consultar<LinhaConta>(`SELECT * FROM contas`),
           motor.consultar<LinhaTransacao>(
             `SELECT * FROM transacoes ORDER BY ocorrido_em DESC, criado_em DESC`,
           ),
           motor.consultar<LinhaMeta>(`SELECT * FROM metas`),
+          motor.consultar<LinhaCategoria>(`SELECT * FROM categorias`),
           motor.consultar<LinhaProgressoDesafio>(`SELECT * FROM progresso_desafios`),
           motor.consultar<{ dia: string }>(`SELECT dia FROM dias_sem_gasto ORDER BY dia`),
         ]);
@@ -295,6 +318,7 @@ export function criarRepositorioSQL(
           contas: contas.map(TABELA_CONTAS.daLinha),
           transacoes: transacoes.map(TABELA_TRANSACOES.daLinha),
           metas: metas.map(TABELA_METAS.daLinha),
+          categorias: categorias.map(TABELA_CATEGORIAS.daLinha),
           progressoDesafios: progressos.map(TABELA_PROGRESSO_DESAFIOS.daLinha),
           diasSemGasto: dias.map((d) => d.dia),
           ...guardadas,
@@ -316,6 +340,10 @@ export function criarRepositorioSQL(
             diferencaPorId(antes?.transacoes ?? [], depois.transacoes),
           );
           await sincronizar(TABELA_METAS, diferencaPorId(antes?.metas ?? [], depois.metas));
+          await sincronizar(
+            TABELA_CATEGORIAS,
+            diferencaPorId(antes?.categorias ?? [], depois.categorias),
+          );
           await sincronizar(
             TABELA_PROGRESSO_DESAFIOS,
             diferencaPorId(antes?.progressoDesafios ?? [], depois.progressoDesafios),
@@ -345,6 +373,7 @@ export function criarRepositorioSQL(
             'transacoes',
             'contas',
             'metas',
+            'categorias',
             'progresso_desafios',
             'dias_sem_gasto',
             'preferencias',

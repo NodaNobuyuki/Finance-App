@@ -21,7 +21,9 @@ import { Metas } from '../Metas';
 import { Onboarding } from '../Onboarding';
 import { Resumo } from '../Resumo';
 import { Simulador } from '../Simulador';
+import { CadastroCategoria } from '../folhas/CadastroCategoria';
 import { CadastroConta } from '../folhas/CadastroConta';
+import { Recategorizar } from '../folhas/Recategorizar';
 import { CadastroMeta } from '../folhas/CadastroMeta';
 import { MovimentoMeta } from '../folhas/MovimentoMeta';
 import { NovaTransacao } from '../folhas/NovaTransacao';
@@ -67,6 +69,7 @@ const TELAS: {
   { nome: 'ritual', no: <Ritual />, texto: 'Seu ritual' },
   { nome: 'nova conta', no: <CadastroConta />, texto: 'Nova conta' },
   { nome: 'nova meta', no: <CadastroMeta />, texto: 'Nova meta' },
+  { nome: 'nova categoria', no: <CadastroCategoria />, texto: 'Nova categoria' },
 ];
 
 describe('renderização das telas', () => {
@@ -113,12 +116,33 @@ describe('app vazio', () => {
     expect(tela.getByText('Nenhum lançamento ainda')).toBeTruthy();
   });
 
-  it('o Extrato distingue "ainda não há nada" de "o filtro não casou"', async () => {
+  it('o Extrato distingue vazio de mês vazio de filtro sem resultado', async () => {
+    // Três situações, três saídas. Dizer "nenhuma transação com esses filtros"
+    // para quem só navegou até um mês em branco mandaria mexer no lugar errado.
     const semNada = await montar(<Extrato />, estadoVazio);
     expect(semNada.getByText('Seu extrato começa aqui')).toBeTruthy();
 
+    const mesVazio = await montar(<Extrato />, { ...estadoInicial, mesVisivel: '2026-06-01' });
+    expect(mesVazio.getByText('Nada em Junho 2026')).toBeTruthy();
+
     const comFiltro = await montar(<Extrato />, { ...estadoInicial, filtroCategoria: 'presente' });
     expect(comFiltro.getByText('Nenhuma transação com esses filtros')).toBeTruthy();
+  });
+
+  it('a folha de recategorizar oferece as categorias do tipo do lançamento', async () => {
+    // O tipo vem do SINAL, não da categoria atual: linha órfã não tem tipo
+    // confiável, e o sinal é o dado que não mente.
+    const despesa = estadoInicial.transacoes.find((t) => t.valorCentavos < 0)!;
+    const tela = await montar(<Recategorizar transacaoId={despesa.id} />, estadoInicial);
+
+    expect(tela.getByText('Mudar categoria')).toBeTruthy();
+    expect(tela.getByText('Mercado')).toBeTruthy();
+    expect(tela.queryByText('Salário')).toBeNull();
+  });
+
+  it('o Extrato mostra o mês visível no cabeçalho, não o dia de hoje', async () => {
+    const julho = await montar(<Extrato />, { ...estadoInicial, mesVisivel: '2026-07-01' });
+    expect(julho.getByText('Julho 2026')).toBeTruthy();
   });
 
   it('Metas vazio explica para que serve uma meta', async () => {

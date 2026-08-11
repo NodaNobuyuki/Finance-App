@@ -21,7 +21,18 @@ export type Categoria = {
   icone: string;
 };
 
-export const categorias: Record<string, Categoria> = {
+/**
+ * Catálogo de FÁBRICA — semente, não fonte de consulta.
+ *
+ * Quem lê daqui é `criarEstadoInicial` e a migration v6, e mais ninguém: as
+ * categorias moram em `Estado.categorias` porque são dado do usuário, que pode
+ * criar, renomear e apagar. Enquanto isto era um `Record` de módulo, elas eram
+ * imutáveis por construção e "Nova categoria" não tinha onde gravar.
+ *
+ * Continua sendo o ponto de partida de toda instalação nova, e é por isso que
+ * segue em código em vez de vir do banco vazio.
+ */
+export const categoriasDeFabrica: Record<string, Categoria> = {
   mercado: {
     id: 'mercado',
     nome: 'Mercado',
@@ -125,13 +136,21 @@ export const categorias: Record<string, Categoria> = {
   },
 };
 
-export const categoriasDespesa = Object.values(categorias)
-  .filter((c) => c.tipo === 'despesa')
-  .map((c) => c.id);
+/** A semente, na ordem em que aparece nas telas. */
+export const categoriasIniciais = (): Categoria[] => Object.values(categoriasDeFabrica);
 
-export const categoriasReceita = Object.values(categorias)
-  .filter((c) => c.tipo === 'receita')
-  .map((c) => c.id);
+/**
+ * Só o que a pessoa pode escolher ao lançar.
+ *
+ * `transferencia` fica de fora sozinha, pelo tipo: ela é das duas pontas de um
+ * movimento entre contas e não faz sentido num seletor de despesa.
+ */
+export function categoriasPorTipo(
+  categorias: Categoria[],
+  tipo: 'despesa' | 'receita',
+): Categoria[] {
+  return categorias.filter((c) => c.tipo === tipo);
+}
 
 /**
  * Placeholder para lançamento cuja categoria não existe mais.
@@ -158,14 +177,34 @@ function categoriaOrfa(id: string): Categoria {
  * meio leva junto tudo que já tinha renderizado. Perder a cor de um item é
  * incomparavelmente melhor que perder a tela.
  */
-export function categoria(id: string): Categoria {
-  return categorias[id] ?? categoriaOrfa(id);
+export function categoria(categorias: Categoria[], id: string): Categoria {
+  return categorias.find((c) => c.id === id) ?? categoriaOrfa(id);
 }
 
-/** O id existe no catálogo? Para quem precisa decidir, não só exibir. */
-export function categoriaExiste(id: string): boolean {
-  return id in categorias;
+/** O id existe na lista? Para quem precisa decidir, não só exibir. */
+export function categoriaExisteEm(categorias: Categoria[], id: string): boolean {
+  return categorias.some((c) => c.id === id);
 }
+
+/**
+ * Paleta oferecida ao criar categoria. Tokens do tema, nunca hex cravado:
+ * categoria criada pelo usuário troca de cor junto com a paleta, como o resto.
+ */
+export const coresDeCategoria: CorRef[] = [
+  token('accent'),
+  token('up'),
+  token('down'),
+  token('atencao'),
+  hex('#2f6f8f'),
+  hex('#8a6d3b'),
+  hex('#b03a5b'),
+  hex('#3c6e5b'),
+];
+
+/** Ícones oferecidos ao criar categoria — os mesmos do catálogo de fábrica. */
+export const iconesDeCategoria: string[] = [
+  ...new Set(Object.values(categoriasDeFabrica).map((c) => c.icone)),
+];
 
 /** Ícones avulsos da interface, no mesmo formato das categorias. */
 export const icones = {

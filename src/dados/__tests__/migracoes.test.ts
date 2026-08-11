@@ -56,6 +56,7 @@ describe('aplicar do zero', () => {
     const motor = criarMotorNode();
     await aplicarMigracoes(motor);
     expect(await tabelas(motor)).toEqual([
+      'categorias',
       'contas',
       'dias_sem_gasto',
       'metas',

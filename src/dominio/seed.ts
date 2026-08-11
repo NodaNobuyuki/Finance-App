@@ -1,4 +1,5 @@
 import { hex, token } from '../tema/paletas';
+import { Categoria, categoriasIniciais } from './categorias';
 import { DiaISO, inicioDaSemana, somarDias } from './datas';
 import { Conta, Contexto, Meta, Perfil, ProgressoDesafio, Transacao } from './tipos';
 
@@ -195,6 +196,7 @@ export type Semente = {
   contas: Conta[];
   transacoes: Transacao[];
   metas: Meta[];
+  categorias: Categoria[];
   progressoDesafios: ProgressoDesafio[];
   diasSemGasto: DiaISO[];
   orcamentoMensalCentavos: number;
@@ -207,6 +209,7 @@ export function semente(hoje: DiaISO): Semente {
     contas,
     transacoes: transacoesDemo(hoje),
     metas: metasDemo(hoje),
+    categorias: categoriasIniciais(),
     progressoDesafios,
     diasSemGasto: diasSemGastoDemo(hoje),
     orcamentoMensalCentavos,
@@ -227,6 +230,10 @@ export function vazia(): Semente {
     contas: [],
     transacoes: [],
     metas: [],
+    // Categoria é o único dado que a instalação nova já traz: sem nenhuma, não
+    // dá para lançar o primeiro gasto, e pedir para a pessoa criar "Mercado"
+    // antes de registrar mercado é fricção sem ganho.
+    categorias: categoriasIniciais(),
     progressoDesafios: [],
     diasSemGasto: [],
     orcamentoMensalCentavos: 0,

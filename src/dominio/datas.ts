@@ -159,6 +159,25 @@ export function mesDe(dia: DiaISO): string {
   return dia.slice(0, 7);
 }
 
+/** Primeiro dia do mês de `dia`. É a âncora do mês visível no Extrato. */
+export function primeiroDoMes(dia: DiaISO): DiaISO {
+  return `${mesDe(dia)}-01`;
+}
+
+/**
+ * Soma meses, ancorando sempre no dia 1.
+ *
+ * Só faz sentido sobre `primeiroDoMes`: somar mês a um dia 31 teria de decidir
+ * o que fazer com fevereiro, e essa pergunta não existe aqui.
+ */
+export function somarMeses(dia: DiaISO, n: number): DiaISO {
+  const { ano, mes } = partes(dia);
+  const total = ano * 12 + (mes - 1) + n;
+  const novoMes = ((total % 12) + 12) % 12;
+  const novoAno = (total - novoMes) / 12;
+  return `${novoAno}-${String(novoMes + 1).padStart(2, '0')}-01`;
+}
+
 export function nomeDoMes(dia: DiaISO): string {
   return MESES[partes(dia).mes - 1];
 }

@@ -149,7 +149,7 @@ export function Inicio() {
           <Rotulo cor={t.onHeroSoft}>Registro em um toque</Rotulo>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
             {atalhosRapidos(estado).map((a) => {
-              const cat = categoria(a.categoriaId);
+              const cat = categoria(estado.categorias, a.categoriaId);
               return (
                 <Toque
                   key={a.categoriaId}

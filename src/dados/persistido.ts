@@ -1,3 +1,5 @@
+import { categoriasIniciais } from '../dominio/categorias';
+import { DiaISO } from '../dominio/datas';
 import { Estado } from '../estado/store';
 
 /**
@@ -14,6 +16,7 @@ export type EstadoPersistido = Pick<
   | 'transacoes'
   | 'contas'
   | 'metas'
+  | 'categorias'
   | 'progressoDesafios'
   | 'diasSemGasto'
   | 'orcamentoMensalCentavos'
@@ -33,6 +36,7 @@ export const CHAVES_PERSISTIDAS = [
   'transacoes',
   'contas',
   'metas',
+  'categorias',
   'progressoDesafios',
   'diasSemGasto',
   'orcamentoMensalCentavos',
@@ -53,6 +57,7 @@ export function recortePersistido(e: Estado): EstadoPersistido {
     transacoes: e.transacoes,
     contas: e.contas,
     metas: e.metas,
+    categorias: e.categorias,
     progressoDesafios: e.progressoDesafios,
     diasSemGasto: e.diasSemGasto,
     orcamentoMensalCentavos: e.orcamentoMensalCentavos,
@@ -65,6 +70,30 @@ export function recortePersistido(e: Estado): EstadoPersistido {
     semanaFechada: e.semanaFechada,
     intencao: e.intencao,
     mostrarSaldo: e.mostrarSaldo,
+  };
+}
+
+/**
+ * O caminho inverso: junta o que veio do disco com o estado vazio.
+ *
+ * Mora aqui, junto do recorte, e não dentro de um repositório: é regra de
+ * domínio, não de armazenamento. As duas implementações passam a mesma suíte de
+ * contrato, então conserto aplicado só numa delas seria uma divergência
+ * esperando para aparecer no aparelho de alguém.
+ */
+export function hidratar(vazio: Estado, salvo: EstadoPersistido, hoje: DiaISO): Estado {
+  return {
+    ...vazio,
+    ...salvo,
+    // `hoje` vem do relógio, nunca do disco — reabrir no dia gravado colocaria
+    // o próximo lançamento na data errada.
+    hoje,
+    // Sem categoria nenhuma não dá para lançar. Só acontece em banco anterior à
+    // v6, que criou a tabela sem preenchê-la: o catálogo de fábrica vive em
+    // código em vez de repetido dentro de uma migration que nunca mais pode ser
+    // editada. Apagar a última categoria de um tipo é proibido no reducer,
+    // então "vazio" não tem outro significado possível.
+    categorias: salvo.categorias.length > 0 ? salvo.categorias : categoriasIniciais(),
   };
 }
 

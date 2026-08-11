@@ -107,7 +107,7 @@ export function Habitos() {
             Desafios desta semana
           </Txt>
           {ativos.map((d, i) => {
-            const cor = resolverCor(categoria(d.categoriaId).cor, paleta);
+            const cor = resolverCor(categoria(estado.categorias, d.categoriaId).cor, paleta);
             return (
               <View
                 key={d.id}
@@ -119,7 +119,7 @@ export function Habitos() {
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11 }}>
-                  <Disco path={categoria(d.categoriaId).icone} cor={cor} />
+                  <Disco path={categoria(estado.categorias, d.categoriaId).icone} cor={cor} />
                   <View style={{ flex: 1, gap: 2 }}>
                     <Txt tamanho={13.5} peso={600}>
                       {d.nome}
@@ -195,7 +195,7 @@ export function Habitos() {
               Desafios opcionais
             </Txt>
             {disponiveis.map((d, i) => {
-              const cor = resolverCor(categoria(d.categoriaId).cor, paleta);
+              const cor = resolverCor(categoria(estado.categorias, d.categoriaId).cor, paleta);
               return (
                 <View
                   key={d.id}
@@ -208,7 +208,7 @@ export function Habitos() {
                     borderBottomColor: i < disponiveis.length - 1 ? t.lineSoft : 'transparent',
                   }}
                 >
-                  <Disco path={categoria(d.categoriaId).icone} cor={cor} />
+                  <Disco path={categoria(estado.categorias, d.categoriaId).icone} cor={cor} />
                   <View style={{ flex: 1, gap: 2 }}>
                     <Txt tamanho={13.5} peso={600}>
                       {d.nome}

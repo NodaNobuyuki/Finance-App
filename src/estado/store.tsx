@@ -1,6 +1,14 @@
 import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
 import { AppState } from 'react-native';
-import { categoria, CATEGORIA_TRANSFERENCIA, icones } from '../dominio/categorias';
+import {
+  Categoria,
+  categoria,
+  CATEGORIA_TRANSFERENCIA,
+  categoriasPorTipo,
+  coresDeCategoria,
+  icones,
+  iconesDeCategoria,
+} from '../dominio/categorias';
 import { definicoesDesafios, progressoDe } from '../dominio/desafios';
 import {
   AGORA,
@@ -8,7 +16,10 @@ import {
   DiaRitualId,
   hojeReal,
   inicioDaSemana,
+  mesDe,
+  primeiroDoMes,
   rotuloCurto,
+  somarMeses,
 } from '../dominio/datas';
 import {
   Centavos,
@@ -69,7 +80,9 @@ export type Folha =
   | { tipo: 'transferencia' }
   | { tipo: 'ritual' }
   | { tipo: 'conta' }
-  | { tipo: 'meta' };
+  | { tipo: 'meta' }
+  | { tipo: 'categoria' }
+  | { tipo: 'recategorizar'; transacaoId: string };
 
 /**
  * Rascunho de cadastro de conta e de meta.
@@ -89,6 +102,14 @@ export type CadastroConta = {
   digitos: string;
 };
 
+export type CadastroCategoria = {
+  id: string | null;
+  nome: string;
+  tipo: 'despesa' | 'receita';
+  cor: CorRef;
+  icone: string;
+};
+
 export type CadastroMeta = {
   id: string | null;
   nome: string;
@@ -103,6 +124,14 @@ const CADASTRO_CONTA_VAZIO: CadastroConta = {
   nome: '',
   tipo: 'corrente',
   digitos: '',
+};
+
+const CADASTRO_CATEGORIA_VAZIO: CadastroCategoria = {
+  id: null,
+  nome: '',
+  tipo: 'despesa',
+  cor: coresDeCategoria[0],
+  icone: iconesDeCategoria[0],
 };
 
 const CADASTRO_META_VAZIO: CadastroMeta = {
@@ -149,6 +178,14 @@ export type Estado = {
   transacoes: Transacao[];
   contas: Conta[];
   metas: Meta[];
+  /**
+   * Categorias são dado do usuário, não catálogo.
+   *
+   * `categoriasDeFabrica` é só a semente de instalação nova. Enquanto isto era
+   * um `Record` de módulo, elas eram imutáveis por construção e "Nova
+   * categoria" não tinha onde gravar.
+   */
+  categorias: Categoria[];
   /** Só o que é do usuário; a definição do desafio é catálogo. */
   progressoDesafios: ProgressoDesafio[];
   /**
@@ -168,7 +205,17 @@ export type Estado = {
   mostrarSaldo: boolean;
   filtroConta: string;
   filtroCategoria: string;
+  /**
+   * Mês que o Extrato mostra, ancorado no dia 1.
+   *
+   * O cabeçalho sempre anunciou um mês, mas a lista trazia o histórico inteiro
+   * — a tela prometia um recorte que não existia. Estado de sessão, como os
+   * filtros: reabrir o app volta para o mês corrente.
+   */
+  mesVisivel: DiaISO;
   abaCategorias: 'despesa' | 'receita';
+  /** Tela Categorias em modo de edição: o toque no item abre o cadastro. */
+  editandoCategorias: boolean;
   insightIdx: number;
 
   ritualDiaFechamento: DiaRitualId;
@@ -202,6 +249,7 @@ export type Estado = {
   transferenciaDestinoId: string;
   cadastroConta: CadastroConta;
   cadastroMeta: CadastroMeta;
+  cadastroCategoria: CadastroCategoria;
   simDigitos: string;
   simTaxaId: string;
 
@@ -233,6 +281,7 @@ function estadoDe(hoje: DiaISO, s: Semente, onboardingConcluido: boolean): Estad
     transacoes: s.transacoes,
     contas: s.contas,
     metas: s.metas,
+    categorias: s.categorias,
     progressoDesafios: s.progressoDesafios,
     diasSemGasto: s.diasSemGasto,
     orcamentoMensalCentavos: s.orcamentoMensalCentavos,
@@ -244,7 +293,9 @@ function estadoDe(hoje: DiaISO, s: Semente, onboardingConcluido: boolean): Estad
     mostrarSaldo: true,
     filtroConta: 'todas',
     filtroCategoria: 'todas',
+    mesVisivel: primeiroDoMes(hoje),
     abaCategorias: 'despesa',
+    editandoCategorias: false,
     insightIdx: 0,
 
     ritualDiaFechamento: 'domingo',
@@ -265,6 +316,7 @@ function estadoDe(hoje: DiaISO, s: Semente, onboardingConcluido: boolean): Estad
     transferenciaDestinoId: '',
     cadastroConta: CADASTRO_CONTA_VAZIO,
     cadastroMeta: CADASTRO_META_VAZIO,
+    cadastroCategoria: CADASTRO_CATEGORIA_VAZIO,
     simDigitos: '',
     simTaxaId: 'cdi',
 
@@ -307,7 +359,9 @@ export type Acao =
   | { tipo: 'PROXIMO_INSIGHT'; total: number }
   | { tipo: 'FILTRO_CONTA'; conta: string }
   | { tipo: 'FILTRO_CATEGORIA'; categoria: string }
+  | { tipo: 'MES_VISIVEL'; passo: -1 | 1 }
   | { tipo: 'ABA_CATEGORIAS'; aba: 'despesa' | 'receita' }
+  | { tipo: 'EDITAR_CATEGORIAS'; ligado: boolean }
   | { tipo: 'ABRIR_NOVA'; categoriaId?: string; tipoLancamento?: 'despesa' | 'receita' }
   | { tipo: 'ABRIR_MOVIMENTO_META'; metaId: string; retirar?: boolean }
   | { tipo: 'ABRIR_TRANSFERENCIA' }
@@ -325,6 +379,16 @@ export type Acao =
   | { tipo: 'CADASTRO_META_CAMPO'; campo: 'nome' | 'digitos'; valor: string }
   | { tipo: 'CADASTRO_META_PRAZO'; prazo: DiaISO | null }
   | { tipo: 'CADASTRO_META_CONTA'; contaId: string }
+  | { tipo: 'ABRIR_CATEGORIA'; categoriaId?: string; tipoCategoria?: 'despesa' | 'receita' }
+  | { tipo: 'CADASTRO_CATEGORIA_NOME'; valor: string }
+  | { tipo: 'CADASTRO_CATEGORIA_TIPO'; tipo_: 'despesa' | 'receita' }
+  | { tipo: 'CADASTRO_CATEGORIA_COR'; cor: CorRef }
+  | { tipo: 'CADASTRO_CATEGORIA_ICONE'; icone: string }
+  | { tipo: 'SALVAR_CATEGORIA' }
+  | { tipo: 'APAGAR_CATEGORIA'; categoriaId: string }
+  /** Trocar a categoria de um lançamento já feito. */
+  | { tipo: 'ABRIR_RECATEGORIZAR'; transacaoId: string }
+  | { tipo: 'RECATEGORIZAR'; transacaoId: string; categoriaId: string }
   | { tipo: 'SALVAR_META' }
   | { tipo: 'APAGAR_META'; metaId: string }
   | { tipo: 'RASCUNHO_TIPO'; valor: 'despesa' | 'receita' }
@@ -602,7 +666,26 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
     case 'IR_PARA':
       // Sair para a Home encerra um fechamento em andamento — senão o Resumo
       // continuaria se apresentando como "passo 2 de 3".
-      return { ...e, tela: a.tela, folha: null, fechando: a.tela === 'home' ? false : e.fechando };
+      return {
+        ...e,
+        tela: a.tela,
+        folha: null,
+        fechando: a.tela === 'home' ? false : e.fechando,
+        // Entrar no Extrato sempre começa no mês corrente. Reabrir a tela em
+        // março porque foi lá que a pessoa parou meses atrás é desorientador.
+        mesVisivel: a.tela === 'extrato' ? primeiroDoMes(e.hoje) : e.mesVisivel,
+      };
+
+    case 'MES_VISIVEL': {
+      const alvo = somarMeses(e.mesVisivel, a.passo);
+      // Mês futuro não tem o que mostrar, e voltar antes do primeiro registro
+      // é percorrer tempo em que o app não existia para a pessoa.
+      const primeiro = [...e.transacoes].sort((x, y) => (x.ocorridoEm < y.ocorridoEm ? -1 : 1))[0];
+      const limiteAntigo = primeiroDoMes(primeiro?.ocorridoEm ?? e.hoje);
+      const limiteRecente = primeiroDoMes(e.hoje);
+      if (alvo < limiteAntigo || alvo > limiteRecente) return e;
+      return { ...e, mesVisivel: alvo };
+    }
 
     case 'ALTERNAR_SALDO':
       return { ...e, mostrarSaldo: !e.mostrarSaldo };
@@ -618,6 +701,9 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
 
     case 'ABA_CATEGORIAS':
       return { ...e, abaCategorias: a.aba };
+
+    case 'EDITAR_CATEGORIAS':
+      return { ...e, editandoCategorias: a.ligado };
 
     case 'ABRIR_NOVA': {
       const tipo = a.tipoLancamento ?? 'despesa';
@@ -803,6 +889,172 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       };
     }
 
+    case 'ABRIR_CATEGORIA': {
+      const existente = e.categorias.find((c) => c.id === a.categoriaId);
+      return {
+        ...e,
+        folha: { tipo: 'categoria' },
+        cadastroCategoria: existente
+          ? {
+              id: existente.id,
+              // `transferencia` nunca chega aqui: ela não aparece na tela
+              // Categorias. Ainda assim o rascunho só sabe dos dois tipos que a
+              // pessoa escolhe, então o fallback é despesa.
+              tipo: existente.tipo === 'receita' ? 'receita' : 'despesa',
+              nome: existente.nome,
+              cor: existente.cor,
+              icone: existente.icone,
+            }
+          : { ...CADASTRO_CATEGORIA_VAZIO, tipo: a.tipoCategoria ?? e.abaCategorias },
+      };
+    }
+
+    case 'CADASTRO_CATEGORIA_NOME':
+      return { ...e, cadastroCategoria: { ...e.cadastroCategoria, nome: a.valor } };
+
+    case 'CADASTRO_CATEGORIA_TIPO':
+      return { ...e, cadastroCategoria: { ...e.cadastroCategoria, tipo: a.tipo_ } };
+
+    case 'CADASTRO_CATEGORIA_COR':
+      return { ...e, cadastroCategoria: { ...e.cadastroCategoria, cor: a.cor } };
+
+    case 'CADASTRO_CATEGORIA_ICONE':
+      return { ...e, cadastroCategoria: { ...e.cadastroCategoria, icone: a.icone } };
+
+    case 'SALVAR_CATEGORIA': {
+      const c = e.cadastroCategoria;
+      const nome = c.nome.trim();
+      if (!nome) return e;
+
+      const seq = e.seq + 1;
+      const anterior = c.id ? e.categorias.find((x) => x.id === c.id) : undefined;
+
+      if (anterior) {
+        // O id NÃO muda na edição, mesmo trocando o nome: ele é a chave que os
+        // lançamentos já gravados apontam. Renomear "Mercado" para "Compras"
+        // tem de levar o histórico junto, não deixá-lo órfão.
+        const categoria: Categoria = { ...anterior, nome, tipo: c.tipo, cor: c.cor, icone: c.icone };
+        return {
+          ...e,
+          seq,
+          categorias: e.categorias.map((x) => (x.id === categoria.id ? categoria : x)),
+          folha: null,
+          cadastroCategoria: CADASTRO_CATEGORIA_VAZIO,
+          toast: avisar(seq, `${nome} atualizada`),
+        };
+      }
+
+      const categoria: Categoria = {
+        id: d.gerarId(),
+        nome,
+        tipo: c.tipo,
+        cor: c.cor,
+        icone: c.icone,
+      };
+      return {
+        ...e,
+        seq,
+        categorias: [...e.categorias, categoria],
+        folha: null,
+        cadastroCategoria: CADASTRO_CATEGORIA_VAZIO,
+        toast: avisar(seq, `${nome} criada`),
+      };
+    }
+
+    case 'APAGAR_CATEGORIA': {
+      const categoria = e.categorias.find((c) => c.id === a.categoriaId);
+      if (!categoria) return e;
+
+      const seq = e.seq + 1;
+
+      // `transferencia` não é escolha da pessoa: é a categoria das duas pontas
+      // de um movimento entre contas, e sem ela o aporte não teria como marcar
+      // as linhas que cria.
+      if (categoria.tipo === 'transferencia') return e;
+
+      // Sem nenhuma categoria do tipo não há o que escolher ao lançar, e o
+      // rascunho apontaria para o vazio. Mesma regra da última conta — e é ela
+      // que faz "tabela vazia" significar sempre "instalação anterior à v6".
+      const irmas = e.categorias.filter(
+        (c) => c.tipo === categoria.tipo && c.id !== categoria.id,
+      );
+      if (irmas.length === 0) {
+        return {
+          ...e,
+          seq,
+          toast: avisar(
+            seq,
+            `${categoria.nome} é sua única categoria de ${categoria.tipo}`,
+            'Crie outra antes de apagar.',
+          ),
+        };
+      }
+
+      // Os lançamentos FICAM, ao contrário do que acontece ao apagar conta: o
+      // gasto aconteceu e o dinheiro saiu, independentemente do rótulo. Eles
+      // caem no caminho da categoria órfã — aparecem como "Sem categoria",
+      // preservam o id e podem ser recategorizados um a um.
+      const usos = e.transacoes.filter((t) => t.categoriaId === categoria.id).length;
+
+      return {
+        ...e,
+        seq,
+        categorias: e.categorias.filter((c) => c.id !== categoria.id),
+        folha: null,
+        cadastroCategoria: CADASTRO_CATEGORIA_VAZIO,
+        // O seletor de lançamento não pode ficar apontando para o que sumiu.
+        rascunho:
+          e.rascunho.categoriaId === categoria.id
+            ? {
+                ...e.rascunho,
+                categoriaId: categoriasPorTipo(
+                  e.categorias.filter((c) => c.id !== categoria.id),
+                  e.rascunho.tipo,
+                )[0]?.id ?? '',
+              }
+            : e.rascunho,
+        filtroCategoria: e.filtroCategoria === categoria.id ? 'todas' : e.filtroCategoria,
+        toast: {
+          id: seq,
+          texto: `${categoria.nome} apagada`,
+          sub:
+            usos > 0
+              ? `${usos} lançamentos ficaram sem categoria — dá para recategorizar no Extrato.`
+              : undefined,
+          acao: { rotulo: 'Desfazer', acao: { tipo: 'RESTAURAR', estado: { ...e, folha: null } } },
+          duracaoMs: 6000,
+        },
+      };
+    }
+
+    case 'ABRIR_RECATEGORIZAR':
+      return { ...e, folha: { tipo: 'recategorizar', transacaoId: a.transacaoId } };
+
+    case 'RECATEGORIZAR': {
+      const tx = e.transacoes.find((t) => t.id === a.transacaoId);
+      if (!tx) return e;
+
+      const seq = e.seq + 1;
+      const anterior = tx.categoriaId;
+      return {
+        ...e,
+        seq,
+        transacoes: e.transacoes.map((t) =>
+          t.id === tx.id ? { ...t, categoriaId: a.categoriaId } : t,
+        ),
+        folha: null,
+        toast: {
+          id: seq,
+          texto: `Movido para ${categoria(e.categorias, a.categoriaId).nome}`,
+          acao: {
+            rotulo: 'Desfazer',
+            acao: { tipo: 'RECATEGORIZAR', transacaoId: tx.id, categoriaId: anterior },
+          },
+          duracaoMs: 6000,
+        },
+      };
+    }
+
     case 'ABRIR_META': {
       const existente = e.metas.find((m) => m.id === a.metaId);
       return {
@@ -948,7 +1200,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         categoriaId: e.rascunho.categoriaId,
         valorCentavos: e.rascunho.tipo === 'despesa' ? -valor : valor,
         ocorridoEm: e.hoje,
-        descricao: e.rascunho.descricao.trim() || categoria(e.rascunho.categoriaId).nome,
+        descricao: e.rascunho.descricao.trim() || categoria(e.categorias, e.rascunho.categoriaId).nome,
       });
       const rotulo = `${e.rascunho.tipo === 'despesa' ? 'Despesa' : 'Receita'} de ${formatar(valor)} registrada`;
       return {
@@ -968,7 +1220,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
     case 'REGISTRO_RAPIDO': {
       if (a.valorCentavos <= 0) return e;
       const seq = e.seq + 1;
-      const cat = categoria(a.categoriaId);
+      const cat = categoria(e.categorias, a.categoriaId);
       const tx = novaTransacao(d, {
         contaId: e.rascunho.contaId,
         categoriaId: a.categoriaId,
@@ -1169,7 +1421,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
             categoriaId: linha.categoriaId,
             valorCentavos: -valor,
             ocorridoEm: dia,
-            descricao: categoria(linha.categoriaId).nome,
+            descricao: categoria(e.categorias, linha.categoriaId).nome,
           }),
         );
       }
@@ -1300,7 +1552,17 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
     case 'DIA_MUDOU':
       // Só o dia muda. `semanaFechada` guarda a semana, então a virada de
       // segunda-feira reabre o ritual sem que ninguém precise zerar nada.
-      return a.dia === e.hoje ? e : { ...e, hoje: a.dia };
+      return a.dia === e.hoje
+        ? e
+        : {
+            ...e,
+            hoje: a.dia,
+            // Quem estava olhando o mês corrente continua olhando o mês
+            // corrente depois da virada; quem tinha navegado para trás fica
+            // onde estava.
+            mesVisivel:
+              mesDe(e.mesVisivel) === mesDe(e.hoje) ? primeiroDoMes(a.dia) : e.mesVisivel,
+          };
 
     case 'AVISAR': {
       const seq = e.seq + 1;

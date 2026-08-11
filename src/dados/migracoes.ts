@@ -258,6 +258,40 @@ export const migracoes: Migracao[] = [
       `DROP TABLE aportes`,
     ],
   },
+  {
+    versao: 6,
+    nome: 'categorias-viram-do-usuario',
+    sql: [
+      // Categoria era catálogo de módulo, imutável por construção: "Nova
+      // categoria" não tinha onde gravar e renomear era impossível. Agora é
+      // dado do usuário, como conta e meta.
+      //
+      // O oposto do que a v2 fez com desafio, e de propósito: desafio é
+      // conteúdo que NÓS publicamos (por isso o catálogo ficou em código, para
+      // desafio novo chegar a quem já instalou), enquanto categoria é
+      // vocabulário de quem usa o app. Ninguém quer receber "Pet" numa
+      // atualização, nem perder a categoria que criou.
+      `CREATE TABLE categorias (
+         id TEXT PRIMARY KEY NOT NULL,
+         nome TEXT NOT NULL,
+         tipo TEXT NOT NULL,
+         cor TEXT NOT NULL,
+         icone TEXT NOT NULL,
+         atualizado_em INTEGER NOT NULL
+       )`,
+
+      // A tabela nasce VAZIA de propósito, e quem a preenche é o repositório:
+      // ver `carregar()` em `repositorioSQL.ts`. Copiar o catálogo de fábrica
+      // para cá significaria repetir 14 paths SVG e 14 cores dentro de uma
+      // migration que nunca mais pode ser editada — e a primeira mudança de
+      // ícone já deixaria os dois em desacordo.
+      //
+      // Tabela vazia é sinal inequívoco de instalação anterior à v6, porque
+      // apagar a última categoria de um tipo é proibido no reducer. Os ids do
+      // catálogo de fábrica são estáveis, então o histórico já gravado
+      // continua apontando para a categoria certa.
+    ],
+  },
 ];
 
 async function versaoAtual(motor: MotorSQL): Promise<number> {

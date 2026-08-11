@@ -4,18 +4,44 @@ import { Chip, Hero, Toque, Txt } from '../componentes/basicos';
 import { ItemTransacao } from '../componentes/ItemTransacao';
 import { Vazio } from '../componentes/Vazio';
 import { categoria, icones } from '../dominio/categorias';
-import { rotuloDia, rotuloMesCurto } from '../dominio/datas';
+import { rotuloDia } from '../dominio/datas';
 import { comSinal, formatar } from '../dominio/dinheiro';
 import { totalEntradas, totalSaidas } from '../dominio/saldo';
-import { agruparPorDia, categoriasUsadas, transacoesFiltradas } from '../estado/derivados';
+import {
+  agruparPorDia,
+  categoriasUsadas,
+  navegacaoDeMes,
+  transacoesDoMesVisivel,
+  transacoesFiltradas,
+} from '../estado/derivados';
 import { useLoja } from '../estado/store';
 import { resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
+
+/** Seta do seletor de mês. Apagada quando não há para onde ir. */
+function SetaDeMes({ passo, ativa, rotulo }: { passo: -1 | 1; ativa: boolean; rotulo: string }) {
+  const { despachar } = useLoja();
+  const { t } = useTema();
+  return (
+    <Toque
+      aoTocar={() => (ativa ? despachar({ tipo: 'MES_VISIVEL', passo }) : undefined)}
+      rotuloAcessivel={rotulo}
+    >
+      <View style={{ paddingHorizontal: 4, paddingVertical: 2, opacity: ativa ? 1 : 0.3 }}>
+        <Txt tamanho={13} cor={t.onHeroSoft}>
+          {passo === -1 ? '‹' : '›'}
+        </Txt>
+      </View>
+    </Toque>
+  );
+}
 
 export function Extrato() {
   const { estado, despachar } = useLoja();
   const { t, paleta } = useTema();
 
+  const mes = navegacaoDeMes(estado);
+  const doMes = transacoesDoMesVisivel(estado);
   const filtradas = transacoesFiltradas(estado);
   const grupos = agruparPorDia(filtradas);
   const entradas = totalEntradas(filtradas);
@@ -63,15 +89,11 @@ export function Extrato() {
               paddingHorizontal: 8,
             }}
           >
-            <Txt tamanho={13} cor={t.onHeroSoft}>
-              ‹
-            </Txt>
+            <SetaDeMes passo={-1} ativa={mes.podeVoltar} rotulo="Mês anterior" />
             <Txt tamanho={12} peso={600} cor={t.onHero}>
-              {rotuloMesCurto(estado.hoje)}
+              {mes.rotulo}
             </Txt>
-            <Txt tamanho={13} cor={t.onHeroSoft}>
-              ›
-            </Txt>
+            <SetaDeMes passo={1} ativa={mes.podeAvancar} rotulo="Mês seguinte" />
           </View>
         </View>
 
@@ -137,7 +159,7 @@ export function Extrato() {
             aoTocar={() => despachar({ tipo: 'FILTRO_CATEGORIA', categoria: 'todas' })}
           />
           {categoriasUsadas(estado).map((id) => {
-            const cat = categoria(id);
+            const cat = categoria(estado.categorias, id);
             return (
               <Chip
                 key={id}
@@ -170,14 +192,19 @@ export function Extrato() {
               </Txt>
             </View>
             {g.itens.map((tx, i) => (
-              <ItemTransacao key={tx.id} tx={tx} separador={i < g.itens.length - 1} />
+              <ItemTransacao
+                key={tx.id}
+                tx={tx}
+                separador={i < g.itens.length - 1}
+                recategorizavel
+              />
             ))}
           </View>
         ))}
 
         {grupos.length === 0 ? (
-          // Duas coisas diferentes: ainda não há nada, ou o filtro não casou.
-          // A saída de cada uma é outra, então a mensagem não pode ser a mesma.
+          // Três coisas diferentes, e a saída de cada uma é outra: ainda não há
+          // nada, o mês está vazio, ou o filtro não casou.
           estado.transacoes.length === 0 ? (
             <Vazio
               icone={icones.extrato}
@@ -187,6 +214,21 @@ export function Extrato() {
                 rotulo: 'Registrar o primeiro',
                 aoTocar: () => despachar({ tipo: 'ABRIR_NOVA' }),
               }}
+            />
+          ) : doMes.length === 0 ? (
+            <Vazio
+              compacto
+              icone={icones.calendario}
+              titulo={`Nada em ${mes.rotulo}`}
+              texto="Nenhum lançamento neste mês. Use as setas para ver outro."
+              acao={
+                mes.podeVoltar
+                  ? {
+                      rotulo: 'Ver o mês anterior',
+                      aoTocar: () => despachar({ tipo: 'MES_VISIVEL', passo: -1 }),
+                    }
+                  : undefined
+              }
             />
           ) : (
             <Vazio

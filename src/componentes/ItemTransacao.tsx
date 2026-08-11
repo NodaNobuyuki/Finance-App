@@ -6,16 +6,32 @@ import { Transacao } from '../dominio/tipos';
 import { useLoja } from '../estado/store';
 import { comAlfa, resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
-import { Disco, Txt } from './basicos';
+import { Disco, Toque, Txt } from './basicos';
 
-export function ItemTransacao({ tx, separador }: { tx: Transacao; separador: boolean }) {
-  const { estado } = useLoja();
+export function ItemTransacao({
+  tx,
+  separador,
+  recategorizavel = false,
+}: {
+  tx: Transacao;
+  separador: boolean;
+  /**
+   * Tocar abre a troca de categoria. Só no Extrato: na Home a lista é resumo,
+   * e transformar cada linha em botão ali competiria com o registro rápido.
+   */
+  recategorizavel?: boolean;
+}) {
+  const { estado, despachar } = useLoja();
   const { t, paleta } = useTema();
-  const cat = categoria(tx.categoriaId);
+  const cat = categoria(estado.categorias, tx.categoriaId);
   const cor = resolverCor(cat.cor, paleta);
   const nomeDaConta = estado.contas.find((c) => c.id === tx.contaId)?.nome ?? '';
 
-  return (
+  // Transferência não se recategoriza: a categoria dela é o que a identifica
+  // como movimento entre contas, e trocá-la a transformaria em despesa.
+  const podeTrocar = recategorizavel && tx.transferenciaId === undefined;
+
+  const conteudo = (
     <View
       style={{
         flexDirection: 'row',
@@ -39,5 +55,16 @@ export function ItemTransacao({ tx, separador }: { tx: Transacao; separador: boo
         {comSinal(tx.valorCentavos)}
       </Txt>
     </View>
+  );
+
+  if (!podeTrocar) return conteudo;
+
+  return (
+    <Toque
+      aoTocar={() => despachar({ tipo: 'ABRIR_RECATEGORIZAR', transacaoId: tx.id })}
+      rotuloAcessivel={`Mudar categoria de ${tx.descricao}`}
+    >
+      {conteudo}
+    </Toque>
   );
 }

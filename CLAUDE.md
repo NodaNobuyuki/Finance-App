@@ -184,7 +184,7 @@ src/
 
 ## Estado atual
 
-**App Expo rodando** (`src/`), portado do protótipo `design/Poupa Hábitos.dc.html`. 9 telas — Início, Extrato, Metas, Categorias, Hábitos, Simulador, Lote, Resumo, Fechar semana — mais 6 folhas: Nova transação, Movimento de meta (guardar/retirar), Transferência, Ritual, Cadastro de conta e Cadastro de meta. 13 paletas, teclado numérico próprio, toast com undo.
+**App Expo rodando** (`src/`), portado do protótipo `design/Poupa Hábitos.dc.html`. 9 telas — Início, Extrato, Metas, Categorias, Hábitos, Simulador, Lote, Resumo, Fechar semana — mais 8 folhas: Nova transação, Movimento de meta (guardar/retirar), Transferência, Ritual, Recategorizar e os cadastros de conta, meta e categoria. 13 paletas, teclado numérico próprio, toast com undo.
 
 ```
 src/dominio/    dinheiro (centavos), saldo derivado, guardado das metas,
@@ -196,7 +196,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = lint + tipos + 356 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = lint + tipos + 396 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
@@ -283,7 +283,25 @@ Todo dado do usuário — transações, contas, metas, desafios, orçamento — 
 
 O motivo é persistência: **o que não está no `Estado` não tem como ser gravado nem recarregado.** Enquanto metas e desafios eram constantes de módulo, eram imutáveis por construção, e os contadores paralelos (`aportes: Record<metaId, número>`) só existiam para contornar isso.
 
-`categorias` e `taxas` continuam sendo constantes de módulo de propósito: são catálogo, não dado de quem usa o app.
+`taxas` continua sendo constante de módulo de propósito: é catálogo de mercado, não dado de quem usa o app.
+
+### Categoria é vocabulário do usuário; desafio é conteúdo nosso
+
+`Estado.categorias` é dado do usuário — criar, renomear, escolher cor e ícone, apagar. `categoriasDeFabrica` virou **semente**: alimenta instalação nova e mais nada.
+
+É o oposto do que a v2 fez com desafio, e de propósito. Desafio é conteúdo que **nós** publicamos, então o catálogo ficou em código para que desafio novo chegue a quem já instalou. Categoria é vocabulário de **quem usa o app**: ninguém quer receber "Pet" numa atualização, nem perder a categoria que criou.
+
+`categoria(categorias, id)` recebe a lista, como `saldoDaConta(conta, transacoes)` — a mesma forma do resto do domínio. Continua sem lançar: com apagar agora possível, **a categoria órfã deixou de ser precaução e virou caminho normal**.
+
+**Renomear não troca o id.** Ele é a chave que os lançamentos apontam; id derivado do nome faria "Mercado" → "Compras" órfãar o histórico inteiro.
+
+**Apagar categoria mantém os lançamentos** — oposto de apagar conta. O gasto aconteceu e o dinheiro saiu, seja qual for o rótulo: some o rótulo, não o dinheiro. As linhas caem em "Sem categoria" e `Recategorizar` é o caminho de volta, que antes não existia.
+
+**A última categoria de um tipo não é apagável**, e `transferencia` nunca é: sem nenhuma despesa não há o que escolher ao lançar, e sem `transferencia` o aporte não teria como marcar as linhas que cria.
+
+**A migration v6 cria a tabela VAZIA.** Copiar 14 paths SVG e 14 cores para dentro de uma migration que nunca mais pode ser editada garantiria divergência na primeira troca de ícone. Quem repõe o catálogo é `hidratar()` em `persistido.ts`, e ele mora lá — não num repositório — porque é regra de domínio: as duas implementações passam a mesma suíte de contrato, e conserto aplicado só numa delas é divergência esperando para aparecer. Como apagar a última categoria de um tipo é proibido, tabela vazia só pode significar "instalação anterior à v6".
+
+O modo de edição da tela Categorias é explícito (botão "Editar"), não toque longo: gesto escondido não se descobre, e o toque simples já tem dono — abrir o extrato filtrado.
 
 **Guardado da meta é derivado, igual ao saldo:** `guardadoInicialCentavos + soma das transações com aquele `metaId`` (`src/dominio/metas.ts`). Como a soma filtra por `metaId`, entrada que aponta para meta apagada não entra em guardado nenhum.
 
@@ -301,7 +319,17 @@ Guardar a partir da mesma conta em que a meta guarda não muda saldo nenhum, e e
 
 **A migration v5 dobra os aportes antigos em `guardadoInicialCentavos` e derruba a tabela.** Convertê-los em pares exigiria inventar uma conta de origem e um saque que nunca aconteceu. Como aporte antigo nunca moveu saldo, ele é literalmente "o que já estava guardado": o guardado exibido não muda em um centavo e nenhum saldo é reescrito.
 
-`categorias.transferencia` tem `tipo: 'transferencia'`, e é isso que a mantém fora de `categoriasDespesa`/`categoriasReceita` — logo fora do seletor de lançamento e da tela Categorias, onde ela não faz sentido.
+A categoria `transferencia` tem `tipo: 'transferencia'`, e é isso que a mantém fora de `categoriasPorTipo` — logo fora do seletor de lançamento e da tela Categorias, onde ela não faz sentido.
+
+### O mês do Extrato é recorte, não decoração
+
+`Estado.mesVisivel` é `DiaISO` ancorado no dia 1, e `transacoesFiltradas` filtra por ele antes de aplicar conta e categoria. O cabeçalho sempre anunciou um mês entre duas setas, mas as setas eram `Txt` e a lista trazia o histórico inteiro — a tela prometia um recorte que não existia, e a transferência piorou isso ao somar duas linhas por movimento.
+
+É estado de sessão, como os filtros: não é persistido, e entrar no Extrato volta para o mês corrente. Reabrir a tela em março porque foi lá que a pessoa parou meses atrás é desorientador.
+
+`navegacaoDeMes()` para no mês corrente à frente (mês futuro não tem o que mostrar) e no mês do primeiro lançamento atrás; sem os limites as setas percorreriam anos vazios. Na virada do mês, quem estava no mês corrente segue nele e quem tinha navegado para trás fica onde estava.
+
+O vazio agora tem **três** casos, e a saída de cada um é outra: sem lançamento nenhum, mês em branco, filtro sem resultado. Dizer "nenhuma transação com esses filtros" para quem só navegou até um mês vazio manda mexer no lugar errado.
 
 ### Uma função para os três movimentos
 
@@ -322,16 +350,12 @@ Como `guardadoDaMeta` soma **com sinal**, os três casos caem na mesma conta sem
 A folha `MovimentoMeta` faz os dois sentidos (`retirar: boolean`) porque é uma transferência só de cabeça para baixo; `PilulasDeConta` é a escolha de conta que as três folhas compartilham, junto com a linha que avisa o que vai acontecer com o saldo.
 
 **Pendências abertas:**
-- Categoria órfã aparece como "Sem categoria" mas não há como recategorizar o lançamento
-- Tela Categorias abre o extrato filtrado, mas não virou tela de orçamento
-- **O Extrato mente sobre o mês:** o cabeçalho anuncia "Agosto 2026" entre duas setas, mas as setas são `Txt` (não `Toque`) e `transacoesFiltradas` não filtra por mês nenhum — a lista traz tudo. Piorou com a transferência, que soma duas linhas por movimento
-- "Nova categoria" é decorativa
-- Categorias ainda são catálogo fixo. Viram dado do usuário (e vão para o `Estado` e para o banco) quando "Nova categoria" funcionar
+- Orçamento ainda é um teto único (`orcamentoMensalCentavos`). Com categoria virando dado do usuário, limite por categoria passou a ser possível — é o que falta para a tela Categorias deixar de ser painel de totais
 - Sobraram dois placeholders em `contexto`, e eles têm o mesmo defeito que `semanasEmDia` tinha: nascem da semente e nada os atualiza. `lancamentosMesAnterior` é derivável em cinco linhas (contar transações do mês anterior); `economiaBaseCentavos` é número inventado da demo e some quando `economizado()` passar a somar só o que existe. Aí o tipo `Contexto` inteiro desaparece
 - Sem retentativa ativa de gravação: o reenvio pega carona na próxima mudança. Um outbox resolve, se virar problema
 - Nenhuma tela lê do banco sob demanda — o estado inteiro é carregado no boot. Aguenta bem os primeiros anos; a saída é paginar por período no repositório
 
-**Próximo ciclo:** categorias como dado do usuário (destrava "Nova categoria" e a tela Categorias virar orçamento) e recategorizar lançamento — as duas caem juntas, porque recategorizar precisa de uma lista que a pessoa controla. Depois: `SectionList` no Extrato (o agrupamento em `agruparPorDia` já encaixa, e ele hoje é O(n·dias)) e memoização dos derivados.
+**Próximo ciclo:** orçamento por categoria — é o que faz a tela Categorias virar tela de verdade, e agora que categoria é dado do usuário o limite tem onde morar. Depois: `SectionList` no Extrato (o agrupamento em `agruparPorDia` já encaixa, e ele hoje é O(n·dias)) e memoização dos derivados.
 
 **Decisão em aberto:** a v1 vale ser 100% local, sem backend. Não perde o loop comportamental, dispensa auth e infra, e encurta muito o caminho até a loja. Backend entra quando houver sync entre aparelhos ou receita — mesmo critério já aplicado ao Open Finance.
 

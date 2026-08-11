@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { hojeReal } from '../dominio/datas';
 import { criarEstadoVazio, Estado } from '../estado/store';
 import { abrirMotorExpo } from './motorExpo';
+import { hidratar } from './persistido';
 import { RepositorioLocal } from './repositorio';
 import { criarRepositorioMemoria } from './repositorioMemoria';
 import { criarRepositorioSQL } from './repositorioSQL';
@@ -41,7 +42,7 @@ export async function abrirBanco(): Promise<Boot> {
 
   // `hoje` vem do relógio, nunca do disco — reabrir no dia gravado colocaria o
   // lançamento na data errada.
-  const inicial = salvo ? { ...vazio, ...salvo, hoje } : vazio;
+  const inicial = salvo ? hidratar(vazio, salvo, hoje) : vazio;
   return { repositorio, inicial, semDisco };
 }
 

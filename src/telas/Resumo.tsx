@@ -84,7 +84,7 @@ export function Resumo() {
                   {formatar(c.valorCentavos)}
                 </Txt>
               </View>
-              <Barra pct={c.pct} cor={resolverCor(categoria(c.categoriaId).cor, paleta)} />
+              <Barra pct={c.pct} cor={resolverCor(categoria(estado.categorias, c.categoriaId).cor, paleta)} />
               <Txt tamanho={11} cor={t.inkFaint}>
                 {c.pct}% do que você gastou
               </Txt>

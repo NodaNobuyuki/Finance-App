@@ -3,7 +3,7 @@ import { ScrollView, TextInput, View } from 'react-native';
 import { BotaoPrincipal, Rotulo, Toque, Txt } from '../../componentes/basicos';
 import { Icone } from '../../componentes/Icone';
 import { Teclado } from '../../componentes/Teclado';
-import { categoria, categoriasDespesa, categoriasReceita, icones } from '../../dominio/categorias';
+import { categoriasPorTipo, icones } from '../../dominio/categorias';
 import { deDigitos, formatar } from '../../dominio/dinheiro';
 import { useLoja } from '../../estado/store';
 import { sans } from '../../tema/fontes';
@@ -25,7 +25,7 @@ export function NovaTransacao() {
   const valor = deDigitos(r.digitos);
   const despesa = r.tipo === 'despesa';
   const corValor = valor === 0 ? t.inkFaint : despesa ? t.down : t.up;
-  const chaves = despesa ? categoriasDespesa : categoriasReceita;
+  const lista = categoriasPorTipo(estado.categorias, despesa ? 'despesa' : 'receita');
 
   const segmento = (rotulo: string, ativo: boolean, cor: string, aoTocar: () => void) => (
     <Toque aoTocar={aoTocar} estilo={{ flex: 1 }} rotuloAcessivel={rotulo}>
@@ -107,14 +107,13 @@ export function NovaTransacao() {
         <View style={{ gap: 8 }}>
           <Rotulo>Categoria</Rotulo>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {chaves.map((id) => {
-              const cat = categoria(id);
+            {lista.map((cat) => {
               const cor = resolverCor(cat.cor, paleta);
-              const ativo = r.categoriaId === id;
+              const ativo = r.categoriaId === cat.id;
               return (
                 <Toque
-                  key={id}
-                  aoTocar={() => despachar({ tipo: 'RASCUNHO_CATEGORIA', categoriaId: id })}
+                  key={cat.id}
+                  aoTocar={() => despachar({ tipo: 'RASCUNHO_CATEGORIA', categoriaId: cat.id })}
                   estilo={{ width: '23%' }}
                   rotuloAcessivel={cat.nome}
                 >
