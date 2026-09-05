@@ -13,6 +13,7 @@ import React from 'react';
 import { SafeAreaView, ScrollView, View } from 'react-native';
 import { NavInferior } from './componentes/NavInferior';
 import { Toast } from './componentes/Toast';
+import { Transicao } from './componentes/Transicao';
 import { useBanco } from './dados/boot';
 import { RepositorioLocal } from './dados/repositorio';
 import { usePersistencia } from './dados/usePersistencia';
@@ -121,7 +122,9 @@ function Casca({ repositorio }: { repositorio: RepositorioLocal }) {
           // do conteúdo anterior.
           key={estado.tela}
         >
-          <TelaAtual />
+          <Transicao chave={estado.tela}>
+            <TelaAtual />
+          </Transicao>
         </ScrollView>
 
         <NavInferior />

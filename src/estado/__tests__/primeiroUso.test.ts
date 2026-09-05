@@ -1,4 +1,5 @@
 import { definicoesDesafios, progressoDe } from '../../dominio/desafios';
+import { saldoDaConta } from '../../dominio/saldo';
 import { desafios, historicoDeSemanas, metas, semana, semanasEmDia } from '../derivados';
 import {
   Acao,
@@ -114,6 +115,30 @@ describe('onboarding', () => {
       { tipo: 'ONBOARDING_CAMPO', campo: 'metaDigitos', valor: '500000' },
     ]);
     expect(depois.contas[0].id).not.toBe(depois.metas[0].id);
+  });
+
+  it('o loop de custo de oportunidade fecha na meta que a pessoa criou', () => {
+    // O defeito que a demo escondia: o Simulador guardava num id fixo
+    // (`'reserva'`, da semente), e meta de instalação de verdade tem id do
+    // gerador. O botão que fecha o loop não achava destino e não fazia nada.
+    const instalado = preencher([
+      { tipo: 'ONBOARDING_CAMPO', campo: 'metaNome', valor: 'Reserva' },
+      { tipo: 'ONBOARDING_CAMPO', campo: 'metaDigitos', valor: '500000' },
+    ]);
+    expect(instalado.metas[0].id).not.toBe('reserva');
+
+    const depois = aplicar(
+      instalado,
+      { tipo: 'SIM_DEFINIR', digitos: '5000' },
+      { tipo: 'SIM_GUARDAR' },
+    );
+
+    expect(metas(depois)[0].guardadoCentavos).toBe(5000);
+
+    // Com uma conta só, a meta guarda nela mesma: o par soma zero e o saldo
+    // não se move — o dinheiro não foi a lugar algum, só passou a ter dono.
+    expect(depois.transacoes).toHaveLength(2);
+    expect(saldoDaConta(depois.contas[0], depois.transacoes)).toBe(150000);
   });
 });
 

@@ -179,6 +179,19 @@ src/
 - **Empty state nunca é texto seco.** Ilustração + call-to-action.
 - **Tema por CSS variables.** Paletas trocáveis, com tons alternativos para modo escuro. Nunca hardcode cor em componente.
 - **Nenhuma tela morta.** Se uma tela só exibe totais sem interação, ela é candidata a virar outra coisa ou sumir.
+- **Movimento vem de um lugar só.** `componentes/animacao.ts` — ver abaixo.
+
+### Movimento: uma gramática, três durações
+
+Tudo que entra na tela usa a mesma frase — surge com uma leve subida — e só a duração muda, em `DURACAO`: tela 170ms, toast 220ms, folha 240ms. Quanto mais a coisa cobre, mais devagar ela chega. Número de animação solto dentro de componente faz a interface parecer montada por gente diferente, e era o que estava acontecendo: `Folha` e `Toast` tinham as mesmas quatro linhas copiadas com durações diferentes.
+
+`useEntrada(duracaoMs, reiniciarEm?)` é o valor 0→1 da montagem. Com `reiniciarEm`, recomeça quando a chave muda — é assim que o toast reanuncia cada recado sem remontar, e dois recados seguidos piscam entre si em vez de o segundo passar despercebido.
+
+**A troca de tela é `Transicao`**, embrulhando `TelaAtual` na `Casca`. Fade curto com 6px de subida: sem isso o conteúdo novo aparece no lugar do antigo e o corte seco faz a navegação parecer recarregamento. 170ms terminam antes de a pessoa acabar de tirar o dedo do botão — transição de tela não pode competir com o toque seguinte. O `flexGrow: 1` do embrulho não é decoração: sem ele a tela curta para de esticar até o rodapé dentro do ScrollView.
+
+**`useMenosMovimento()` respeita "reduzir movimento" do sistema**, e isso é acessibilidade, não capricho: animação de entrada dispara enjoo em quem tem sensibilidade vestibular. Quem pediu recebe o valor já em 1 — conteúdo inteiro, no lugar certo, sem transição. O padrão é `false` e a correção vem na primeira resposta do sistema, porque assumir o contrário tiraria a animação de todo mundo no primeiro frame.
+
+**Animação não é testável aqui, e o teste não finge que é.** `useNativeDriver: true` tira o valor do lado JS, então o `style` renderizado fica congelado no estado inicial durante o teste inteiro — não dá para afirmar "chegou a opacity 1", nem verificar o atalho de menos movimento. `transicao.test.tsx` cobre o que pode quebrar em silêncio (o embrulho comendo conteúdo, a troca não renderizando a tela nova, o `flexGrow`, e a pergunta de acessibilidade continuar sendo feita) e diz por escrito o que fica de fora. **Tela invisível por animação travada só se pega no aparelho** — depois de mexer em `animacao.ts`, abra o app e navegue, porque o `verificar` passa verde de qualquer jeito.
 
 ---
 
@@ -191,7 +204,7 @@ src/dominio/    dinheiro (centavos), saldo derivado, guardado das metas,
                 categorias, taxas, datas, ids, erros, seed
 src/dados/      persistência: motor SQL, migrations, repositórios
 src/estado/     store (reducer + context) e derivados (seleções)
-src/componentes/ primitivos que leem tokens do tema
+src/componentes/ primitivos que leem tokens do tema, e a gramática de movimento
 src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em Onboarding
 src/tema/       paletas como tokens + provider
 ```
@@ -347,10 +360,22 @@ Como `guardadoDaMeta` soma **com sinal**, os três casos caem na mesma conta sem
 
 **Transferir recusa origem igual a destino.** Seria um par somando zero na mesma conta, duas linhas no Extrato para não dizer nada. Guardar na própria conta da meta é diferente e continua permitido: ali o par documenta que o dinheiro passou a estar reservado.
 
-A folha `MovimentoMeta` faz os dois sentidos (`retirar: boolean`) porque é uma transferência só de cabeça para baixo; `PilulasDeConta` é a escolha de conta que as três folhas compartilham, junto com a linha que avisa o que vai acontecer com o saldo.
+A folha `MovimentoMeta` faz os dois sentidos (`retirar: boolean`) porque é uma transferência só de cabeça para baixo; `PilulasDeConta` é a escolha de conta que as três folhas compartilham, junto com a linha que avisa o que vai acontecer com o saldo. Ele hoje delega ao genérico `Pilulas<T extends { id, nome }>` no mesmo arquivo — o Simulador escolhe **meta** com o mesmo componente, e um componente chamado "de conta" escolhendo meta seria mentira no nome.
+
+### O destino do Simulador é escolha, não constante
+
+O botão "Guardar em vez de gastar" fecha o loop de custo de oportunidade — é a razão de o produto existir — e ele **não funcionava para ninguém que tinha instalado o app**. A tela despachava `SIM_GUARDAR` com `metaId: 'reserva'`, id vindo da semente da demo; meta criada no onboarding ou em `CadastroMeta` nasce com UUID v7. O reducer não achava a meta, fazia `return e`, e o toque não produzia nada — sem toast, sem recado, sem pista.
+
+É a mesma família de defeito que `semanasEmDia` e `orcamentoMensalCentavos`: **nasce da semente e nada o alimenta no app real**, então a demo passa e a instalação de verdade não. Sempre que um id de `seed.ts` aparecer cravado em código de tela, é este bug outra vez.
+
+`Estado.simMetaId` é `string | null` e a resolução é `metaEscolhida(metas, id)` em `dominio/metas.ts`: `null` é "ninguém escolheu ainda" e vale a primeira meta, e id apontando para meta apagada também cai na primeira. Resolver na leitura em vez de limpar a escolha no `APAGAR_META` é a decisão de `categoria()` de novo — id pendurado é caminho normal, não corrupção. `SIM_GUARDAR` **não tem payload**: tela e reducer resolvendo a meta por caminhos separados é divergência esperando para aparecer.
+
+**Sem meta nenhuma, o botão não mente:** vira "Criar uma meta" e abre `ABRIR_META`, porque criar a meta é o que de fato falta. E `SIM_GUARDAR` sem destino passou a avisar no toast, como "retirar mais do que está guardado" — foi o `return e` calado que deixou o defeito escondido tanto tempo.
+
+O teste que trava isso mora em `primeiroUso.test.ts`, e é lá porque o que ele exercita é justamente o que a demo escondia: conclui o onboarding, confirma que a meta **não** tem id `'reserva'`, e guarda. Com uma conta só, o par cai na mesma conta e o saldo não se move — o teste afirma isso de propósito.
 
 **Pendências abertas:**
-- Orçamento ainda é um teto único (`orcamentoMensalCentavos`). Com categoria virando dado do usuário, limite por categoria passou a ser possível — é o que falta para a tela Categorias deixar de ser painel de totais
+- Orçamento ainda é um teto único (`orcamentoMensalCentavos`) e **nenhuma ação o escreve**: é `0` no estado vazio, então o cartão da Home anuncia `0% usado · R$ 0,00 de R$ 0,00`, sempre verde, para quem instalou o app. Mesmo defeito do destino do Simulador, e é o que o limite por categoria resolve de uma vez — o teto único vira soma dos limites, e a tela Categorias deixa de ser painel de totais
 - Sobraram dois placeholders em `contexto`, e eles têm o mesmo defeito que `semanasEmDia` tinha: nascem da semente e nada os atualiza. `lancamentosMesAnterior` é derivável em cinco linhas (contar transações do mês anterior); `economiaBaseCentavos` é número inventado da demo e some quando `economizado()` passar a somar só o que existe. Aí o tipo `Contexto` inteiro desaparece
 - Sem retentativa ativa de gravação: o reenvio pega carona na próxima mudança. Um outbox resolve, se virar problema
 - Nenhuma tela lê do banco sob demanda — o estado inteiro é carregado no boot. Aguenta bem os primeiros anos; a saída é paginar por período no repositório
@@ -361,25 +386,41 @@ A folha `MovimentoMeta` faz os dois sentidos (`retirar: boolean`) porque é uma 
 
 ---
 
-## SDK do Expo está fixado em 54 de propósito
+## O SDK acompanha o Expo Go da loja
 
-**Não atualize sem ler isto.** A App Store publica o Expo Go **54.0.2** desde setembro de 2025, e o Expo Go roda só um SDK por vez. Subir o projeto para 55+ quebra o teste em iPhone — que hoje é o único aparelho disponível.
+**A regra é uma só: o SDK do projeto tem de ser o mesmo que a App Store publica no Expo Go**, porque o Expo Go roda um SDK por vez. Não é preferência por versão nova nem por versão velha — é o que decide se o app abre no iPhone, que hoje é o único aparelho de teste.
 
-O acoplamento acaba quando o projeto migrar para **development build** (EAS). Aí o cliente é compilado por nós e o SDK volta a ser escolha livre. Isso vai acontecer de qualquer forma no item 2 da ordem de implementação: share sheet e `NotificationListenerService` são código nativo e **não rodam no Expo Go, em SDK nenhum**.
+Hoje: **SDK 57** (`expo ~57.0.20`, RN 0.86.3, React 19.2.3, TypeScript 6).
 
-Ao subir de SDK, depois do dev build:
+O projeto ficou em 54 enquanto a loja publicava o Expo Go 54; quando o aparelho passou a trazer o Expo Go 57, o app parou de abrir com "the installed version of Expo Go is for SDK 57.0.0 / the project you opened uses SDK 54" e o SDK subiu junto. É esse o gatilho — o aparelho reclamando —, e a resposta é sempre acompanhar, nunca ficar atrás.
+
+O acoplamento acaba quando o projeto migrar para **development build** (EAS): aí o cliente é compilado por nós e o SDK volta a ser escolha livre. Isso vai acontecer de qualquer forma no item 2 da ordem de implementação — share sheet e `NotificationListenerService` são código nativo e **não rodam no Expo Go, em SDK nenhum**.
+
+### A receita, e o que ela cobra
 
 ```
 npx expo install expo@^NN
-npx expo install --fix      # runtime + jest-expo + typescript
-# manual — o Expo não vigia estes: @types/react, react-test-renderer
-# (versão exata do react), @testing-library/react-native
+npx expo install --fix      # runtime, expo-*, jest-expo, typescript, @types/react
+# manual — o Expo não vigia: @testing-library/react-native
 npm run verificar
 ```
 
-Dois detalhes que já custaram tempo: `expo install --check` lê o `node_modules`, não o `package.json` — editar o manifesto sem instalar dá falso "tudo certo". E numa troca grande, apague `node_modules` e `package-lock.json` antes do install.
+Três armadilhas, todas já pagas em tempo:
 
-Se o `verificar` quebrar depois de subir SDK, olhe qual arquivo falhou. Os testes de domínio e estado não importam nada externo: se eles quebram, é regressão real. Já `telas.test.tsx` depende de `react` e do RNTL — quando os 30 testes dele caem juntos com a mesma mensagem, quase sempre é mudança de API da biblioteca, não bug do app.
+**`expo install --check` lê o `node_modules`, não o `package.json`** — editar o manifesto sem instalar dá falso "tudo certo".
+
+**Numa troca grande, apague `node_modules` E `package-lock.json` antes do install — e apague o lock de novo depois do `--fix`.** No salto 54 → 57 o lock foi gerado com o manifesto pela metade (`expo` já em 57, os `expo-*` ainda em 54). O conflito fez o npm aninhar `expo-modules-core` dentro de `node_modules/expo/`, o `--fix` corrigiu o manifesto mas o lock manteve a árvore torta, e o `jest-expo` não resolve de lá: **os 18 suites caíram juntos** com `Cannot find module 'expo-modules-core'`. Nada a ver com o app — lock refeito, tudo verde.
+
+**O `eslint-config-expo` traz regras novas a cada SDK.** O 57 trouxe `react-hooks/refs` (era do React Compiler), que pegou dois padrões antigos de RN espalhados pelo projeto e estava certa nos dois:
+
+- `useRef(new Animated.Value(0)).current` lido no render virou `useState(() => new Animated.Value(0))` — o valor é criado uma vez só e ler estado no render é legítimo (`Toast.tsx`, `Folha.tsx`).
+- `falhar.current = aoFalhar` escrito no corpo de `usePersistencia` virou efeito com `[aoFalhar]`. O objetivo continua o mesmo — callback recente sem entrar nas dependências do efeito de gravação — e quem lê `falhar.current` é o `catch`, muito depois do commit.
+
+`react-test-renderer` saiu das devDependencies no mesmo salto: o RNTL 14 usa `test-renderer`, e o projeto nunca o importou direto.
+
+### Quando o `verificar` quebrar depois de subir SDK
+
+Olhe **qual** arquivo falhou. Os testes de domínio e estado não importam nada externo: se eles quebram, é regressão real. Já `telas.test.tsx` depende de `react` e do RNTL — quando os 30 testes dele caem juntos com a mesma mensagem, quase sempre é mudança de API da biblioteca. E quando **todos** os suites caem com a mesma mensagem, é a árvore de dependências, não código: veja a armadilha do lock acima.
 
 ---
 

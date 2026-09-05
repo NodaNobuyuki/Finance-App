@@ -73,3 +73,22 @@ export function contaPadraoDeMeta(contas: { id: string; tipo: string }[]): strin
   const naoCartao = contas.find((c) => c.tipo !== 'cartao');
   return (poupanca ?? naoCartao ?? contas[0])?.id ?? '';
 }
+
+/**
+ * Qual meta uma escolha de `id` aponta, tolerando id que não existe mais.
+ *
+ * A primeira da lista é o padrão, e é ela que responde quando o id é `null` —
+ * ninguém escolheu ainda — ou aponta para meta apagada. Resolver na leitura em
+ * vez de limpar a escolha ao apagar é a mesma decisão de `categoria()`: id
+ * pendurado é caminho normal, não corrupção, e apagar meta já não mexe em nada
+ * que aponte para ela.
+ *
+ * Estrutural em vez de `Meta[]` porque quem chama costuma ter a lista
+ * enriquecida de `derivados.metas()`, com guardado e prazo já calculados.
+ */
+export function metaEscolhida<T extends { id: string }>(
+  metas: T[],
+  id: string | null,
+): T | undefined {
+  return metas.find((m) => m.id === id) ?? metas[0];
+}

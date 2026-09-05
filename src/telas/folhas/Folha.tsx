@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { Animated, View } from 'react-native';
+import { DURACAO, useEntrada } from '../../componentes/animacao';
 import { Toque, Txt } from '../../componentes/basicos';
 import { Icone } from '../../componentes/Icone';
 import { icones } from '../../dominio/categorias';
@@ -22,11 +23,7 @@ export function Folha({
   cabecalho?: React.ReactNode;
 }) {
   const { t } = useTema();
-  const entrada = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(entrada, { toValue: 1, duration: 240, useNativeDriver: true }).start();
-  }, [entrada]);
+  const entrada = useEntrada(DURACAO.folha);
 
   return (
     <Animated.View

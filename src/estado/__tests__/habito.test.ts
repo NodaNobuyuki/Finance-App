@@ -1,4 +1,5 @@
 import { inicioDaSemana, somarDias } from '../../dominio/datas';
+import { guardadoDaMeta } from '../../dominio/metas';
 import { saldoDaConta, saldoTotal } from '../../dominio/saldo';
 import {
   desafios,
@@ -540,12 +541,16 @@ describe('transferência entre contas', () => {
 });
 
 describe('simulador guarda de verdade', () => {
-  it('o fecho do loop também move dinheiro', () => {
-    const depois = aplicar(
-      { ...estadoInicial, rascunho: { ...estadoInicial.rascunho, contaId: 'corrente' } },
+  const simular = (estado: Estado, ...acoes: Acao[]) =>
+    aplicar(
+      { ...estado, rascunho: { ...estado.rascunho, contaId: 'corrente' } },
       { tipo: 'SIM_DEFINIR', digitos: '5000' },
-      { tipo: 'SIM_GUARDAR', metaId: 'chile' },
+      ...acoes,
+      { tipo: 'SIM_GUARDAR' },
     );
+
+  it('o fecho do loop também move dinheiro', () => {
+    const depois = simular(estadoInicial, { tipo: 'SIM_META', metaId: 'chile' });
     const corrente = estadoInicial.contas.find((c) => c.id === 'corrente')!;
 
     expect(saldoDaConta(corrente, depois.transacoes)).toBe(
@@ -553,6 +558,44 @@ describe('simulador guarda de verdade', () => {
     );
     expect(totalGuardado(depois)).toBe(totalGuardado(estadoInicial) + 5000);
     expect(depois.tela).toBe('metas');
+  });
+
+  it('guarda na meta escolhida, não numa fixa', () => {
+    const depois = simular(estadoInicial, { tipo: 'SIM_META', metaId: 'note' });
+    const note = depois.metas.find((m) => m.id === 'note')!;
+
+    expect(guardadoDaMeta(note, depois.transacoes)).toBe(
+      guardadoDaMeta(note, estadoInicial.transacoes) + 5000,
+    );
+  });
+
+  it('sem escolha, a primeira meta é o destino', () => {
+    // `simMetaId` nasce `null`: quem só digita um valor e confirma tem de ver
+    // dinheiro guardado, não um botão que não faz nada.
+    const depois = simular(estadoInicial);
+    const primeira = depois.metas[0];
+
+    expect(depois.simMetaId).toBeNull();
+    expect(guardadoDaMeta(primeira, depois.transacoes)).toBe(
+      guardadoDaMeta(primeira, estadoInicial.transacoes) + 5000,
+    );
+  });
+
+  it('escolha pendurada em meta apagada cai na primeira, sem sumir com o dinheiro', () => {
+    const escolhida = aplicar(estadoInicial, { tipo: 'SIM_META', metaId: 'note' });
+    const semNote = aplicar(escolhida, { tipo: 'APAGAR_META', metaId: 'note' });
+    const depois = simular(semNote);
+
+    expect(totalGuardado(depois)).toBe(totalGuardado(semNote) + 5000);
+  });
+
+  it('sem meta nenhuma, avisa em vez de sair calado', () => {
+    // Era aqui que o loop morria: `return e` silencioso, e o botão principal
+    // da tela que vende o app não fazia nada nem explicava por quê.
+    const depois = simular({ ...estadoVazio, contas: estadoInicial.contas });
+
+    expect(depois.transacoes).toEqual([]);
+    expect(depois.toast?.texto).toBe('Nenhuma meta para guardar');
   });
 });
 

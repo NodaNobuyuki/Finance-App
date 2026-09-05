@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { Animated, View } from 'react-native';
+import { DURACAO, useEntrada } from './animacao';
 import { icones } from '../dominio/categorias';
 import { useLoja } from '../estado/store';
 import { useTema } from '../tema/TemaContext';
@@ -17,18 +18,18 @@ export function Toast() {
   const { estado, despachar } = useLoja();
   const { t } = useTema();
   const toast = estado.toast;
-  const entrada = useRef(new Animated.Value(0)).current;
-
   const id = toast?.id;
   const duracao = toast?.duracaoMs ?? 0;
 
+  // Reanuncia a cada recado: dois toasts seguidos têm de piscar entre si, ou o
+  // segundo passa despercebido embaixo do primeiro.
+  const entrada = useEntrada(DURACAO.toast, id);
+
   useEffect(() => {
     if (id === undefined) return;
-    entrada.setValue(0);
-    Animated.timing(entrada, { toValue: 1, duration: 220, useNativeDriver: true }).start();
     const timer = setTimeout(() => despachar({ tipo: 'LIMPAR_TOAST', id }), duracao);
     return () => clearTimeout(timer);
-  }, [id, duracao, despachar, entrada]);
+  }, [id, duracao, despachar]);
 
   if (!toast) return null;
 

@@ -28,7 +28,15 @@ export function usePersistencia(
   const ultimoGravado = useRef<EstadoPersistido | null>(null);
   const fila = useRef<Promise<void>>(Promise.resolve());
   const falhar = useRef(aoFalhar);
-  falhar.current = aoFalhar;
+
+  // O callback mais recente sem entrar nas dependências do efeito de gravação:
+  // trocar `aoFalhar` a cada render não pode reagendar uma escrita. A escrita
+  // vai para um efeito porque mexer em ref durante o render é o que a regra
+  // `react-hooks/refs` proíbe; quem lê `falhar.current` é o `catch`, muito
+  // depois do commit.
+  useEffect(() => {
+    falhar.current = aoFalhar;
+  }, [aoFalhar]);
 
   useEffect(() => {
     if (!repositorio) return;

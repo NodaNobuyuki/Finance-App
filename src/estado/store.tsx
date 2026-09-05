@@ -30,7 +30,7 @@ import {
   removerDigito,
 } from '../dominio/dinheiro';
 import { GerarId, idsSequenciais, uuidV7 } from '../dominio/ids';
-import { contaPadraoDeMeta, guardadoDaMeta } from '../dominio/metas';
+import { contaPadraoDeMeta, guardadoDaMeta, metaEscolhida } from '../dominio/metas';
 import { Semente, semente, vazia } from '../dominio/seed';
 import {
   Conta,
@@ -252,6 +252,15 @@ export type Estado = {
   cadastroCategoria: CadastroCategoria;
   simDigitos: string;
   simTaxaId: string;
+  /**
+   * Meta que recebe o valor quando a pessoa decide guardar em vez de gastar.
+   *
+   * `null` é "ninguém escolheu ainda", e `metaEscolhida()` faz valer a
+   * primeira. Era uma constante `'reserva'` cravada na tela — id da semente,
+   * que instalação de verdade nunca tem: o botão que fecha o loop de custo de
+   * oportunidade não achava meta nenhuma e não fazia nada.
+   */
+  simMetaId: string | null;
 
   toast: Toast | null;
   /** Contador para ids determinísticos — nada de `Date.now()` dentro do reducer. */
@@ -319,6 +328,7 @@ function estadoDe(hoje: DiaISO, s: Semente, onboardingConcluido: boolean): Estad
     cadastroCategoria: CADASTRO_CATEGORIA_VAZIO,
     simDigitos: '',
     simTaxaId: 'cdi',
+    simMetaId: null,
 
     toast: null,
     seq: 0,
@@ -421,7 +431,9 @@ export type Acao =
   | { tipo: 'SIM_DIGITO'; valor: string }
   | { tipo: 'SIM_APAGAR' }
   | { tipo: 'SIM_DEFINIR'; digitos: string }
-  | { tipo: 'SIM_GUARDAR'; metaId: string }
+  | { tipo: 'SIM_META'; metaId: string }
+  /** Sem payload: o destino é `simMetaId`, resolvido por `metaEscolhida()`. */
+  | { tipo: 'SIM_GUARDAR' }
   | { tipo: 'SIMULAR_DO_RASCUNHO' }
   | { tipo: 'DIA_MUDOU'; dia: DiaISO }
   /** Recado do mundo externo — hoje, falha ao gravar no disco. */
@@ -1510,11 +1522,29 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
     case 'SIM_DEFINIR':
       return { ...e, simDigitos: a.digitos };
 
+    case 'SIM_META':
+      return { ...e, simMetaId: a.metaId };
+
     case 'SIM_GUARDAR': {
       const valor = deDigitos(e.simDigitos);
       if (valor <= 0) return e;
-      const meta = e.metas.find((m) => m.id === a.metaId);
-      if (!meta) return e;
+
+      // Sem meta não há destino, e a tela já oferece criar uma. Sair calado
+      // daqui foi o que escondeu o defeito por tanto tempo: o botão principal
+      // do Simulador não fazia nada e nada explicava por quê.
+      const meta = metaEscolhida(e.metas, e.simMetaId);
+      if (!meta) {
+        const seq = e.seq + 1;
+        return {
+          ...e,
+          seq,
+          toast: avisar(
+            seq,
+            'Nenhuma meta para guardar',
+            'Crie uma meta e este valor tem para onde ir.',
+          ),
+        };
+      }
 
       // É o fecho do loop de custo de oportunidade: o gasto que a pessoa
       // simulou vira dinheiro de verdade saindo da conta e indo para a meta.

@@ -3,13 +3,12 @@ import { View } from 'react-native';
 import { BotaoPrincipal, BotaoVoltar, Hero, Rotulo, Toque, Txt } from '../componentes/basicos';
 import { Teclado } from '../componentes/Teclado';
 import { deDigitos, formatar, percentual } from '../dominio/dinheiro';
+import { metaEscolhida } from '../dominio/metas';
 import { taxas } from '../dominio/taxas';
 import { metas, projecao } from '../estado/derivados';
 import { useLoja } from '../estado/store';
 import { useTema } from '../tema/TemaContext';
-
-/** Meta que recebe o valor quando o usuário decide guardar em vez de gastar. */
-const META_PADRAO = 'reserva';
+import { Pilulas } from './folhas/PilulasDeConta';
 
 export function Simulador() {
   const { estado, despachar } = useLoja();
@@ -18,8 +17,15 @@ export function Simulador() {
   const valor = deDigitos(estado.simDigitos);
   const em5anos = projecao(valor, estado.simTaxaId, 5);
   const rendimento = em5anos - valor;
-  const reserva = metas(estado).find((m) => m.id === META_PADRAO);
-  const pctReserva = reserva ? Math.min(100, percentual(valor, reserva.alvoCentavos)) : 0;
+
+  // O destino era a constante `'reserva'` — id da semente da demo. Quem
+  // instalou o app tem metas com UUID, então o botão que fecha o loop não
+  // achava meta nenhuma e morria calado. Agora a meta é escolhida aqui.
+  const lista = metas(estado);
+  const meta = metaEscolhida(lista, estado.simMetaId);
+  const pctDaMeta = meta ? Math.min(100, percentual(valor, meta.alvoCentavos)) : 0;
+  const contaDaMeta = estado.contas.find((c) => c.id === meta?.contaId);
+  const origem = estado.contas.find((c) => c.id === estado.rascunho.contaId);
 
   return (
     <View>
@@ -155,10 +161,28 @@ export function Simulador() {
         </View>
 
         <Txt tamanho={12.5} cor={t.inkMuted} entrelinha={1.5}>
-          {valor > 0 && reserva
-            ? `Esse valor cobre ${pctReserva}% da sua ${reserva.nome} hoje.`
-            : 'Digite um valor para ver o custo de oportunidade.'}
+          {valor === 0
+            ? 'Digite um valor para ver o custo de oportunidade.'
+            : meta
+              ? `Esse valor cobre ${pctDaMeta}% da meta ${meta.nome}.`
+              : 'Crie uma meta para transformar esse valor em dinheiro guardado.'}
         </Txt>
+
+        {meta ? (
+          <Pilulas
+            rotulo="GUARDAR EM"
+            itens={lista}
+            selecionado={meta.id}
+            aoEscolher={(metaId) => despachar({ tipo: 'SIM_META', metaId })}
+            nota={
+              contaDaMeta === undefined
+                ? 'Esta meta ainda não tem onde guardar.'
+                : contaDaMeta.id === origem?.id
+                  ? `Fica em ${contaDaMeta.nome} — o dinheiro já está lá, o saldo não muda.`
+                  : `Sai de ${origem?.nome ?? 'sua conta'} e vai para ${contaDaMeta.nome}.`
+            }
+          />
+        ) : null}
 
         <Teclado
           altura={44}
@@ -166,12 +190,21 @@ export function Simulador() {
           aoApagar={() => despachar({ tipo: 'SIM_APAGAR' })}
         />
 
-        <BotaoPrincipal
-          rotulo={valor === 0 ? 'Informe um valor' : 'Guardar em vez de gastar'}
-          fundo={valor === 0 ? t.lineInput : t.up}
-          desabilitado={valor === 0}
-          aoTocar={() => despachar({ tipo: 'SIM_GUARDAR', metaId: META_PADRAO })}
-        />
+        {/* Sem meta o botão não mente: leva a criar uma, que é o que falta. */}
+        {meta === undefined ? (
+          <BotaoPrincipal
+            rotulo="Criar uma meta"
+            fundo={t.accent}
+            aoTocar={() => despachar({ tipo: 'ABRIR_META' })}
+          />
+        ) : (
+          <BotaoPrincipal
+            rotulo={valor === 0 ? 'Informe um valor' : `Guardar em ${meta.nome}`}
+            fundo={valor === 0 ? t.lineInput : t.up}
+            desabilitado={valor === 0}
+            aoTocar={() => despachar({ tipo: 'SIM_GUARDAR' })}
+          />
+        )}
       </View>
     </View>
   );
