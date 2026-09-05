@@ -2,17 +2,14 @@ import React from 'react';
 import { ScrollView, TextInput, View } from 'react-native';
 import { BotaoPrincipal, BotaoVoltar, Hero, Toque, Txt } from '../componentes/basicos';
 import { Vazio } from '../componentes/Vazio';
-import { categoria, icones } from '../dominio/categorias';
+import { categoriaPadrao, icones } from '../dominio/categorias';
 import { rotuloDia } from '../dominio/datas';
 import { deTextoLivre } from '../dominio/dinheiro';
-import { semana } from '../estado/derivados';
+import { categoriasDoLote, semana } from '../estado/derivados';
 import { useLoja } from '../estado/store';
 import { comAlfa, resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
 import { mono } from '../tema/fontes';
-
-/** Categorias oferecidas no lançamento em lote — as que cobrem o dia a dia. */
-const CATEGORIAS_LOTE = ['mercado', 'restaurante', 'transporte', 'casa', 'lazer'];
 
 /**
  * Colocar em dia.
@@ -25,6 +22,11 @@ export function Lote() {
   const { t, paleta } = useTema();
 
   const { pendentes } = semana(estado);
+
+  // As categorias da pessoa, mais lançadas primeiro — não uma lista de ids de
+  // fábrica. Ver `categoriasDoLote`.
+  const categorias = categoriasDoLote(estado);
+  const padrao = categoriaPadrao(estado.categorias, 'despesa');
 
   const completo =
     pendentes.length > 0 &&
@@ -61,7 +63,7 @@ export function Lote() {
 
       <View style={{ paddingHorizontal: 22, paddingTop: 8, paddingBottom: 26, gap: 2 }}>
         {pendentes.map((dia, i) => {
-          const linha = estado.lote[dia] ?? { texto: '', categoriaId: 'mercado', semGasto: false };
+          const linha = estado.lote[dia] ?? { texto: '', categoriaId: padrao, semGasto: false };
           return (
             <View
               key={dia}
@@ -132,14 +134,15 @@ export function Lote() {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ gap: 6 }}
                 >
-                  {CATEGORIAS_LOTE.map((id) => {
-                    const cat = categoria(estado.categorias, id);
+                  {categorias.map((cat) => {
                     const cor = resolverCor(cat.cor, paleta);
-                    const ativo = linha.categoriaId === id;
+                    const ativo = linha.categoriaId === cat.id;
                     return (
                       <Toque
-                        key={id}
-                        aoTocar={() => despachar({ tipo: 'LOTE_CATEGORIA', dia, categoriaId: id })}
+                        key={cat.id}
+                        aoTocar={() =>
+                          despachar({ tipo: 'LOTE_CATEGORIA', dia, categoriaId: cat.id })
+                        }
                         rotuloAcessivel={cat.nome}
                       >
                         <View

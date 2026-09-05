@@ -145,6 +145,22 @@ export const categoriasIniciais = (): Categoria[] => Object.values(categoriasDeF
  * `transferencia` fica de fora sozinha, pelo tipo: ela é das duas pontas de um
  * movimento entre contas e não faz sentido num seletor de despesa.
  */
+/**
+ * Categoria padrão de um tipo: a primeira que a pessoa tem.
+ *
+ * Existe para que nenhum id de fábrica apareça cravado em tela ou reducer.
+ * `'mercado'` e `'salario'` estavam nos dois, e desde que categoria virou dado
+ * do usuário eles são chute: quem apaga "Mercado" passa a abrir a folha de
+ * lançamento pré-selecionada em "Sem categoria".
+ *
+ * Devolve `''` quando não há nenhuma do tipo. Não lança, pela mesma razão de
+ * `categoria()`: o vazio é caminho normal — o estado nasce sem nada até o
+ * catálogo ser semeado, e a interface não pode cair por causa disso.
+ */
+export function categoriaPadrao(categorias: Categoria[], tipo: 'despesa' | 'receita'): string {
+  return categoriasPorTipo(categorias, tipo)[0]?.id ?? '';
+}
+
 export function categoriasPorTipo(
   categorias: Categoria[],
   tipo: 'despesa' | 'receita',

@@ -203,9 +203,9 @@ describe('recategorizar', () => {
       transacaoId: alvo.id,
       categoriaId: 'lazer',
     });
-    expect(categoria(salvo.categorias, salvo.transacoes.find((t) => t.id === alvo.id)!.categoriaId).nome).toBe(
-      'Lazer',
-    );
+    expect(
+      categoria(salvo.categorias, salvo.transacoes.find((t) => t.id === alvo.id)!.categoriaId).nome,
+    ).toBe('Lazer');
   });
 
   it('lançamento inexistente não mexe em nada', () => {
@@ -216,5 +216,59 @@ describe('recategorizar', () => {
         categoriaId: 'lazer',
       }),
     ).toBe(estadoInicial);
+  });
+});
+
+describe('nenhum id de fábrica cravado no reducer', () => {
+  /**
+   * O rascunho nascia em `'mercado'` e `'salario'` — ids do catálogo de
+   * fábrica. Existem na instalação nova, então o defeito só aparecia depois de
+   * a pessoa apagar a categoria: a folha de lançamento abria pré-selecionada
+   * em "Sem categoria".
+   *
+   * O teste de tela não pega isto, porque monta `NovaTransacao` direto, sem
+   * passar por `ABRIR_NOVA`. É aqui que o caminho existe.
+   */
+  const vocabularioProprio = (estado: Estado): Estado => ({
+    ...estado,
+    categorias: estado.categorias.map((c) => ({ ...c, id: `u-${c.id}` })),
+  });
+
+  const existe = (estado: Estado, id: string) => estado.categorias.some((c) => c.id === id);
+
+  it('abrir lançamento escolhe uma categoria que existe', () => {
+    const proprio = vocabularioProprio(estadoInicial);
+    const depois = aplicar(proprio, { tipo: 'ABRIR_NOVA' });
+
+    expect(depois.rascunho.categoriaId).not.toBe('mercado');
+    expect(existe(depois, depois.rascunho.categoriaId)).toBe(true);
+  });
+
+  it('trocar para receita escolhe uma receita que existe', () => {
+    const proprio = vocabularioProprio(estadoInicial);
+    const depois = aplicar(
+      proprio,
+      { tipo: 'ABRIR_NOVA' },
+      { tipo: 'RASCUNHO_TIPO', valor: 'receita' },
+    );
+
+    expect(depois.rascunho.categoriaId).not.toBe('salario');
+    expect(categoria(depois.categorias, depois.rascunho.categoriaId).tipo).toBe('receita');
+  });
+
+  it('apagar a categoria do rascunho não deixa o lançamento sem seletor', () => {
+    // O caminho real: a pessoa apaga "Mercado" e depois abre um lançamento.
+    const semMercado = aplicar(estadoInicial, { tipo: 'APAGAR_CATEGORIA', categoriaId: 'mercado' });
+    const depois = aplicar(semMercado, { tipo: 'ABRIR_NOVA' });
+
+    expect(existe(depois, depois.rascunho.categoriaId)).toBe(true);
+  });
+
+  it('sem nenhuma categoria, o padrão é vazio em vez de um id inventado', () => {
+    // Estado impossível pela interface (a última do tipo não é apagável), mas
+    // alcançável por banco antigo. Melhor rascunho sem categoria do que
+    // rascunho apontando para um id que não existe.
+    const depois = aplicar({ ...estadoInicial, categorias: [] }, { tipo: 'ABRIR_NOVA' });
+    expect(depois.rascunho.categoriaId).toBe('');
   });
 });

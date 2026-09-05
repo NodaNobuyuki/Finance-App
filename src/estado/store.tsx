@@ -4,6 +4,7 @@ import {
   Categoria,
   categoria,
   CATEGORIA_TRANSFERENCIA,
+  categoriaPadrao,
   categoriasPorTipo,
   coresDeCategoria,
   icones,
@@ -267,11 +268,17 @@ export type Estado = {
   seq: number;
 };
 
+/**
+ * Rascunho sem conteúdo. Categoria e conta ficam vazias de propósito: eram
+ * `'mercado'` e `'cartao'`, ids da semente da demo, que instalação de verdade
+ * não tem. Quem resolve o padrão é quem monta o estado ou abre a folha, contra
+ * o que a pessoa realmente possui.
+ */
 const RASCUNHO_VAZIO: Rascunho = {
   tipo: 'despesa',
   digitos: '',
-  categoriaId: 'mercado',
-  contaId: 'cartao',
+  categoriaId: '',
+  contaId: '',
   descricao: '',
 };
 
@@ -321,7 +328,11 @@ function estadoDe(hoje: DiaISO, s: Semente, onboardingConcluido: boolean): Estad
     lote: {},
 
     folha: null,
-    rascunho: RASCUNHO_VAZIO,
+    rascunho: {
+      ...RASCUNHO_VAZIO,
+      categoriaId: categoriaPadrao(s.categorias, 'despesa'),
+      contaId: s.contas[0]?.id ?? '',
+    },
     transferenciaDestinoId: '',
     cadastroConta: CADASTRO_CONTA_VAZIO,
     cadastroMeta: CADASTRO_META_VAZIO,
@@ -644,10 +655,14 @@ function corDaConta(tipo: Conta['tipo']): CorRef {
   }
 }
 
-const LINHA_LOTE_VAZIA: LinhaLote = { texto: '', categoriaId: 'mercado', semGasto: false };
-
 function linhaDoLote(e: Estado, dia: DiaISO): LinhaLote {
-  return e.lote[dia] ?? LINHA_LOTE_VAZIA;
+  return (
+    e.lote[dia] ?? {
+      texto: '',
+      categoriaId: categoriaPadrao(e.categorias, 'despesa'),
+      semGasto: false,
+    }
+  );
 }
 
 function ordenar(transacoes: Transacao[]): Transacao[] {
@@ -725,7 +740,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         rascunho: {
           ...RASCUNHO_VAZIO,
           tipo,
-          categoriaId: a.categoriaId ?? (tipo === 'despesa' ? 'mercado' : 'salario'),
+          categoriaId: a.categoriaId ?? categoriaPadrao(e.categorias, tipo),
           contaId: e.rascunho.contaId,
         },
       };
@@ -1178,7 +1193,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         rascunho: {
           ...e.rascunho,
           tipo: a.valor,
-          categoriaId: a.valor === 'despesa' ? 'mercado' : 'salario',
+          categoriaId: categoriaPadrao(e.categorias, a.valor),
         },
       };
 

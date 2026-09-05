@@ -192,3 +192,76 @@ describe('estados-limite', () => {
     expect(tela.getByText('Um foco para a próxima')).toBeTruthy();
   });
 });
+
+/**
+ * O terceiro estado: quem tem vocabulário próprio.
+ *
+ * A suíte montava tudo contra a demo e contra o app vazio, e as duas trazem os
+ * ids de fábrica — então id de semente cravado em tela passava verde. Foi
+ * assim que `'reserva'` sobreviveu no Simulador e a lista de cinco categorias
+ * sobreviveu no Lote: **na demo elas existem.**
+ *
+ * Aqui todo id de categoria, meta e conta é reescrito para um que o catálogo
+ * não conhece, com as transações remapeadas junto — é o que acontece de
+ * verdade, onde tudo nasce de UUID. Qualquer tela que dependa de um id fixo
+ * passa a mostrar buraco.
+ */
+const NOVO_ID = (id: string) => `u-${id}`;
+
+function comVocabularioProprio(base: Estado): Estado {
+  return {
+    ...base,
+    categorias: base.categorias.map((c) => ({ ...c, id: NOVO_ID(c.id) })),
+    contas: base.contas.map((c) => ({ ...c, id: NOVO_ID(c.id) })),
+    metas: base.metas.map((m) => ({ ...m, id: NOVO_ID(m.id), contaId: NOVO_ID(m.contaId) })),
+    transacoes: base.transacoes.map((t) => ({
+      ...t,
+      categoriaId: NOVO_ID(t.categoriaId),
+      contaId: NOVO_ID(t.contaId),
+      metaId: t.metaId === undefined ? undefined : NOVO_ID(t.metaId),
+    })),
+    rascunho: {
+      ...base.rascunho,
+      categoriaId: NOVO_ID(base.rascunho.categoriaId),
+      contaId: NOVO_ID(base.rascunho.contaId),
+    },
+    transferenciaDestinoId: NOVO_ID(base.transferenciaDestinoId),
+  };
+}
+
+describe('vocabulário próprio do usuário', () => {
+  const proprio = comVocabularioProprio(estadoInicial);
+
+  // `MovimentoMeta` recebe o id por prop, então acompanha o remapeamento.
+  const TELAS_PROPRIAS = TELAS.map((tela) =>
+    tela.nome === 'guardar na meta'
+      ? { ...tela, no: <MovimentoMeta metaId={NOVO_ID('reserva')} retirar={false} /> }
+      : tela.nome === 'retirar da meta'
+        ? { ...tela, no: <MovimentoMeta metaId={NOVO_ID('reserva')} retirar /> }
+        : tela,
+  );
+
+  it.each(TELAS_PROPRIAS)(
+    '$nome monta com ids que não são os de fábrica',
+    async ({ no, texto }) => {
+      const tela = await montar(no, proprio);
+      expect(tela.getByText(texto)).toBeTruthy();
+    },
+  );
+
+  it.each(TELAS_PROPRIAS)('$nome não mostra buraco de categoria', async ({ no }) => {
+    // "Sem categoria" é o placeholder de `categoriaOrfa`. Com todas as
+    // categorias válidas e todas as transações apontando para elas, ele não
+    // pode aparecer em tela nenhuma: se aparecer, alguém cravou um id.
+    const tela = await montar(no, proprio);
+    expect(tela.queryByText('Sem categoria')).toBeNull();
+  });
+
+  it('o Lote oferece as categorias da pessoa, não as de fábrica', async () => {
+    // O caso concreto: a tela trazia
+    // `['mercado', 'restaurante', 'transporte', 'casa', 'lazer']` cravado.
+    const tela = await montar(<Lote />, proprio);
+    const nomes = proprio.categorias.filter((c) => c.tipo === 'despesa').map((c) => c.nome);
+    expect(nomes.some((nome) => tela.queryAllByText(nome).length > 0)).toBe(true);
+  });
+});

@@ -1,4 +1,4 @@
-import { categoria } from '../dominio/categorias';
+import { Categoria, categoria, categoriasPorTipo } from '../dominio/categorias';
 import {
   DiaISO,
   diasRitual,
@@ -146,6 +146,11 @@ export function transacoesDoMes(e: Estado): Transacao[] {
   return e.transacoes.filter((t) => mesDe(t.ocorridoEm) === mes);
 }
 
+export function transacoesDoMesAnterior(e: Estado): Transacao[] {
+  const mes = mesDe(somarMeses(primeiroDoMes(e.hoje), -1));
+  return e.transacoes.filter((t) => mesDe(t.ocorridoEm) === mes);
+}
+
 export type ResumoMes = {
   receitas: Centavos;
   despesas: Centavos;
@@ -248,6 +253,37 @@ export function atalhosRapidos(e: Estado): AtalhoRapido[] {
   }));
 }
 
+/* ── Colocar em dia ──────────────────────────────────────────── */
+
+/** Cabem cinco pílulas na linha do dia. */
+const CATEGORIAS_NO_LOTE = 5;
+
+/**
+ * As categorias oferecidas por dia em "Colocar em dia".
+ *
+ * Era uma lista de cinco ids de fábrica cravada na tela
+ * (`['mercado', 'restaurante', 'transporte', 'casa', 'lazer']`). Desde que
+ * categoria virou dado do usuário, isso oferecia o vocabulário errado: quem
+ * apagou "Lazer" via uma pílula "Sem categoria" — clicável, gravando um id
+ * morto — e quem criou as próprias categorias nunca as via ali.
+ *
+ * Sai do histórico, como `atalhosRapidos`: as mais lançadas primeiro. O
+ * `sort` do JS é estável, então categoria sem histórico nenhum mantém a ordem
+ * da lista da pessoa — que é o desempate certo numa instalação nova, onde
+ * ninguém lançou nada ainda.
+ */
+export function categoriasDoLote(e: Estado): Categoria[] {
+  const contagem: Record<string, number> = {};
+  for (const t of e.transacoes) {
+    if (t.valorCentavos >= 0 || ehTransferencia(t)) continue;
+    contagem[t.categoriaId] = (contagem[t.categoriaId] ?? 0) + 1;
+  }
+
+  return [...categoriasPorTipo(e.categorias, 'despesa')]
+    .sort((a, b) => (contagem[b.id] ?? 0) - (contagem[a.id] ?? 0))
+    .slice(0, CATEGORIAS_NO_LOTE);
+}
+
 /* ── Insights ────────────────────────────────────────────────── */
 
 export type Insight = { tag: string; texto: string };
@@ -258,15 +294,27 @@ export function insights(e: Estado): Insight[] {
   const porCategoria = somaPorCategoria(doMes);
   const lista: Insight[] = [];
 
-  const assinaturas = porCategoria['assinaturas'] ?? 0;
-  if (assinaturas > 0) {
+  const topo = Object.keys(porCategoria).sort((a, b) => porCategoria[b] - porCategoria[a])[0];
+
+  // Custo recorrente, anualizado: a maior categoria que também gastou no mês
+  // anterior. Era `porCategoria['assinaturas']` — id de fábrica cravado, que
+  // sumia para quem apagasse a categoria e nunca via a "Streaming" que a
+  // pessoa criou. O que dá a pancada aqui é multiplicar por 12, e isso vale
+  // para qualquer gasto que se repete.
+  const anterior = somaPorCategoria(transacoesDoMesAnterior(e));
+  const recorrente = Object.keys(porCategoria)
+    .filter((id) => (anterior[id] ?? 0) > 0)
+    // Sem isto o insight repetiria a categoria que "Concentração" já nomeia.
+    .filter((id) => id !== topo)
+    .sort((a, b) => porCategoria[b] - porCategoria[a])[0];
+
+  if (recorrente) {
+    const mensal = porCategoria[recorrente];
     lista.push({
-      tag: 'Assinaturas',
-      texto: `Assinaturas somam ${formatar(assinaturas)} por mês — ${formatar(assinaturas * 12)} no ano.`,
+      tag: 'Recorrente',
+      texto: `${categoria(e.categorias, recorrente).nome} soma ${formatar(mensal)} por mês — ${formatar(mensal * 12)} no ano.`,
     });
   }
-
-  const topo = Object.keys(porCategoria).sort((a, b) => porCategoria[b] - porCategoria[a])[0];
   if (topo && despesas > 0) {
     lista.push({
       tag: 'Concentração',

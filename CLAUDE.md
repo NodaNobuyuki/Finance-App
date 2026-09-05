@@ -362,6 +362,26 @@ Como `guardadoDaMeta` soma **com sinal**, os três casos caem na mesma conta sem
 
 A folha `MovimentoMeta` faz os dois sentidos (`retirar: boolean`) porque é uma transferência só de cabeça para baixo; `PilulasDeConta` é a escolha de conta que as três folhas compartilham, junto com a linha que avisa o que vai acontecer com o saldo. Ele hoje delega ao genérico `Pilulas<T extends { id, nome }>` no mesmo arquivo — o Simulador escolhe **meta** com o mesmo componente, e um componente chamado "de conta" escolhendo meta seria mentira no nome.
 
+### Id de semente cravado em código é uma classe de bug, não um caso
+
+O Simulador foi o primeiro achado; a auditoria encontrou outros três. **Sempre que um id de `seed.ts` ou de `categoriasDeFabrica` aparece literal fora deles, é este bug.** Ele passa despercebido porque na demo o id existe — e é só na instalação de verdade, ou depois de a pessoa apagar algo, que o buraco aparece.
+
+O que estava cravado, e o que cada um causava:
+
+| onde | id | efeito |
+|---|---|---|
+| `Simulador.tsx` | `'reserva'` | botão principal não fazia nada |
+| `Lote.tsx` | 5 categorias de despesa | pílula "Sem categoria" clicável; vocabulário da pessoa nunca aparecia |
+| `store.tsx` (`ABRIR_NOVA`, `RASCUNHO_TIPO`, `RASCUNHO_VAZIO`) | `'mercado'`, `'salario'`, `'cartao'` | folha de lançamento pré-selecionada em "Sem categoria" depois de apagar a categoria |
+| `derivados.ts` (`insights`) | `'assinaturas'` | insight sumia para quem apagasse a categoria, e nunca via a que a pessoa criou |
+
+A forma da correção é sempre a mesma: **resolver contra o que a pessoa tem, não contra um literal.** `categoriaPadrao(categorias, tipo)` devolve a primeira do tipo (e `''` quando não há nenhuma — não lança, pelo motivo de `categoria()`); `categoriasDoLote(e)` deriva as cinco pílulas do histórico, com o `sort` estável do JS deixando o desempate na ordem da lista da pessoa; o insight anualiza a maior categoria que também gastou no mês anterior, suprimida quando repetiria a que "Concentração" já nomeia.
+
+**Os dois guardas que impedem a volta**, e os dois foram verificados falhando com o bug reintroduzido — guarda que não falha no código antigo é fachada:
+
+- **`telas.test.tsx` ganhou um terceiro estado: `comVocabularioProprio`.** A suíte montava tudo contra a demo e contra o app vazio, e **as duas trazem os ids de fábrica** — foi isso que deixou o defeito viver. Agora todo id de categoria, meta e conta é reescrito para um que o catálogo não conhece, com as transações remapeadas junto, e além de montar, nenhuma tela pode mostrar `"Sem categoria"`: com tudo apontando para categoria válida, esse texto só aparece se alguém cravou um id.
+- **`categorias.test.ts` cobre o reducer**, que o teste de tela não alcança: `NovaTransacao` é montada direto, sem passar por `ABRIR_NOVA`, então o padrão do rascunho só tem caminho por ali.
+
 ### O destino do Simulador é escolha, não constante
 
 O botão "Guardar em vez de gastar" fecha o loop de custo de oportunidade — é a razão de o produto existir — e ele **não funcionava para ninguém que tinha instalado o app**. A tela despachava `SIM_GUARDAR` com `metaId: 'reserva'`, id vindo da semente da demo; meta criada no onboarding ou em `CadastroMeta` nasce com UUID v7. O reducer não achava a meta, fazia `return e`, e o toque não produzia nada — sem toast, sem recado, sem pista.
