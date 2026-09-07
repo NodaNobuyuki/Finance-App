@@ -150,6 +150,22 @@ describe('app vazio', () => {
     expect(tela.getByText('Nenhuma meta ainda')).toBeTruthy();
   });
 
+  it('a Home não anuncia orçamento que ninguém definiu', async () => {
+    // `0% usado · R$ 0,00 de R$ 0,00`, sempre verde, era o que toda instalação
+    // nova via: o teto era um campo da semente que nenhuma ação escrevia. Agora
+    // ele é a soma dos tetos das categorias, e sem nenhum a Home convida a
+    // definir o primeiro em vez de mostrar uma barra vazia.
+    const tela = await montar(<Inicio />, estadoVazio);
+    expect(tela.getByText('Definir orçamento')).toBeTruthy();
+    expect(tela.queryByText('0% usado')).toBeNull();
+    expect(tela.queryByText('Orçamento do mês')).toBeNull();
+  });
+
+  it('Categorias oferece o caminho do primeiro teto', async () => {
+    const tela = await montar(<Categorias />, estadoVazio);
+    expect(tela.getByText(/ainda não definiu teto nenhum/)).toBeTruthy();
+  });
+
   it('a Home não anuncia constância que não existe', async () => {
     const tela = await montar(<Inicio />, estadoVazio);
     expect(tela.queryByText(/semanas seguidas em dia/)).toBeNull();

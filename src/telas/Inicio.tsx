@@ -1,6 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
-import { Barra, Disco, Hero, Rotulo, Toque, Txt } from '../componentes/basicos';
+import { Barra, corDoNivel, Disco, Hero, Rotulo, Toque, Txt } from '../componentes/basicos';
 import { Icone } from '../componentes/Icone';
 import { ItemTransacao } from '../componentes/ItemTransacao';
 import { Vazio } from '../componentes/Vazio';
@@ -35,7 +35,7 @@ export function Inicio() {
   const listaInsights = insights(estado);
   const insight = listaInsights[estado.insightIdx % listaInsights.length];
   const recentes = transacoesDoMes(estado).slice(0, 5);
-  const corOrcamento = orc.nivel === 'ok' ? t.up : orc.nivel === 'atencao' ? t.atencao : t.down;
+  const corOrcamento = corDoNivel(orc.nivel, t);
 
   /** Um quadradinho da trilha da semana. */
   const celulaDoDia = (d: DiaDaSemana) => {
@@ -469,38 +469,61 @@ export function Inicio() {
             </View>
           </View>
 
-          {/* Orçamento: a cor progride verde → amarelo → vermelho */}
+          {/* Orçamento: a cor progride verde → amarelo → vermelho.
+              Sem teto definido, o bloco não finge um número: vira o convite a
+              definir o primeiro. Enquanto o teto era um campo que nenhuma ação
+              escrevia, esta área anunciava "0% usado · R$ 0,00 de R$ 0,00",
+              sempre verde, para toda instalação nova. */}
           <View style={{ gap: 8, paddingTop: 2 }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'baseline',
-                justifyContent: 'space-between',
-              }}
-            >
-              <Txt tamanho={12.5} cor={t.inkMuted}>
-                Orçamento do mês
-              </Txt>
-              <Txt tamanho={12.5} peso={600} numerico cor={corOrcamento}>
-                {orc.pctReal}% usado
-              </Txt>
-            </View>
-            <Barra pct={orc.pct} cor={corOrcamento} altura={10} />
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'baseline',
-                justifyContent: 'space-between',
-                gap: 10,
-              }}
-            >
-              <Txt tamanho={12.5} numerico cor={t.inkMuted}>
-                {formatar(orc.gasto)} de {formatar(orc.total)}
-              </Txt>
-              <Txt tamanho={11.5} cor={t.inkSoft}>
-                {orc.restanteLabel}
-              </Txt>
-            </View>
+            {orc.semLimites ? (
+              <Toque
+                aoTocar={() => despachar({ tipo: 'IR_PARA', tela: 'categorias' })}
+                rotuloAcessivel="Definir teto por categoria"
+              >
+                <View style={{ gap: 4 }}>
+                  <Txt tamanho={12.5} peso={600}>
+                    Definir orçamento
+                  </Txt>
+                  <Txt tamanho={11.5} cor={t.inkSoft} entrelinha={1.45}>
+                    Dê um teto às categorias que você quer segurar. O orçamento do mês é a soma
+                    deles.
+                  </Txt>
+                </View>
+              </Toque>
+            ) : (
+              <>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'baseline',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <Txt tamanho={12.5} cor={t.inkMuted}>
+                    Orçamento do mês
+                  </Txt>
+                  <Txt tamanho={12.5} peso={600} numerico cor={corOrcamento}>
+                    {orc.pctReal}% usado
+                  </Txt>
+                </View>
+                <Barra pct={orc.pct} cor={corOrcamento} altura={10} />
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'baseline',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                  }}
+                >
+                  <Txt tamanho={12.5} numerico cor={t.inkMuted}>
+                    {formatar(orc.gasto)} de {formatar(orc.total)}
+                  </Txt>
+                  <Txt tamanho={11.5} cor={t.inkSoft}>
+                    {orc.restanteLabel}
+                  </Txt>
+                </View>
+              </>
+            )}
           </View>
         </View>
 

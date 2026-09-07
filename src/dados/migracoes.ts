@@ -292,6 +292,42 @@ export const migracoes: Migracao[] = [
       // continua apontando para a categoria certa.
     ],
   },
+  {
+    versao: 7,
+    nome: 'orcamento-por-categoria',
+    sql: [
+      // O teto do mês era um número só (`orcamentoMensalCentavos`) e NENHUMA
+      // ação o escrevia: vinha da semente da demo, então quem instalava o app
+      // via `0% usado · R$ 0,00 de R$ 0,00`, sempre verde, para sempre. Agora
+      // o limite mora na categoria e o teto do mês é a soma deles — derivado,
+      // como o saldo da conta e o guardado da meta.
+      //
+      // `DEFAULT 0` é "sem limite", e é o valor certo para quem já tinha o app:
+      // converter o teto único em limites por categoria exigiria repartir um
+      // número entre categorias que a pessoa nunca orçou.
+      `ALTER TABLE categorias ADD COLUMN limite_centavos INTEGER NOT NULL DEFAULT 0`,
+
+      // A preferência antiga não tem mais leitor. Deixá-la no banco faria
+      // `carregar()` devolvê-la de volta para dentro do estado, e um campo
+      // fantasma que nada escreve é exatamente o que esta migration remove.
+      `DELETE FROM preferencias WHERE chave = 'orcamentoMensalCentavos'`,
+    ],
+  },
+  {
+    versao: 8,
+    nome: 'contexto-vira-derivado',
+    sql: [
+      // `contexto` guardava dois números da semente da demo que nada atualizava:
+      // 18 lançamentos "no mês anterior" e R$ 180 de economia de base. Quem
+      // instalava o app lia os dois no primeiro dia.
+      //
+      // Agora os dois são contas sobre o que existe — `lancamentosDoMesAnterior`
+      // conta as transações do mês passado e `economizado` soma só os desafios
+      // aceitos. Mesma regra do saldo derivado, e nada se perde ao apagar: o
+      // número gravado nunca foi dado de ninguém.
+      `DELETE FROM preferencias WHERE chave = 'contexto'`,
+    ],
+  },
 ];
 
 async function versaoAtual(motor: MotorSQL): Promise<number> {

@@ -67,6 +67,7 @@ type LinhaCategoria = {
   tipo: string;
   cor: string;
   icone: string;
+  limite_centavos: number;
 };
 
 type LinhaProgressoDesafio = {
@@ -190,14 +191,23 @@ const TABELA_METAS: Tabela<Meta, LinhaMeta> = {
 
 const TABELA_CATEGORIAS: Tabela<Categoria, LinhaCategoria> = {
   nome: 'categorias',
-  colunas: ['id', 'nome', 'tipo', 'cor', 'icone', 'atualizado_em'],
-  paraLinha: (c, agoraMs) => [c.id, c.nome, c.tipo, corParaTexto(c.cor), c.icone, agoraMs],
+  colunas: ['id', 'nome', 'tipo', 'cor', 'icone', 'limite_centavos', 'atualizado_em'],
+  paraLinha: (c, agoraMs) => [
+    c.id,
+    c.nome,
+    c.tipo,
+    corParaTexto(c.cor),
+    c.icone,
+    c.limiteCentavos,
+    agoraMs,
+  ],
   daLinha: (l) => ({
     id: l.id,
     nome: l.nome,
     tipo: l.tipo as Categoria['tipo'],
     cor: corDeTexto(l.cor),
     icone: l.icone,
+    limiteCentavos: l.limite_centavos,
   }),
 };
 
@@ -217,8 +227,6 @@ const TABELA_PROGRESSO_DESAFIOS: Tabela<ProgressoDesafio, LinhaProgressoDesafio>
 type Preferencias = Pick<
   EstadoPersistido,
   | 'perfil'
-  | 'orcamentoMensalCentavos'
-  | 'contexto'
   | 'onboardingConcluido'
   | 'metaSemanal'
   | 'ritualDiaFechamento'
@@ -232,8 +240,6 @@ type Preferencias = Pick<
 function preferenciasDe(e: EstadoPersistido): Preferencias {
   return {
     perfil: e.perfil,
-    orcamentoMensalCentavos: e.orcamentoMensalCentavos,
-    contexto: e.contexto,
     onboardingConcluido: e.onboardingConcluido,
     metaSemanal: e.metaSemanal,
     ritualDiaFechamento: e.ritualDiaFechamento,

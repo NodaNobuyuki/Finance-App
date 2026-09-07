@@ -1,7 +1,7 @@
 import { hex, token } from '../tema/paletas';
 import { Categoria, categoriasIniciais } from './categorias';
 import { DiaISO, inicioDaSemana, somarDias } from './datas';
-import { Conta, Contexto, Meta, Perfil, ProgressoDesafio, Transacao } from './tipos';
+import { Conta, Meta, Perfil, ProgressoDesafio, Transacao } from './tipos';
 
 /**
  * Dados de demonstração. Todos os valores já em centavos inteiros.
@@ -181,14 +181,23 @@ function diasSemGastoDemo(hoje: DiaISO): DiaISO[] {
   });
 }
 
-/** Teto de gasto do mês. Vira `budgets.limit_cents` quando houver backend. */
-const orcamentoMensalCentavos = 500000;
-
-/** Números de contexto que ainda não saem das transações carregadas. */
-const contexto: Contexto = {
-  lancamentosMesAnterior: 18,
-  economiaBaseCentavos: 18000,
-};
+/**
+ * As categorias da demo, com teto nas quatro que a Marina mais usa.
+ *
+ * O orçamento do mês é a soma destes limites — não existe mais um teto único
+ * guardado. Os R$ 5.000 que `orcamentoMensalCentavos` cravava viraram estes
+ * quatro números, e a instalação de verdade continua nascendo SEM limite: quem
+ * escolhe quanto pode gastar em mercado é quem gasta.
+ */
+function categoriasDemo(): Categoria[] {
+  const limites: Record<string, number> = {
+    mercado: 120000,
+    restaurante: 80000,
+    transporte: 60000,
+    casa: 240000,
+  };
+  return categoriasIniciais().map((c) => ({ ...c, limiteCentavos: limites[c.id] ?? 0 }));
+}
 
 /** O que a demo carrega, ancorado no dia recebido. */
 export type Semente = {
@@ -199,8 +208,6 @@ export type Semente = {
   categorias: Categoria[];
   progressoDesafios: ProgressoDesafio[];
   diasSemGasto: DiaISO[];
-  orcamentoMensalCentavos: number;
-  contexto: Contexto;
 };
 
 export function semente(hoje: DiaISO): Semente {
@@ -209,11 +216,9 @@ export function semente(hoje: DiaISO): Semente {
     contas,
     transacoes: transacoesDemo(hoje),
     metas: metasDemo(hoje),
-    categorias: categoriasIniciais(),
+    categorias: categoriasDemo(),
     progressoDesafios,
     diasSemGasto: diasSemGastoDemo(hoje),
-    orcamentoMensalCentavos,
-    contexto,
   };
 }
 
@@ -236,7 +241,5 @@ export function vazia(): Semente {
     categorias: categoriasIniciais(),
     progressoDesafios: [],
     diasSemGasto: [],
-    orcamentoMensalCentavos: 0,
-    contexto: { lancamentosMesAnterior: 0, economiaBaseCentavos: 0 },
   };
 }

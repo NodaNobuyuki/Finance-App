@@ -101,20 +101,6 @@ export type Perfil = {
   nome: string;
 };
 
-/**
- * Números que a tela ainda mostra mas que nenhum cálculo produz — vieram do
- * protótipo. Ficam agrupados aqui para que dê para achá-los quando cada um
- * virar derivação de verdade.
- *
- * `semanasEmDia` saiu daqui: virou `semanasEmDia()` em `estado/derivados.ts`.
- * Como campo, ele nascia da semente e nada o incrementava — a constância de
- * quem usava o app de verdade ficava parada em zero para sempre.
- */
-export type Contexto = {
-  lancamentosMesAnterior: number;
-  economiaBaseCentavos: Centavos;
-};
-
 export type Taxa = {
   id: string;
   nome: string;

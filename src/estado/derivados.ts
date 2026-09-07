@@ -1,4 +1,9 @@
-import { Categoria, categoria, categoriasPorTipo } from '../dominio/categorias';
+import {
+  Categoria,
+  categoria,
+  categoriasComLimite,
+  categoriasPorTipo,
+} from '../dominio/categorias';
 import {
   DiaISO,
   diasRitual,
@@ -16,7 +21,13 @@ import {
 import { Centavos, formatar, percentual, renderPor } from '../dominio/dinheiro';
 import { DefinicaoDesafio, definicoesDesafios, progressoDe } from '../dominio/desafios';
 import { guardadoDaMeta, rotuloDePrazo, totalGuardado as somarGuardado } from '../dominio/metas';
-import { ehTransferencia, somaPorCategoria, totalEntradas, totalSaidas } from '../dominio/saldo';
+import {
+  ehTransferencia,
+  semTransferencias,
+  somaPorCategoria,
+  totalEntradas,
+  totalSaidas,
+} from '../dominio/saldo';
 import { taxa } from '../dominio/taxas';
 import { Transacao } from '../dominio/tipos';
 import { Estado } from './store';
@@ -160,6 +171,20 @@ export type ResumoMes = {
   pctSobra: number;
 };
 
+/**
+ * Quantos lançamentos a pessoa registrou no mês anterior.
+ *
+ * Era `contexto.lancamentosMesAnterior`, um `18` que vinha da semente da demo e
+ * que nada atualizava: quem instalava o app lia "18 no mês anterior" no primeiro
+ * dia. Contar é a mesma conta que a tela já faz para o mês corrente.
+ *
+ * Transferência fica de fora pelo mesmo motivo de sempre: o número é de
+ * registro de gasto e ganho, e um aporte lançaria duas linhas de uma vez.
+ */
+export function lancamentosDoMesAnterior(e: Estado): number {
+  return semTransferencias(transacoesDoMesAnterior(e)).length;
+}
+
 export function resumoDoMes(e: Estado): ResumoMes {
   const doMes = transacoesDoMes(e);
   const receitas = totalEntradas(doMes);
@@ -186,11 +211,25 @@ export type Orcamento = {
   pctReal: number;
   nivel: NivelOrcamento;
   restanteLabel: string;
+  /**
+   * Ninguém definiu limite nenhum ainda.
+   *
+   * A tela precisa saber disso para não anunciar `0% usado · R$ 0,00 de
+   * R$ 0,00` — que é o que a Home fazia para toda instalação nova enquanto o
+   * teto era um campo que nenhuma ação escrevia.
+   */
+  semLimites: boolean;
 };
 
-export function orcamento(e: Estado): Orcamento {
-  const total = e.orcamentoMensalCentavos;
-  const gasto = resumoDoMes(e).despesas;
+/**
+ * Orçamento de UMA categoria no mês corrente.
+ *
+ * O nível é o mesmo do total, e é de propósito: a cor da barra quer dizer a
+ * mesma coisa nas duas telas.
+ */
+export type OrcamentoDeCategoria = Orcamento & { categoria: Categoria };
+
+function montar(gasto: Centavos, total: Centavos): Orcamento {
   const pctReal = percentual(gasto, total);
   return {
     gasto,
@@ -200,7 +239,46 @@ export function orcamento(e: Estado): Orcamento {
     nivel: pctReal < 70 ? 'ok' : pctReal < 90 ? 'atencao' : 'estouro',
     restanteLabel:
       gasto <= total ? `restam ${formatar(total - gasto)}` : `${formatar(gasto - total)} acima`,
+    semLimites: total === 0,
   };
+}
+
+/**
+ * Uma linha por categoria de despesa com teto, na ordem da lista da pessoa.
+ *
+ * Categoria sem limite fica de fora: ela não tem orçamento, e mostrá-la com
+ * barra vazia diria que a pessoa estourou 0% de nada.
+ */
+export function orcamentosPorCategoria(e: Estado): OrcamentoDeCategoria[] {
+  const gastos = somaPorCategoria(transacoesDoMes(e));
+  return categoriasComLimite(e.categorias).map((c) => ({
+    ...montar(gastos[c.id] ?? 0, c.limiteCentavos),
+    categoria: c,
+  }));
+}
+
+/**
+ * O teto do mês é a SOMA dos limites, nunca um número guardado.
+ *
+ * Mesma regra do saldo e do guardado da meta: o total é derivado do que existe
+ * embaixo dele. Enquanto era `Estado.orcamentoMensalCentavos`, nenhuma ação o
+ * escrevia — vinha da semente da demo e ficava em zero para todo mundo que
+ * instalava o app de verdade.
+ *
+ * O gasto conta só o que cai em categoria COM teto: comparar a despesa inteira
+ * do mês contra a soma de alguns limites acusaria estouro de um orçamento que a
+ * pessoa nunca definiu.
+ */
+export function orcamento(e: Estado): Orcamento {
+  const gastos = somaPorCategoria(transacoesDoMes(e));
+  const comLimite = categoriasComLimite(e.categorias);
+  let total = 0;
+  let gasto = 0;
+  for (const c of comLimite) {
+    total += c.limiteCentavos;
+    gasto += gastos[c.id] ?? 0;
+  }
+  return montar(gasto, total);
 }
 
 /* ── Atalhos de registro em um toque ─────────────────────────── */
@@ -611,10 +689,17 @@ export function desafios(e: Estado): { ativos: DesafioView[]; disponiveis: Defin
   return { ativos, disponiveis };
 }
 
+/**
+ * Quanto os desafios aceitos economizam.
+ *
+ * Soma só o que existe. Começava em `contexto.economiaBaseCentavos` — R$ 180
+ * inventados na semente da demo, que apareciam para quem nunca aceitou desafio
+ * nenhum.
+ */
 export function economizado(e: Estado): Centavos {
   return definicoesDesafios
     .filter((d) => progressoDe(d, e.progressoDesafios).aceito)
-    .reduce((a, d) => a + d.economiaCentavos, e.contexto.economiaBaseCentavos);
+    .reduce((a, d) => a + d.economiaCentavos, 0);
 }
 
 /* ── Metas ───────────────────────────────────────────────────── */

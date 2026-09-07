@@ -1,6 +1,15 @@
 import { definicoesDesafios, progressoDe } from '../../dominio/desafios';
 import { saldoDaConta } from '../../dominio/saldo';
-import { desafios, historicoDeSemanas, metas, semana, semanasEmDia } from '../derivados';
+import {
+  desafios,
+  economizado,
+  historicoDeSemanas,
+  lancamentosDoMesAnterior,
+  metas,
+  orcamento,
+  semana,
+  semanasEmDia,
+} from '../derivados';
 import {
   Acao,
   criarEstadoDemo,
@@ -37,9 +46,15 @@ describe('estado vazio', () => {
     // anteriores à instalação: elas não são constância que a pessoa falhou.
     expect(semanasEmDia(estadoVazio)).toBe(0);
     expect(historicoDeSemanas(estadoVazio)).toHaveLength(1);
-    expect(estadoVazio.contexto.lancamentosMesAnterior).toBe(0);
-    expect(estadoVazio.contexto.economiaBaseCentavos).toBe(0);
-    expect(estadoVazio.orcamentoMensalCentavos).toBe(0);
+    // Eram campos de `contexto`, com 18 lançamentos e R$ 180 economizados que
+    // vinham da semente da demo. Agora são contas sobre o que existe.
+    expect(lancamentosDoMesAnterior(estadoVazio)).toBe(0);
+    expect(economizado(estadoVazio)).toBe(0);
+    // Nenhuma categoria nasce com teto: quem decide quanto pode gastar em
+    // mercado é quem gasta. O orçamento do mês é a soma desses tetos, então
+    // ele começa em zero — e a Home mostra o convite, não `0% usado`.
+    expect(orcamento(estadoVazio).semLimites).toBe(true);
+    expect(orcamento(estadoVazio).total).toBe(0);
   });
 
   it('começa com o onboarding pendente; a demo não', () => {

@@ -1,8 +1,12 @@
 import React from 'react';
 import { ScrollView, View } from 'react-native';
-import { BotaoPrincipal, Rotulo, Toque, Txt } from '../../componentes/basicos';
+import { Barra, BotaoPrincipal, Rotulo, Toque, Txt } from '../../componentes/basicos';
 import { Icone } from '../../componentes/Icone';
+import { Teclado } from '../../componentes/Teclado';
 import { coresDeCategoria, iconesDeCategoria } from '../../dominio/categorias';
+import { deDigitos, empilharDigitos, formatar, removerDigito } from '../../dominio/dinheiro';
+import { somaPorCategoria } from '../../dominio/saldo';
+import { transacoesDoMes } from '../../estado/derivados';
 import { useLoja } from '../../estado/store';
 import { comAlfa, CorRef, resolverCor } from '../../tema/paletas';
 import { useTema } from '../../tema/TemaContext';
@@ -32,6 +36,11 @@ export function CadastroCategoria() {
   const usos = editando
     ? estado.transacoes.filter((tx) => tx.categoriaId === c.id).length
     : 0;
+
+  // O teto só existe para despesa: receita não é gasto para limitar.
+  const temLimite = c.tipo === 'despesa';
+  const limite = deDigitos(c.limiteDigitos);
+  const gastoNoMes = editando ? (somaPorCategoria(transacoesDoMes(estado))[c.id!] ?? 0) : 0;
 
   return (
     <Folha
@@ -75,6 +84,49 @@ export function CadastroCategoria() {
           selecionada={c.tipo}
           aoEscolher={(tipo_) => despachar({ tipo: 'CADASTRO_CATEGORIA_TIPO', tipo_ })}
         />
+
+        {temLimite ? (
+          <View style={{ gap: 9 }}>
+            <Rotulo>Teto do mês</Rotulo>
+            <View style={{ alignItems: 'center', gap: 6 }}>
+              <Txt tamanho={30} peso={600} numerico espacamento={-0.9} entrelinha={1.1}>
+                {limite > 0 ? formatar(limite) : 'sem limite'}
+              </Txt>
+              <Txt tamanho={11.5} cor={t.inkFaint} alinhamento="center" entrelinha={1.45}>
+                {limite > 0
+                  ? 'O orçamento do mês é a soma dos tetos das suas categorias.'
+                  : 'Deixe zerado para acompanhar esta categoria sem teto.'}
+              </Txt>
+
+              {/* Comparar o teto com o que já foi gasto é o que evita escolher
+                  um número no escuro — sem isso a pessoa arbitra e desiste. */}
+              {editando && limite > 0 ? (
+                <View style={{ alignSelf: 'stretch', gap: 6, paddingTop: 4 }}>
+                  <Barra pct={Math.min(100, (gastoNoMes / limite) * 100)} cor={cor} />
+                  <Txt tamanho={11.5} numerico cor={t.inkSoft} alinhamento="center">
+                    {formatar(gastoNoMes)} gastos neste mês
+                  </Txt>
+                </View>
+              ) : null}
+            </View>
+
+            <Teclado
+              altura={46}
+              aoDigitar={(digito) =>
+                despachar({
+                  tipo: 'CADASTRO_CATEGORIA_LIMITE',
+                  digitos: empilharDigitos(c.limiteDigitos, digito),
+                })
+              }
+              aoApagar={() =>
+                despachar({
+                  tipo: 'CADASTRO_CATEGORIA_LIMITE',
+                  digitos: removerDigito(c.limiteDigitos),
+                })
+              }
+            />
+          </View>
+        ) : null}
 
         <View style={{ gap: 9 }}>
           <Rotulo>Cor</Rotulo>

@@ -19,8 +19,6 @@ export type EstadoPersistido = Pick<
   | 'categorias'
   | 'progressoDesafios'
   | 'diasSemGasto'
-  | 'orcamentoMensalCentavos'
-  | 'contexto'
   | 'onboardingConcluido'
   | 'metaSemanal'
   | 'ritualDiaFechamento'
@@ -39,8 +37,6 @@ export const CHAVES_PERSISTIDAS = [
   'categorias',
   'progressoDesafios',
   'diasSemGasto',
-  'orcamentoMensalCentavos',
-  'contexto',
   'onboardingConcluido',
   'metaSemanal',
   'ritualDiaFechamento',
@@ -60,8 +56,6 @@ export function recortePersistido(e: Estado): EstadoPersistido {
     categorias: e.categorias,
     progressoDesafios: e.progressoDesafios,
     diasSemGasto: e.diasSemGasto,
-    orcamentoMensalCentavos: e.orcamentoMensalCentavos,
-    contexto: e.contexto,
     onboardingConcluido: e.onboardingConcluido,
     metaSemanal: e.metaSemanal,
     ritualDiaFechamento: e.ritualDiaFechamento,

@@ -1,9 +1,11 @@
-import { inicioDaSemana, somarDias } from '../../dominio/datas';
+import { inicioDaSemana, primeiroDoMes, somarDias, somarMeses } from '../../dominio/datas';
 import { guardadoDaMeta } from '../../dominio/metas';
+import { Transacao } from '../../dominio/tipos';
 import { saldoDaConta, saldoTotal } from '../../dominio/saldo';
 import {
   desafios,
   historicoDeSemanas,
+  lancamentosDoMesAnterior,
   metas,
   orcamento,
   resumoDoMes,
@@ -30,6 +32,39 @@ import {
 function aplicar(estado: Estado, ...acoes: Acao[]): Estado {
   return acoes.reduce(criarReducer(dependenciasDeTeste()), estado);
 }
+
+describe('lançamentos do mês anterior', () => {
+  // Era `contexto.lancamentosMesAnterior`: um `18` que vinha da semente da demo
+  // e que nada atualizava — quem instalava o app lia "18 no mês anterior" no
+  // primeiro dia, e para a Marina o número nunca mudava de mês.
+  const noMesPassado = (id: string, valorCentavos: number): Transacao => ({
+    id,
+    contaId: estadoInicial.contas[0].id,
+    categoriaId: 'mercado',
+    valorCentavos,
+    ocorridoEm: somarMeses(primeiroDoMes(estadoInicial.hoje), -1),
+    descricao: 'Mercado',
+    origem: 'manual',
+    criadoEm: 1,
+  });
+
+  it('conta o que existe no mês passado, e nada mais', () => {
+    const e = {
+      ...estadoInicial,
+      transacoes: [noMesPassado('a', -1000), noMesPassado('b', 2000), ...estadoInicial.transacoes],
+    };
+    expect(lancamentosDoMesAnterior(e)).toBe(lancamentosDoMesAnterior(estadoInicial) + 2);
+  });
+
+  it('ignora transferência — um aporte lançaria duas linhas de uma vez', () => {
+    const par = [noMesPassado('t1', -50000), noMesPassado('t2', 50000)].map((t) => ({
+      ...t,
+      transferenciaId: 'tr1',
+    }));
+    const e = { ...estadoInicial, transacoes: [...par, ...estadoInicial.transacoes] };
+    expect(lancamentosDoMesAnterior(e)).toBe(lancamentosDoMesAnterior(estadoInicial));
+  });
+});
 
 describe('semana', () => {
   it('parte da segunda-feira e marca os dias em aberto até hoje', () => {

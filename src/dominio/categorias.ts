@@ -1,4 +1,5 @@
 import { CorRef, hex, token } from '../tema/paletas';
+import { Centavos } from './dinheiro';
 
 /**
  * `transferencia` não é despesa nem receita: é dinheiro seu mudando de lugar.
@@ -19,7 +20,30 @@ export type Categoria = {
   cor: CorRef;
   /** Path SVG 24×24, traçado — o mesmo vocabulário visual do protótipo. */
   icone: string;
+  /**
+   * Teto de gasto do mês para esta categoria. `0` = sem limite.
+   *
+   * O orçamento do mês é a SOMA destes limites — não existe teto guardado à
+   * parte. Antes existia (`orcamentoMensalCentavos`), e nenhuma ação o
+   * escrevia: quem instalava o app via `0% usado · R$ 0,00 de R$ 0,00`, sempre
+   * verde, para sempre. Mesmo defeito do destino do Simulador — nascia da
+   * semente e nada o alimentava.
+   *
+   * Só faz sentido em `despesa`. Receita não tem teto, e `transferencia` é
+   * dinheiro mudando de lugar: as duas ficam em `0` e o reducer não deixa
+   * outra coisa acontecer.
+   */
+  limiteCentavos: Centavos;
 };
+
+/**
+ * Uma categoria sem o limite — a forma do catálogo de fábrica.
+ *
+ * O limite é decisão de quem usa o app, e a semente não chuta nenhuma: entregar
+ * "Mercado com teto de R$ 800" para quem acabou de instalar é número inventado,
+ * exatamente o que `economiaBaseCentavos` ainda é.
+ */
+export type ModeloDeCategoria = Omit<Categoria, 'limiteCentavos'>;
 
 /**
  * Catálogo de FÁBRICA — semente, não fonte de consulta.
@@ -32,7 +56,7 @@ export type Categoria = {
  * Continua sendo o ponto de partida de toda instalação nova, e é por isso que
  * segue em código em vez de vir do banco vazio.
  */
-export const categoriasDeFabrica: Record<string, Categoria> = {
+export const categoriasDeFabrica: Record<string, ModeloDeCategoria> = {
   mercado: {
     id: 'mercado',
     nome: 'Mercado',
@@ -136,8 +160,9 @@ export const categoriasDeFabrica: Record<string, Categoria> = {
   },
 };
 
-/** A semente, na ordem em que aparece nas telas. */
-export const categoriasIniciais = (): Categoria[] => Object.values(categoriasDeFabrica);
+/** A semente, na ordem em que aparece nas telas — toda categoria nasce sem teto. */
+export const categoriasIniciais = (): Categoria[] =>
+  Object.values(categoriasDeFabrica).map((c) => ({ ...c, limiteCentavos: 0 }));
 
 /**
  * Só o que a pessoa pode escolher ao lançar.
@@ -161,6 +186,11 @@ export function categoriaPadrao(categorias: Categoria[], tipo: 'despesa' | 'rece
   return categoriasPorTipo(categorias, tipo)[0]?.id ?? '';
 }
 
+/** Só as que a pessoa colocou teto — a base do orçamento do mês. */
+export function categoriasComLimite(categorias: Categoria[]): Categoria[] {
+  return categorias.filter((c) => c.tipo === 'despesa' && c.limiteCentavos > 0);
+}
+
 export function categoriasPorTipo(
   categorias: Categoria[],
   tipo: 'despesa' | 'receita',
@@ -181,6 +211,9 @@ function categoriaOrfa(id: string): Categoria {
     tipo: 'despesa',
     cor: token('inkFaint'),
     icone: 'M12 21a9 9 0 100-18 9 9 0 000 18zM12 8v5M12 16.5h.01',
+    // Categoria que não existe mais não tem teto: o limite dela foi apagado
+    // junto, e o gasto órfão não pode estourar orçamento nenhum.
+    limiteCentavos: 0,
   };
 }
 

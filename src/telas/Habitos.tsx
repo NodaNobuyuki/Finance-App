@@ -7,6 +7,7 @@ import { semTransferencias } from '../dominio/saldo';
 import {
   desafios,
   historicoDeSemanas,
+  lancamentosDoMesAnterior,
   resumoDoRitual,
   semana,
   semanasEmDia,
@@ -96,7 +97,7 @@ export function Habitos() {
           <CartaoNumero
             rotulo={`Lançamentos em ${nomeDoMes(estado.hoje)}`}
             valor={String(semTransferencias(transacoesDoMes(estado)).length)}
-            nota={`${estado.contexto.lancamentosMesAnterior} no mês anterior`}
+            nota={`${lancamentosDoMesAnterior(estado)} no mês anterior`}
             corValor={t.up}
           />
         </View>

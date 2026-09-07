@@ -209,6 +209,35 @@ describe('aplicar do zero', () => {
     expect(colunas).toContain('meta_id');
   });
 
+  it('a v7 dá teto às categorias que já existiam, sem inventar número', async () => {
+    const motor = criarMotorNode();
+    await ateAVersao(motor, 6);
+    await motor.executar(
+      `INSERT INTO categorias (id, nome, tipo, cor, icone, atualizado_em)
+       VALUES ('mercado', 'Mercado', 'despesa', 'x', 'M2 12h20', 1)`,
+    );
+    // O teto único que a v7 aposenta: um número só, que nenhuma ação escrevia.
+    await motor.executar(
+      `INSERT INTO preferencias (chave, valor) VALUES ('orcamentoMensalCentavos', '500000')`,
+    );
+
+    expect(await aplicarMigracoes(motor)).toBe(VERSAO_ESPERADA);
+
+    // "Sem limite" é o único valor honesto para quem já tinha o app: repartir o
+    // teto único entre categorias que a pessoa nunca orçou seria chute.
+    const [categoria] = await motor.consultar<{ limite_centavos: number }>(
+      `SELECT limite_centavos FROM categorias WHERE id = 'mercado'`,
+    );
+    expect(categoria.limite_centavos).toBe(0);
+
+    // A preferência sai do banco: deixá-la faria `carregar()` devolvê-la para
+    // dentro do estado, que é o campo fantasma que esta migration remove.
+    const sobrou = await motor.consultar<{ chave: string }>(
+      `SELECT chave FROM preferencias WHERE chave = 'orcamentoMensalCentavos'`,
+    );
+    expect(sobrou).toEqual([]);
+  });
+
   it('é idempotente — rodar de novo não faz nada', async () => {
     const motor = criarMotorNode();
     await aplicarMigracoes(motor);

@@ -72,7 +72,7 @@ describe.each(implementacoes)('repositório: %s', (_nome, criar) => {
     for (const t of lido!.transacoes) expect(Number.isInteger(t.valorCentavos)).toBe(true);
     for (const c of lido!.contas) expect(Number.isInteger(c.saldoInicialCentavos)).toBe(true);
     for (const m of lido!.metas) expect(Number.isInteger(m.alvoCentavos)).toBe(true);
-    expect(Number.isInteger(lido!.orcamentoMensalCentavos)).toBe(true);
+    for (const c of lido!.categorias) expect(Number.isInteger(c.limiteCentavos)).toBe(true);
   });
 
   it('preserva o sinal de saída e o valor exato', async () => {
@@ -138,10 +138,10 @@ describe.each(implementacoes)('repositório: %s', (_nome, criar) => {
     expect((await repo.carregar())!.semanaFechada).toBe(fechada);
   });
 
-  it('objeto aninhado (contexto) sobrevive à ida e volta', async () => {
+  it('objeto aninhado (perfil) sobrevive à ida e volta', async () => {
     const estado = base();
     await repo.salvar(null, estado);
-    expect((await repo.carregar())!.contexto).toEqual(estado.contexto);
+    expect((await repo.carregar())!.perfil).toEqual(estado.perfil);
   });
 
   it('cor de conta e meta sobrevive — token e hex', async () => {
@@ -239,6 +239,7 @@ describe.each(implementacoes)('repositório: %s', (_nome, criar) => {
       tipo: 'despesa' as const,
       cor: { tipo: 'hex' as const, hex: '#123456' },
       icone: 'M1 2h3',
+      limiteCentavos: 45000,
     };
     await repo.salvar(null, { ...estado, categorias: [...estado.categorias, minha] });
 

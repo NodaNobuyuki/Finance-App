@@ -1,9 +1,22 @@
 import React from 'react';
 import { Pressable, StyleProp, Text, TextStyle, View, ViewStyle } from 'react-native';
-import { comAlfa } from '../tema/paletas';
+// Só o tipo: `basicos` não pode passar a depender de derivados em runtime.
+import type { NivelOrcamento } from '../estado/derivados';
+import { comAlfa, Tokens } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
 import { mono, Peso, sans } from '../tema/fontes';
 import { Icone } from './Icone';
+
+/**
+ * A cor de um nível de orçamento — verde, amarelo, vermelho.
+ *
+ * Mora aqui porque a Home e a tela Categorias mostram a mesma barra e ela tem
+ * de querer dizer a mesma coisa nas duas: com o mapeamento copiado, um ajuste
+ * de faixa em um lugar deixaria a outra tela pintando outra história.
+ */
+export function corDoNivel(nivel: NivelOrcamento, t: Tokens): string {
+  return nivel === 'ok' ? t.up : nivel === 'atencao' ? t.atencao : t.down;
+}
 
 /* ── Texto ───────────────────────────────────────────────────── */
 

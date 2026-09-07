@@ -23,7 +23,6 @@ export function criarRepositorioMemoria(): RepositorioLocal {
     categorias: [...e.categorias],
     progressoDesafios: [...e.progressoDesafios],
     diasSemGasto: [...e.diasSemGasto],
-    contexto: { ...e.contexto },
   });
 
   return {

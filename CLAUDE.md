@@ -58,15 +58,17 @@ Nomes de variáveis, comentários, mensagens de commit e strings de UI em pt-BR.
 ```
 users            (id, email, password_hash, created_at)
 accounts         (id, user_id, name, type, initial_balance_cents, currency)
-categories       (id, user_id, name, type[income|expense], icon, color, is_default)
+categories       (id, user_id, name, type[income|expense], icon, color, is_default,
+                  limit_cents)
 transactions     (id, account_id, category_id, amount_cents, occurred_at,
                   description, raw_description, external_id, source, created_at,
                   transfer_id, goal_id)
 goals            (id, user_id, name, target_cents, opening_cents, deadline, account_id)
-budgets          (id, user_id, category_id, limit_cents, period)
 recurring_rules  (id, user_id, template, frequency, next_occurrence)
 challenges       (id, user_id, type, target, progress, started_at, completed_at)
 ```
+
+Não há tabela de orçamento: o teto do mês é `SUM(categories.limit_cents)` — ver "Orçamento é a soma dos tetos".
 
 **Saldo de conta é derivado**, nunca armazenado como valor mutável:
 
@@ -209,7 +211,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = lint + tipos + 396 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = lint + tipos + 463 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
@@ -394,13 +396,27 @@ O botão "Guardar em vez de gastar" fecha o loop de custo de oportunidade — é
 
 O teste que trava isso mora em `primeiroUso.test.ts`, e é lá porque o que ele exercita é justamente o que a demo escondia: conclui o onboarding, confirma que a meta **não** tem id `'reserva'`, e guarda. Com uma conta só, o par cai na mesma conta e o saldo não se move — o teste afirma isso de propósito.
 
+### Orçamento é a soma dos tetos, e o teto mora na categoria
+
+`Categoria.limiteCentavos` — `0` é "sem limite". O orçamento do mês é `orcamento(e)` somando os tetos das categorias de despesa, e o gasto conta **só o que cai em categoria com teto**: comparar a despesa inteira do mês contra a soma de alguns limites acusaria estouro de um orçamento que a pessoa nunca definiu.
+
+Era `Estado.orcamentoMensalCentavos`, um número só, e **nenhuma ação o escrevia**: vinha da semente da demo, então toda instalação de verdade lia `0% usado · R$ 0,00 de R$ 0,00`, sempre verde, para sempre. É a mesma família do destino do Simulador e do `semanasEmDia` contado à mão — nasce da semente e nada o alimenta —, e o que a mata é parar de guardar o total. Regra do saldo derivado de novo: o número de cima sai do que existe embaixo dele.
+
+**Só despesa tem teto**, e trocar o tipo de uma categoria orçada zera o limite junto: gravado e invisível na tela, ele voltaria a valer sozinho na primeira vez que a pessoa trocasse o tipo de volta. Apagar categoria derruba o teto dela do total, como esperado — o limite é da categoria, não uma linha à parte.
+
+**A migration v7 acrescenta a coluna com `DEFAULT 0` e apaga a preferência antiga.** "Sem limite" é o único valor honesto para quem já tinha o app: repartir um teto único entre categorias que ninguém orçou seria chute. A preferência sai do banco porque `carregar()` a devolveria para dentro do estado — campo fantasma é justamente o que a mudança remove.
+
+Onde a interface mudou: a Home mostra "Definir orçamento" em vez de barra vazia quando não há teto nenhum (`semLimites`), e a tela Categorias ganhou o cartão do mês mais uma barra por categoria orçada — é isso que a tira de painel de totais. `corDoNivel()` mora em `componentes/basicos.tsx` porque as duas telas pintam a mesma barra e ela precisa querer dizer a mesma coisa nas duas.
+
+### `Contexto` acabou
+
+Os dois placeholders viraram conta sobre o que existe, e o tipo sumiu junto com a chave no banco (migration v8). `lancamentosDoMesAnterior()` conta as transações do mês passado, sem transferência — um aporte lançaria duas linhas de uma vez. `economizado()` soma só os desafios aceitos, partindo de zero em vez dos R$ 180 que a demo inventava.
+
 **Pendências abertas:**
-- Orçamento ainda é um teto único (`orcamentoMensalCentavos`) e **nenhuma ação o escreve**: é `0` no estado vazio, então o cartão da Home anuncia `0% usado · R$ 0,00 de R$ 0,00`, sempre verde, para quem instalou o app. Mesmo defeito do destino do Simulador, e é o que o limite por categoria resolve de uma vez — o teto único vira soma dos limites, e a tela Categorias deixa de ser painel de totais
-- Sobraram dois placeholders em `contexto`, e eles têm o mesmo defeito que `semanasEmDia` tinha: nascem da semente e nada os atualiza. `lancamentosMesAnterior` é derivável em cinco linhas (contar transações do mês anterior); `economiaBaseCentavos` é número inventado da demo e some quando `economizado()` passar a somar só o que existe. Aí o tipo `Contexto` inteiro desaparece
 - Sem retentativa ativa de gravação: o reenvio pega carona na próxima mudança. Um outbox resolve, se virar problema
 - Nenhuma tela lê do banco sob demanda — o estado inteiro é carregado no boot. Aguenta bem os primeiros anos; a saída é paginar por período no repositório
 
-**Próximo ciclo:** orçamento por categoria — é o que faz a tela Categorias virar tela de verdade, e agora que categoria é dado do usuário o limite tem onde morar. Depois: `SectionList` no Extrato (o agrupamento em `agruparPorDia` já encaixa, e ele hoje é O(n·dias)) e memoização dos derivados.
+**Próximo ciclo:** `SectionList` no Extrato (o agrupamento em `agruparPorDia` já encaixa, e ele hoje é O(n·dias)) e memoização dos derivados. Depois disso, o salto real é o **development build (EAS)**: ele destrava o item 2 da ordem de ingestão (OFX/CSV + share sheet), as notificações Android, e encerra o acoplamento com o SDK que o Expo Go da loja publica.
 
 **Decisão em aberto:** a v1 vale ser 100% local, sem backend. Não perde o loop comportamental, dispensa auth e infra, e encurta muito o caminho até a loja. Backend entra quando houver sync entre aparelhos ou receita — mesmo critério já aplicado ao Open Finance.
 

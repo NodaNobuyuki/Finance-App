@@ -35,7 +35,6 @@ import { contaPadraoDeMeta, guardadoDaMeta, metaEscolhida } from '../dominio/met
 import { Semente, semente, vazia } from '../dominio/seed';
 import {
   Conta,
-  Contexto,
   Meta,
   Perfil,
   ProgressoDesafio,
@@ -109,6 +108,13 @@ export type CadastroCategoria = {
   tipo: 'despesa' | 'receita';
   cor: CorRef;
   icone: string;
+  /**
+   * Teto do mês, na fila do teclado numérico. Vazio = sem limite.
+   *
+   * Fica em dígitos como o saldo de abertura da conta e o alvo da meta: quem
+   * converte para centavos é `deDigitos`, uma vez só, ao salvar.
+   */
+  limiteDigitos: string;
 };
 
 export type CadastroMeta = {
@@ -133,6 +139,7 @@ const CADASTRO_CATEGORIA_VAZIO: CadastroCategoria = {
   tipo: 'despesa',
   cor: coresDeCategoria[0],
   icone: iconesDeCategoria[0],
+  limiteDigitos: '',
 };
 
 const CADASTRO_META_VAZIO: CadastroMeta = {
@@ -196,8 +203,6 @@ export type Estado = {
    * trilha de semanas e streak são derivados, não contadores gravados.
    */
   diasSemGasto: DiaISO[];
-  orcamentoMensalCentavos: Centavos;
-  contexto: Contexto;
 
   /** Já passou pelo primeiro uso. Persistido: só acontece uma vez. */
   onboardingConcluido: boolean;
@@ -300,8 +305,6 @@ function estadoDe(hoje: DiaISO, s: Semente, onboardingConcluido: boolean): Estad
     categorias: s.categorias,
     progressoDesafios: s.progressoDesafios,
     diasSemGasto: s.diasSemGasto,
-    orcamentoMensalCentavos: s.orcamentoMensalCentavos,
-    contexto: s.contexto,
 
     onboardingConcluido,
     onboarding: ONBOARDING_VAZIO,
@@ -405,6 +408,7 @@ export type Acao =
   | { tipo: 'CADASTRO_CATEGORIA_TIPO'; tipo_: 'despesa' | 'receita' }
   | { tipo: 'CADASTRO_CATEGORIA_COR'; cor: CorRef }
   | { tipo: 'CADASTRO_CATEGORIA_ICONE'; icone: string }
+  | { tipo: 'CADASTRO_CATEGORIA_LIMITE'; digitos: string }
   | { tipo: 'SALVAR_CATEGORIA' }
   | { tipo: 'APAGAR_CATEGORIA'; categoriaId: string }
   /** Trocar a categoria de um lançamento já feito. */
@@ -931,6 +935,10 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
               nome: existente.nome,
               cor: existente.cor,
               icone: existente.icone,
+              // Fila vazia para limite zero: abrir a folha com "0" na tela
+              // faria o primeiro dígito digitado virar "0X".
+              limiteDigitos:
+                existente.limiteCentavos > 0 ? String(existente.limiteCentavos) : '',
             }
           : { ...CADASTRO_CATEGORIA_VAZIO, tipo: a.tipoCategoria ?? e.abaCategorias },
       };
@@ -948,6 +956,9 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
     case 'CADASTRO_CATEGORIA_ICONE':
       return { ...e, cadastroCategoria: { ...e.cadastroCategoria, icone: a.icone } };
 
+    case 'CADASTRO_CATEGORIA_LIMITE':
+      return { ...e, cadastroCategoria: { ...e.cadastroCategoria, limiteDigitos: a.digitos } };
+
     case 'SALVAR_CATEGORIA': {
       const c = e.cadastroCategoria;
       const nome = c.nome.trim();
@@ -956,11 +967,24 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       const seq = e.seq + 1;
       const anterior = c.id ? e.categorias.find((x) => x.id === c.id) : undefined;
 
+      // Só despesa tem teto. Receita não é gasto para limitar, e trocar o tipo
+      // de uma categoria orçada tem de zerar o limite junto — senão ele ficaria
+      // gravado, invisível na tela, e voltaria a valer na primeira vez que a
+      // pessoa trocasse o tipo de volta.
+      const limiteCentavos = c.tipo === 'despesa' ? deDigitos(c.limiteDigitos) : 0;
+
       if (anterior) {
         // O id NÃO muda na edição, mesmo trocando o nome: ele é a chave que os
         // lançamentos já gravados apontam. Renomear "Mercado" para "Compras"
         // tem de levar o histórico junto, não deixá-lo órfão.
-        const categoria: Categoria = { ...anterior, nome, tipo: c.tipo, cor: c.cor, icone: c.icone };
+        const categoria: Categoria = {
+          ...anterior,
+          nome,
+          tipo: c.tipo,
+          cor: c.cor,
+          icone: c.icone,
+          limiteCentavos,
+        };
         return {
           ...e,
           seq,
@@ -977,6 +1001,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         tipo: c.tipo,
         cor: c.cor,
         icone: c.icone,
+        limiteCentavos,
       };
       return {
         ...e,

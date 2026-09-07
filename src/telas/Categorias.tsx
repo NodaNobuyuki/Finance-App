@@ -1,10 +1,11 @@
 import React from 'react';
 import { View } from 'react-native';
-import { Disco, Hero, Toque, Txt } from '../componentes/basicos';
+import { Barra, corDoNivel, Disco, Hero, Toque, Txt } from '../componentes/basicos';
 import { Icone } from '../componentes/Icone';
 import { categoriasPorTipo, icones } from '../dominio/categorias';
 import { formatar } from '../dominio/dinheiro';
-import { transacoesDoMes } from '../estado/derivados';
+import { somaPorCategoria, totalEntradas } from '../dominio/saldo';
+import { orcamento, orcamentosPorCategoria, transacoesDoMes } from '../estado/derivados';
 import { useLoja } from '../estado/store';
 import { comAlfa, resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
@@ -18,8 +19,17 @@ export function Categorias() {
   const editando = estado.editandoCategorias;
   const lista = categoriasPorTipo(estado.categorias, despesa ? 'despesa' : 'receita');
 
+  // Transferência não é gasto nem ganho — `somaPorCategoria` já a ignora, e a
+  // soma manual que estava aqui contava as duas pontas de um aporte como
+  // movimento da categoria.
+  const gastos = somaPorCategoria(doMes);
   const totalDe = (id: string) =>
-    doMes.reduce((a, tx) => (tx.categoriaId === id ? a + Math.abs(tx.valorCentavos) : a), 0);
+    despesa
+      ? (gastos[id] ?? 0)
+      : totalEntradas(doMes.filter((tx) => tx.categoriaId === id));
+
+  const orcamentos = new Map(orcamentosPorCategoria(estado).map((o) => [o.categoria.id, o]));
+  const mes = orcamento(estado);
 
   const aba = (rotulo: string, ativa: boolean, aoTocar: () => void) => (
     <Toque aoTocar={aoTocar} estilo={{ flex: 1 }} rotuloAcessivel={rotulo}>
@@ -88,8 +98,65 @@ export function Categorias() {
           {aba('Receitas', !despesa, () => despachar({ tipo: 'ABA_CATEGORIAS', aba: 'receita' }))}
         </View>
 
+        {despesa ? (
+          <View
+            style={{
+              backgroundColor: t.surfaceMuted,
+              borderRadius: 16,
+              padding: 16,
+              gap: 10,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'baseline',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Txt tamanho={13} peso={600}>
+                Orçamento do mês
+              </Txt>
+              {mes.semLimites ? null : (
+                <Txt tamanho={12.5} peso={600} numerico cor={corDoNivel(mes.nivel, t)}>
+                  {mes.pctReal}% usado
+                </Txt>
+              )}
+            </View>
+
+            {mes.semLimites ? (
+              // Empty state com saída, não texto seco: o teto do mês é a soma
+              // dos tetos das categorias, então o caminho é abrir uma delas.
+              <Txt tamanho={12} cor={t.inkSoft} entrelinha={1.45}>
+                Você ainda não definiu teto nenhum. Toque em Editar e escolha uma categoria para
+                dizer quanto ela pode consumir no mês — o orçamento é a soma desses tetos.
+              </Txt>
+            ) : (
+              <>
+                <Barra pct={mes.pct} cor={corDoNivel(mes.nivel, t)} altura={10} />
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'baseline',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                  }}
+                >
+                  <Txt tamanho={12.5} numerico cor={t.inkMuted}>
+                    {formatar(mes.gasto)} de {formatar(mes.total)}
+                  </Txt>
+                  <Txt tamanho={11.5} cor={t.inkSoft}>
+                    {mes.restanteLabel}
+                  </Txt>
+                </View>
+              </>
+            )}
+          </View>
+        ) : null}
+
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
           {lista.map((cat) => {
+            const orc = orcamentos.get(cat.id);
             return (
               // Tocar numa categoria abre o extrato já filtrado — a tela não é
               // só um painel de totais. Segurar abre a edição.
@@ -132,6 +199,18 @@ export function Categorias() {
                   <Txt tamanho={11} numerico cor={t.inkSoft}>
                     {formatar(totalDe(cat.id))}
                   </Txt>
+
+                  {/* Com teto, o número deixa de ser um total solto e vira
+                      "quanto ainda cabe" — que é a pergunta que a tela existe
+                      para responder. */}
+                  {orc ? (
+                    <View style={{ alignSelf: 'stretch', gap: 5 }}>
+                      <Barra pct={orc.pct} cor={corDoNivel(orc.nivel, t)} altura={5} />
+                      <Txt tamanho={10} numerico cor={t.inkFaint} alinhamento="center">
+                        de {formatar(orc.total)}
+                      </Txt>
+                    </View>
+                  ) : null}
                 </View>
               </Toque>
             );
