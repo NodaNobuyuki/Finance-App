@@ -6,6 +6,7 @@
     "@expo-google-fonts/ibm-plex-mono": "^0.4.1",
     "@expo-google-fonts/ibm-plex-sans": "^0.4.1",
     "expo": "~57.0.26",
+    "expo-dev-client": "~57.0.19",
     "expo-font": "~57.0.4",
     "expo-sqlite": "~57.0.3",
     "expo-status-bar": "~57.0.1",
@@ -27,6 +28,8 @@
   },
   "scripts": {
     "start": "expo start",
+    "start:go": "expo start --go",
+    "build:dev": "npx --yes eas-cli@latest build --profile development --platform android",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
