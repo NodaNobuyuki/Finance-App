@@ -13,6 +13,11 @@ import { DURACAO, useEntrada } from './animacao';
  * `chave` reinicia a animação a cada tela — a mesma coisa que o `key` do
  * ScrollView já faz por remontagem, mas dita aqui, para que a transição não
  * dependa de um detalhe de rolagem lá em cima.
+ *
+ * O embrulho vive em dois pais diferentes. Dentro do `ScrollView` da `Casca`,
+ * `flexGrow` estica a tela curta até o rodapé. Numa tela com rolagem própria o
+ * pai tem altura fixa, e é `flexShrink` que faz o embrulho caber nela: sem ele
+ * o embrulho mede o conteúdo da lista, passa da tela e a lista nunca rola.
  */
 export function Transicao({ chave, children }: { chave: string; children: React.ReactNode }) {
   const entrada = useEntrada(DURACAO.tela, chave);
@@ -21,6 +26,7 @@ export function Transicao({ chave, children }: { chave: string; children: React.
     <Animated.View
       style={{
         flexGrow: 1,
+        flexShrink: 1,
         opacity: entrada,
         transform: [
           { translateY: entrada.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) },

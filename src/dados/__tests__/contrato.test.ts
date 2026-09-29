@@ -285,4 +285,77 @@ describe.each(implementacoes)('repositório: %s', (_nome, criar) => {
     const lido = await repo.carregar();
     expect(lido!.transacoes).not.toBe(estado.transacoes);
   });
+
+  describe('restrição violada recusa a linha, não a gravação', () => {
+    // FITID do OFX: a mesma conta não pode ter duas linhas com o mesmo.
+    const comFitid = (id: string, fitid: string, contaId = 'cartao'): Transacao => ({
+      ...tx(id, -1000),
+      contaId,
+      idExterno: fitid,
+    });
+    const ids = async () => (await repo.carregar())!.transacoes.map((t) => t.id).sort();
+
+    it('o caminho normal não recusa nada', async () => {
+      expect(await repo.salvar(null, base())).toEqual({ recusadas: [] });
+    });
+
+    it('FITID repetido na mesma conta é recusado, e o original continua no disco', async () => {
+      const antes = { ...base(), transacoes: [comFitid('a', 'FIT1')] };
+      await repo.salvar(null, antes);
+
+      const depois = {
+        ...antes,
+        transacoes: [comFitid('b', 'FIT1'), tx('c', -500), ...antes.transacoes],
+      };
+      const { recusadas } = await repo.salvar(antes, depois);
+
+      expect(recusadas).toEqual([{ tabela: 'transacoes', id: 'b' }]);
+      // Com `INSERT OR REPLACE`, o 'b' entrava e o 'a' sumia sem aviso.
+      expect(await ids()).toEqual(['a', 'c']);
+    });
+
+    it('a linha recusada não trava as gravações seguintes', async () => {
+      const primeiro = { ...base(), transacoes: [comFitid('a', 'FIT1')] };
+      await repo.salvar(null, primeiro);
+      const segundo = { ...primeiro, transacoes: [comFitid('b', 'FIT1'), ...primeiro.transacoes] };
+      await repo.salvar(primeiro, segundo);
+
+      const terceiro = { ...segundo, transacoes: [tx('d', -700), ...segundo.transacoes] };
+      expect(await repo.salvar(segundo, terceiro)).toEqual({ recusadas: [] });
+      expect(await ids()).toEqual(['a', 'd']);
+    });
+
+    it('o mesmo FITID em contas diferentes não colide', async () => {
+      const estado = {
+        ...base(),
+        transacoes: [comFitid('a', 'FIT1', 'cartao'), comFitid('b', 'FIT1', 'corrente')],
+      };
+      expect(await repo.salvar(null, estado)).toEqual({ recusadas: [] });
+      expect(await ids()).toEqual(['a', 'b']);
+    });
+
+    it('trocar uma linha por outra com o mesmo FITID na mesma gravação não é conflito', async () => {
+      // Reimportar o extrato corrigido: a linha antiga sai, a nova ocupa a chave.
+      const antes = { ...base(), transacoes: [comFitid('a', 'FIT1')] };
+      await repo.salvar(null, antes);
+      const depois = { ...antes, transacoes: [comFitid('b', 'FIT1')] };
+
+      expect(await repo.salvar(antes, depois)).toEqual({ recusadas: [] });
+      expect(await ids()).toEqual(['b']);
+    });
+
+    it('atualização recusada mantém a versão anterior no disco', async () => {
+      const antes = { ...base(), transacoes: [comFitid('a', 'FIT1'), comFitid('b', 'FIT2')] };
+      await repo.salvar(null, antes);
+      const depois = {
+        ...antes,
+        transacoes: [antes.transacoes[0], { ...antes.transacoes[1], idExterno: 'FIT1' }],
+      };
+
+      const { recusadas } = await repo.salvar(antes, depois);
+      expect(recusadas).toEqual([{ tabela: 'transacoes', id: 'b' }]);
+      const b = (await repo.carregar())!.transacoes.find((t) => t.id === 'b');
+      expect(b?.idExterno).toBe('FIT2');
+    });
+  });
 });

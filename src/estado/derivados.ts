@@ -1,6 +1,7 @@
 import {
   Categoria,
   categoria,
+  categoriaExisteEm,
   categoriasComLimite,
   categoriasPorTipo,
 } from '../dominio/categorias';
@@ -30,7 +31,8 @@ import {
 } from '../dominio/saldo';
 import { taxa } from '../dominio/taxas';
 import { Transacao } from '../dominio/tipos';
-import { Estado } from './store';
+import { CorRef } from '../tema/paletas';
+import type { Estado } from './store';
 
 /**
  * Seleções derivadas do estado.
@@ -50,7 +52,7 @@ export type DiaDaSemana = {
   ehHoje: boolean;
 };
 
-export function diasRegistrados(e: Estado): Set<DiaISO> {
+export function diasRegistrados(e: Pick<Estado, 'transacoes' | 'diasSemGasto'>): Set<DiaISO> {
   const dias = new Set<DiaISO>(e.diasSemGasto);
   for (const t of e.transacoes) dias.add(t.ocorridoEm);
   return dias;
@@ -82,7 +84,9 @@ function registrosNaSemana(registrados: Set<DiaISO>, inicio: DiaISO, hoje: DiaIS
   return n;
 }
 
-export function semana(e: Estado): Semana {
+export function semana(
+  e: Pick<Estado, 'hoje' | 'metaSemanal' | 'transacoes' | 'diasSemGasto'>,
+): Semana {
   const inicio = inicioDaSemana(e.hoje);
   const registrados = diasRegistrados(e);
   const dias: DiaDaSemana[] = [];
@@ -118,7 +122,7 @@ export function semana(e: Estado): Semana {
 }
 
 /** Último dia com registro, para a linha de status. */
-export function ultimoRegistro(e: Estado): DiaISO | undefined {
+export function ultimoRegistro(e: Pick<Estado, 'transacoes' | 'diasSemGasto'>): DiaISO | undefined {
   return [...diasRegistrados(e)].sort().reverse()[0];
 }
 
@@ -128,12 +132,14 @@ export function ultimoRegistro(e: Estado): DiaISO | undefined {
  * Comparar com o início da semana é o que faz o ritual reabrir sozinho na
  * virada de segunda — sem isso, um fechamento gravado valeria para sempre.
  */
-export function semanaEstaFechada(e: Estado): boolean {
+export function semanaEstaFechada(e: Pick<Estado, 'semanaFechada' | 'hoje'>): boolean {
   return e.semanaFechada !== null && e.semanaFechada === inicioDaSemana(e.hoje);
 }
 
 /** Hoje é o dia em que o usuário escolheu fechar a semana? */
-export function ehDiaDeFechar(e: Estado): boolean {
+export function ehDiaDeFechar(
+  e: Pick<Estado, 'semanaFechada' | 'hoje' | 'ritualDiaFechamento'>,
+): boolean {
   if (semanaEstaFechada(e)) return false;
   const escolhido = diasRitual.find((d) => d.id === e.ritualDiaFechamento);
   if (!escolhido) return false;
@@ -145,19 +151,19 @@ export function diaDeFechamento() {
   return diasRitual;
 }
 
-export function resumoDoRitual(e: Estado): string {
+export function resumoDoRitual(e: Pick<Estado, 'ritualDiaFechamento' | 'metaSemanal'>): string {
   const d = diasRitual.find((x) => x.id === e.ritualDiaFechamento) ?? diasRitual[6];
   return `Você fecha a semana ${d.prep} ${d.nome}, com ${e.metaSemanal} registros por semana.`;
 }
 
 /* ── Mês corrente ────────────────────────────────────────────── */
 
-export function transacoesDoMes(e: Estado): Transacao[] {
+export function transacoesDoMes(e: Pick<Estado, 'hoje' | 'transacoes'>): Transacao[] {
   const mes = mesDe(e.hoje);
   return e.transacoes.filter((t) => mesDe(t.ocorridoEm) === mes);
 }
 
-export function transacoesDoMesAnterior(e: Estado): Transacao[] {
+export function transacoesDoMesAnterior(e: Pick<Estado, 'hoje' | 'transacoes'>): Transacao[] {
   const mes = mesDe(somarMeses(primeiroDoMes(e.hoje), -1));
   return e.transacoes.filter((t) => mesDe(t.ocorridoEm) === mes);
 }
@@ -181,11 +187,11 @@ export type ResumoMes = {
  * Transferência fica de fora pelo mesmo motivo de sempre: o número é de
  * registro de gasto e ganho, e um aporte lançaria duas linhas de uma vez.
  */
-export function lancamentosDoMesAnterior(e: Estado): number {
+export function lancamentosDoMesAnterior(e: Pick<Estado, 'hoje' | 'transacoes'>): number {
   return semTransferencias(transacoesDoMesAnterior(e)).length;
 }
 
-export function resumoDoMes(e: Estado): ResumoMes {
+export function resumoDoMes(e: Pick<Estado, 'hoje' | 'transacoes'>): ResumoMes {
   const doMes = transacoesDoMes(e);
   const receitas = totalEntradas(doMes);
   const despesas = totalSaidas(doMes);
@@ -249,7 +255,9 @@ function montar(gasto: Centavos, total: Centavos): Orcamento {
  * Categoria sem limite fica de fora: ela não tem orçamento, e mostrá-la com
  * barra vazia diria que a pessoa estourou 0% de nada.
  */
-export function orcamentosPorCategoria(e: Estado): OrcamentoDeCategoria[] {
+export function orcamentosPorCategoria(
+  e: Pick<Estado, 'categorias' | 'hoje' | 'transacoes'>,
+): OrcamentoDeCategoria[] {
   const gastos = somaPorCategoria(transacoesDoMes(e));
   return categoriasComLimite(e.categorias).map((c) => ({
     ...montar(gastos[c.id] ?? 0, c.limiteCentavos),
@@ -269,7 +277,7 @@ export function orcamentosPorCategoria(e: Estado): OrcamentoDeCategoria[] {
  * do mês contra a soma de alguns limites acusaria estouro de um orçamento que a
  * pessoa nunca definiu.
  */
-export function orcamento(e: Estado): Orcamento {
+export function orcamento(e: Pick<Estado, 'categorias' | 'hoje' | 'transacoes'>): Orcamento {
   const gastos = somaPorCategoria(transacoesDoMes(e));
   const comLimite = categoriasComLimite(e.categorias);
   let total = 0;
@@ -292,7 +300,9 @@ export type AtalhoRapido = { categoriaId: string; valorCentavos: Centavos };
  * Olha só para semanas fechadas, então o conjunto de botões fica estável
  * durante a semana inteira.
  */
-export function atalhosRapidos(e: Estado): AtalhoRapido[] {
+export function atalhosRapidos(
+  e: Pick<Estado, 'categorias' | 'hoje' | 'transacoes'>,
+): AtalhoRapido[] {
   const inicio = inicioDaSemana(e.hoje);
 
   const porCategoria: Record<string, Centavos[]> = {};
@@ -350,7 +360,7 @@ const CATEGORIAS_NO_LOTE = 5;
  * da lista da pessoa — que é o desempate certo numa instalação nova, onde
  * ninguém lançou nada ainda.
  */
-export function categoriasDoLote(e: Estado): Categoria[] {
+export function categoriasDoLote(e: Pick<Estado, 'categorias' | 'transacoes'>): Categoria[] {
   const contagem: Record<string, number> = {};
   for (const t of e.transacoes) {
     if (t.valorCentavos >= 0 || ehTransferencia(t)) continue;
@@ -366,7 +376,7 @@ export function categoriasDoLote(e: Estado): Categoria[] {
 
 export type Insight = { tag: string; texto: string };
 
-export function insights(e: Estado): Insight[] {
+export function insights(e: Pick<Estado, 'categorias' | 'hoje' | 'transacoes'>): Insight[] {
   const doMes = transacoesDoMes(e);
   const despesas = totalSaidas(doMes);
   const porCategoria = somaPorCategoria(doMes);
@@ -425,7 +435,18 @@ export type AcaoDoDia = {
   destino: 'resumo' | 'fechar' | 'lote';
 };
 
-export function acaoDoDia(e: Estado): AcaoDoDia {
+export function acaoDoDia(
+  e: Pick<
+    Estado,
+    | 'hoje'
+    | 'metaSemanal'
+    | 'transacoes'
+    | 'diasSemGasto'
+    | 'intencao'
+    | 'semanaFechada'
+    | 'ritualDiaFechamento'
+  >,
+): AcaoDoDia {
   const s = semana(e);
 
   if (semanaEstaFechada(e)) {
@@ -475,7 +496,9 @@ export function acaoDoDia(e: Estado): AcaoDoDia {
   };
 }
 
-export function statusDoRegistro(e: Estado): { titulo: string; sub: string; emDia: boolean } {
+export function statusDoRegistro(
+  e: Pick<Estado, 'hoje' | 'metaSemanal' | 'transacoes' | 'diasSemGasto'>,
+): { titulo: string; sub: string; emDia: boolean } {
   const s = semana(e);
   const ultimo = ultimoRegistro(e);
   const seguidas = semanasEmDia(e);
@@ -517,7 +540,9 @@ export type ResumoSemana = {
   mediaCentavos: Centavos;
 };
 
-export function resumoDaSemana(e: Estado): ResumoSemana {
+export function resumoDaSemana(
+  e: Pick<Estado, 'hoje' | 'metaSemanal' | 'transacoes' | 'diasSemGasto' | 'categorias'>,
+): ResumoSemana {
   const s = semana(e);
   // Sem as transferências: o resumo é sobre para onde o dinheiro foi, e guardar
   // numa meta não é gasto — entraria como "maior despesa da semana".
@@ -574,7 +599,9 @@ const SEMANAS_NA_TRILHA = 6;
  * sozinho, enquanto um contador gravado no fechamento ficaria velho para
  * sempre — o mesmo motivo pelo qual saldo e guardado são derivados.
  */
-export function historicoDeSemanas(e: Estado) {
+export function historicoDeSemanas(
+  e: Pick<Estado, 'hoje' | 'metaSemanal' | 'transacoes' | 'diasSemGasto'>,
+) {
   const registrados = diasRegistrados(e);
   const atual = inicioDaSemana(e.hoje);
   const primeiro = [...registrados].sort()[0];
@@ -613,7 +640,9 @@ export function historicoDeSemanas(e: Estado) {
  * passadas; guardar a meta vigente em cada uma exigiria histórico gravado, que
  * é justamente o que se está tirando daqui.
  */
-export function semanasEmDia(e: Estado): number {
+export function semanasEmDia(
+  e: Pick<Estado, 'hoje' | 'metaSemanal' | 'transacoes' | 'diasSemGasto'>,
+): number {
   const registrados = diasRegistrados(e);
   if (registrados.size === 0) return 0;
 
@@ -640,15 +669,64 @@ export type DesafioView = {
   id: string;
   nome: string;
   sub: string;
-  categoriaId: string;
+  icone: string;
+  cor: CorRef;
   atual: number;
   alvo: number;
   pct: number;
   completo: boolean;
   progressoLabel: string;
   acaoLabel: string;
-  automatico: boolean;
+  medida: DefinicaoDesafio['medida'];
 };
+
+/** Quanto andou, contra o quê, e o que dizer — por medida. */
+function medirDesafio(
+  e: Pick<
+    Estado,
+    | 'hoje'
+    | 'metaSemanal'
+    | 'transacoes'
+    | 'diasSemGasto'
+    | 'categorias'
+    | 'progressoDesafios'
+    | 'ritualDiaFechamento'
+  >,
+  d: DefinicaoDesafio,
+  registrosDaSemana: number,
+): { atual: number; alvo: number; sub: string } {
+  switch (d.medida) {
+    case 'registros': {
+      // O alvo É a meta do ritual. Cravado em 4, o desafio discordava do
+      // ritual de quem escolheu outro número, e os dois apareciam na mesma tela.
+      const dia = diasRitual.find((x) => x.id === e.ritualDiaFechamento) ?? diasRitual[6];
+      return {
+        atual: Math.min(e.metaSemanal, registrosDaSemana),
+        alvo: e.metaSemanal,
+        sub: `você fecha a semana ${dia.prep} ${dia.nome}`,
+      };
+    }
+    case 'categorizados': {
+      const doMes = semTransferencias(transacoesDoMes(e));
+      const certos = doMes.filter((t) => categoriaExisteEm(e.categorias, t.categoriaId)).length;
+      const soltos = doMes.length - certos;
+      return {
+        atual: certos,
+        alvo: doMes.length,
+        sub:
+          doMes.length === 0
+            ? 'nada lançado neste mês ainda'
+            : soltos === 0
+              ? 'tudo categorizado'
+              : `${soltos} ${soltos === 1 ? 'lançamento' : 'lançamentos'} sem categoria`,
+      };
+    }
+    case 'manual': {
+      const p = progressoDe(d, e.progressoDesafios);
+      return { atual: Math.min(d.alvo, p.progresso), alvo: d.alvo, sub: d.sub };
+    }
+  }
+}
 
 /**
  * Junta o catálogo (definição) com o que é do usuário (progresso).
@@ -656,33 +734,44 @@ export type DesafioView = {
  * Desafio publicado numa versão nova entra por aqui já com o padrão certo,
  * porque `progressoDe` cai no default quando não há linha gravada.
  */
-export function desafios(e: Estado): { ativos: DesafioView[]; disponiveis: DefinicaoDesafio[] } {
+export function desafios(
+  e: Pick<
+    Estado,
+    | 'hoje'
+    | 'metaSemanal'
+    | 'transacoes'
+    | 'diasSemGasto'
+    | 'categorias'
+    | 'progressoDesafios'
+    | 'ritualDiaFechamento'
+  >,
+): { ativos: DesafioView[]; disponiveis: DefinicaoDesafio[] } {
   const s = semana(e);
   const ativos: DesafioView[] = [];
   const disponiveis: DefinicaoDesafio[] = [];
 
   for (const d of definicoesDesafios) {
-    const p = progressoDe(d, e.progressoDesafios);
-    if (!p.aceito) {
+    if (!progressoDe(d, e.progressoDesafios).aceito) {
       disponiveis.push(d);
       continue;
     }
-    // Desafio automático espelha os registros da semana; o resto conta o
-    // progresso que o próprio usuário marcou.
-    const atual = Math.min(d.alvo, d.automatico ? s.registros : p.progresso);
-    const completo = atual >= d.alvo;
+    const { atual, alvo, sub } = medirDesafio(e, d, s.registros);
+    // Alvo zero (mês sem lançamento) não é desafio cumprido: não há o que
+    // categorizar ainda.
+    const completo = alvo > 0 && atual >= alvo;
     ativos.push({
       id: d.id,
       nome: d.nome,
-      sub: completo ? 'desafio concluído' : d.sub,
-      categoriaId: d.categoriaId,
+      sub: completo && d.medida !== 'categorizados' ? 'desafio concluído' : sub,
+      icone: d.icone,
+      cor: d.cor,
       atual,
-      alvo: d.alvo,
-      pct: Math.round((atual / d.alvo) * 100),
+      alvo,
+      pct: alvo > 0 ? Math.round((atual / alvo) * 100) : 0,
       completo,
-      progressoLabel: `${atual} de ${d.alvo} ${d.unidade}`,
+      progressoLabel: `${atual} de ${alvo} ${d.unidade}`,
       acaoLabel: completo ? 'Concluído' : d.acao,
-      automatico: d.automatico === true,
+      medida: d.medida,
     });
   }
 
@@ -696,7 +785,7 @@ export function desafios(e: Estado): { ativos: DesafioView[]; disponiveis: Defin
  * inventados na semente da demo, que apareciam para quem nunca aceitou desafio
  * nenhum.
  */
-export function economizado(e: Estado): Centavos {
+export function economizado(e: Pick<Estado, 'progressoDesafios'>): Centavos {
   return definicoesDesafios
     .filter((d) => progressoDe(d, e.progressoDesafios).aceito)
     .reduce((a, d) => a + d.economiaCentavos, 0);
@@ -704,7 +793,7 @@ export function economizado(e: Estado): Centavos {
 
 /* ── Metas ───────────────────────────────────────────────────── */
 
-export function metas(e: Estado) {
+export function metas(e: Pick<Estado, 'metas' | 'transacoes' | 'hoje'>) {
   return e.metas.map((m) => {
     const guardado = guardadoDaMeta(m, e.transacoes);
     return {
@@ -719,7 +808,7 @@ export function metas(e: Estado) {
   });
 }
 
-export function totalGuardado(e: Estado): Centavos {
+export function totalGuardado(e: Pick<Estado, 'metas' | 'transacoes'>): Centavos {
   return somarGuardado(e.metas, e.transacoes);
 }
 
@@ -737,13 +826,24 @@ export type GrupoDoDia = {
   itens: Transacao[];
 };
 
+/**
+ * O que o recorte do Extrato lê, e só isso. As funções abaixo recebem fatias
+ * do `Estado`, não ele inteiro, para que a tela memoize por campo: digitar no
+ * teclado de uma folha aberta sobre o Extrato troca o `Estado` a cada tecla, e
+ * não pode refazer o mês inteiro por isso.
+ */
+export type RecorteDoExtrato = Pick<
+  Estado,
+  'transacoes' | 'mesVisivel' | 'filtroConta' | 'filtroCategoria'
+>;
+
 /** Só o mês visível, sem os filtros de conta e categoria. */
-export function transacoesDoMesVisivel(e: Estado): Transacao[] {
+export function transacoesDoMesVisivel(e: Pick<Estado, 'transacoes' | 'mesVisivel'>): Transacao[] {
   const mes = mesDe(e.mesVisivel);
   return e.transacoes.filter((t) => mesDe(t.ocorridoEm) === mes);
 }
 
-export function transacoesFiltradas(e: Estado): Transacao[] {
+export function transacoesFiltradas(e: RecorteDoExtrato): Transacao[] {
   return transacoesDoMesVisivel(e).filter(
     (t) =>
       (e.filtroConta === 'todas' || t.contaId === e.filtroConta) &&
@@ -764,9 +864,16 @@ export type NavegacaoDeMes = {
  * do primeiro lançamento atrás. Sem os limites, as setas percorreriam anos
  * vazios em qualquer direção.
  */
-export function navegacaoDeMes(e: Estado): NavegacaoDeMes {
-  const primeiro = [...e.transacoes].sort((a, b) => (a.ocorridoEm < b.ocorridoEm ? -1 : 1))[0];
-  const limiteAntigo = primeiroDoMes(primeiro?.ocorridoEm ?? e.hoje);
+export function navegacaoDeMes(
+  e: Pick<Estado, 'transacoes' | 'mesVisivel' | 'hoje'>,
+): NavegacaoDeMes {
+  // Só o mínimo interessa: ordenar o histórico inteiro para ler o primeiro
+  // item custava O(n log n) a cada render.
+  let primeiro: DiaISO | undefined;
+  for (const t of e.transacoes) {
+    if (primeiro === undefined || t.ocorridoEm < primeiro) primeiro = t.ocorridoEm;
+  }
+  const limiteAntigo = primeiroDoMes(primeiro ?? e.hoje);
   const limiteRecente = primeiroDoMes(e.hoje);
 
   return {
@@ -776,19 +883,28 @@ export function navegacaoDeMes(e: Estado): NavegacaoDeMes {
   };
 }
 
+/**
+ * Dias do mais recente para o mais antigo; dentro do dia, a ordem de entrada.
+ *
+ * Uma passada só. Era um `filter` por dia distinto — O(n·dias) —, e o mês
+ * inteiro passa por aqui a cada vez que o recorte do Extrato muda.
+ */
 export function agruparPorDia(transacoes: Transacao[]): GrupoDoDia[] {
-  const dias = [...new Set(transacoes.map((t) => t.ocorridoEm))].sort().reverse();
-  return dias.map((dia) => {
-    const itens = transacoes.filter((t) => t.ocorridoEm === dia);
-    return {
-      dia,
-      itens,
-      totalCentavos: itens.reduce((a, t) => a + t.valorCentavos, 0),
-    };
-  });
+  const porDia = new Map<DiaISO, GrupoDoDia>();
+  for (const t of transacoes) {
+    const grupo = porDia.get(t.ocorridoEm);
+    if (grupo) {
+      grupo.itens.push(t);
+      grupo.totalCentavos += t.valorCentavos;
+    } else {
+      porDia.set(t.ocorridoEm, { dia: t.ocorridoEm, itens: [t], totalCentavos: t.valorCentavos });
+    }
+  }
+  // Chaves únicas: o comparador nunca precisa decidir empate.
+  return [...porDia.values()].sort((a, b) => (a.dia < b.dia ? 1 : -1));
 }
 
 /** Categorias que aparecem no histórico, para os chips de filtro. */
-export function categoriasUsadas(e: Estado): string[] {
+export function categoriasUsadas(e: Pick<Estado, 'transacoes'>): string[] {
   return [...new Set(e.transacoes.map((t) => t.categoriaId))];
 }

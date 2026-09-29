@@ -1,7 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
 import { Barra, BotaoVoltar, CartaoNumero, Disco, Hero, Toque, Txt } from '../componentes/basicos';
-import { categoria } from '../dominio/categorias';
 import { nomeDoMes } from '../dominio/datas';
 import { semTransferencias } from '../dominio/saldo';
 import {
@@ -13,9 +12,12 @@ import {
   semanasEmDia,
   transacoesDoMes,
 } from '../estado/derivados';
-import { useLoja } from '../estado/store';
+import { useRecorte, useDespachar } from '../estado/store';
 import { comAlfa, resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
+
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['lembrete', 'categorias', 'progressoDesafios', 'ritualDiaFechamento', 'hoje', 'metaSemanal', 'transacoes', 'diasSemGasto'] as const;
 
 const LEMBRETES = [
   { id: 'domingo', nome: 'Domingo à noite' },
@@ -25,7 +27,8 @@ const LEMBRETES = [
 ];
 
 export function Habitos() {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t, paleta } = useTema();
 
   const s = semana(estado);
@@ -108,7 +111,7 @@ export function Habitos() {
             Desafios desta semana
           </Txt>
           {ativos.map((d, i) => {
-            const cor = resolverCor(categoria(estado.categorias, d.categoriaId).cor, paleta);
+            const cor = resolverCor(d.cor, paleta);
             return (
               <View
                 key={d.id}
@@ -120,7 +123,7 @@ export function Habitos() {
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11 }}>
-                  <Disco path={categoria(estado.categorias, d.categoriaId).icone} cor={cor} />
+                  <Disco path={d.icone} cor={cor} />
                   <View style={{ flex: 1, gap: 2 }}>
                     <Txt tamanho={13.5} peso={600}>
                       {d.nome}
@@ -161,12 +164,7 @@ export function Habitos() {
                       d.completo
                         ? undefined
                         : () =>
-                            despachar({
-                              tipo: 'AVANCAR_DESAFIO',
-                              desafioId: d.id,
-                              automatico: d.automatico,
-                              rotulo: d.nome,
-                            })
+                            despachar({ tipo: 'AVANCAR_DESAFIO', desafioId: d.id })
                     }
                     rotuloAcessivel={d.acaoLabel}
                   >
@@ -196,7 +194,7 @@ export function Habitos() {
               Desafios opcionais
             </Txt>
             {disponiveis.map((d, i) => {
-              const cor = resolverCor(categoria(estado.categorias, d.categoriaId).cor, paleta);
+              const cor = resolverCor(d.cor, paleta);
               return (
                 <View
                   key={d.id}
@@ -209,7 +207,7 @@ export function Habitos() {
                     borderBottomColor: i < disponiveis.length - 1 ? t.lineSoft : 'transparent',
                   }}
                 >
-                  <Disco path={categoria(estado.categorias, d.categoriaId).icone} cor={cor} />
+                  <Disco path={d.icone} cor={cor} />
                   <View style={{ flex: 1, gap: 2 }}>
                     <Txt tamanho={13.5} peso={600}>
                       {d.nome}

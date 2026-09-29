@@ -148,6 +148,19 @@ describe('lançamento em lote', () => {
     expect(preenchido.transacoes[0].valorCentavos).toBe(-4250);
   });
 
+  it('só o dia marcado "não gastei" vira dia sem gasto', () => {
+    // O Lote gravava todos os pendentes ali, inclusive o dia que acabou de
+    // ganhar uma despesa — "dia sem gasto" num dia com gasto.
+    const salvo = aplicar(
+      estadoInicial,
+      { tipo: 'LOTE_VALOR', dia: pendentes[0], texto: '42,50' },
+      { tipo: 'LOTE_SEM_GASTO', dia: pendentes[1] },
+      { tipo: 'SALVAR_LOTE', pendentes },
+    );
+    const novos = salvo.diasSemGasto.filter((d) => !estadoInicial.diasSemGasto.includes(d));
+    expect(novos).toEqual([pendentes[1]]);
+  });
+
   it('não salva com dia incompleto', () => {
     const parcial = aplicar(
       estadoInicial,
@@ -186,6 +199,19 @@ describe('fechamento da semana', () => {
     expect(fechado.tela).toBe('home');
     expect(fechado.fechando).toBe(false);
     expect(fechado.toast?.sub).toContain('menos delivery');
+  });
+
+  it('sem intenção, o toast conta a constância de verdade', () => {
+    // Era "6 semanas seguidas" cravado, para qualquer um.
+    const semIntencao = (e: Estado) =>
+      aplicar(e, { tipo: 'FECHAR_INICIAR' }, { tipo: 'FECHAR_CONCLUIR' });
+
+    const n = semanasEmDia(estadoInicial);
+    expect(n).toBeGreaterThan(1);
+    expect(semIntencao(estadoInicial).toast?.sub).toBe(`${n} semanas seguidas em dia.`);
+
+    expect(semanasEmDia(estadoVazio)).toBe(0);
+    expect(semIntencao(estadoVazio).toast?.sub).toMatch(/recomeça/);
   });
 
   it('guarda QUAL semana foi fechada, não um sim/não', () => {
@@ -647,11 +673,82 @@ describe('desafios', () => {
   });
 
   it('marcar o dia avança só o desafio tocado, sem passar do alvo', () => {
-    const marcar = { tipo: 'AVANCAR_DESAFIO', desafioId: 'assin', automatico: false, rotulo: 'x' };
+    const marcar = { tipo: 'AVANCAR_DESAFIO', desafioId: 'assin' };
     // 'assin' começa em 1 de 3: cinco toques não podem levar além de 3.
     const depois = aplicar(estadoInicial, ...(Array(5).fill(marcar) as Acao[]));
     const assin = desafios(depois).ativos.find((d) => d.id === 'assin')!;
     expect(assin.atual).toBe(assin.alvo);
     expect(assin.completo).toBe(true);
+  });
+});
+
+describe('desafios derivados não repetem o que o catálogo dizia', () => {
+  const ativo = (e: Estado, id: string) => desafios(e).ativos.find((d) => d.id === id)!;
+  const doMes = (e: Estado) =>
+    e.transacoes.filter(
+      (t) => t.transferenciaId === undefined && t.ocorridoEm.slice(0, 7) === e.hoje.slice(0, 7),
+    );
+
+  it('o desafio de registros mede contra a meta do ritual, não contra 4', () => {
+    // Era "Registrar 4 vezes nesta semana" cravado: quem escolhia 6 no ritual
+    // via as duas metas, discordando, na mesma tela.
+    const seis = aplicar(estadoInicial, { tipo: 'RITUAL_META', meta: 6 });
+    expect(ativo(seis, 'reg4').alvo).toBe(6);
+    expect(ativo(seis, 'reg4').progressoLabel).toMatch(/de 6 registros$/);
+  });
+
+  it('o subtítulo diz o dia em que a pessoa fecha a semana', () => {
+    // Era "a semana fecha domingo" para todo mundo.
+    const sabado = aplicar(estadoInicial, { tipo: 'RITUAL_DIA', dia: 'sabado' });
+    expect(ativo(sabado, 'reg4').sub).toBe('você fecha a semana no sábado');
+  });
+
+  it('categorizar mede os lançamentos do mês que têm categoria', () => {
+    const total = doMes(estadoInicial).length;
+    const catg = ativo(estadoInicial, 'catg');
+    expect(catg.alvo).toBe(total);
+    expect(catg.atual).toBe(total);
+    expect(catg.completo).toBe(true);
+    expect(catg.sub).toBe('tudo categorizado');
+  });
+
+  it('apagar uma categoria usada no mês reabre o desafio, com a conta certa', () => {
+    // Era "2 lançamentos sem categoria" para todo mundo, sempre.
+    const usada = doMes(estadoInicial)[0].categoriaId;
+    const soltos = doMes(estadoInicial).filter((t) => t.categoriaId === usada).length;
+    const depois = aplicar(estadoInicial, { tipo: 'APAGAR_CATEGORIA', categoriaId: usada });
+    const catg = ativo(depois, 'catg');
+
+    expect(catg.completo).toBe(false);
+    expect(catg.atual).toBe(catg.alvo - soltos);
+    expect(catg.sub).toBe(
+      `${soltos} ${soltos === 1 ? 'lançamento' : 'lançamentos'} sem categoria`,
+    );
+  });
+
+  it('mês sem lançamento não conta como tudo categorizado', () => {
+    const catg = ativo(estadoVazio, 'catg');
+    expect(catg.alvo).toBe(0);
+    expect(catg.completo).toBe(false);
+    expect(catg.pct).toBe(0);
+    expect(catg.sub).toBe('nada lançado neste mês ainda');
+  });
+
+  it('tocar em categorizar leva ao Extrato, sem mexer em progresso', () => {
+    const depois = aplicar(estadoInicial, { tipo: 'AVANCAR_DESAFIO', desafioId: 'catg' });
+    expect(depois.tela).toBe('extrato');
+    expect(depois.progressoDesafios).toBe(estadoInicial.progressoDesafios);
+  });
+
+  it('tocar em registros abre o lançamento', () => {
+    const depois = aplicar(estadoInicial, { tipo: 'AVANCAR_DESAFIO', desafioId: 'reg4' });
+    expect(depois.folha).toEqual({ tipo: 'nova' });
+    expect(depois.progressoDesafios).toBe(estadoInicial.progressoDesafios);
+  });
+
+  it('o toast do desafio manual diz onde a pessoa está, sem passar do alvo', () => {
+    const depois = aplicar(estadoInicial, { tipo: 'AVANCAR_DESAFIO', desafioId: 'assin' });
+    // A demo começa em 1 de 3.
+    expect(depois.toast?.texto).toBe('Revisar 3 assinaturas: 2 de 3');
   });
 });

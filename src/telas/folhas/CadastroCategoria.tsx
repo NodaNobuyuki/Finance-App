@@ -7,11 +7,14 @@ import { coresDeCategoria, iconesDeCategoria } from '../../dominio/categorias';
 import { deDigitos, empilharDigitos, formatar, removerDigito } from '../../dominio/dinheiro';
 import { somaPorCategoria } from '../../dominio/saldo';
 import { transacoesDoMes } from '../../estado/derivados';
-import { useLoja } from '../../estado/store';
+import { useRecorte, useDespachar } from '../../estado/store';
 import { comAlfa, CorRef, resolverCor } from '../../tema/paletas';
 import { useTema } from '../../tema/TemaContext';
 import { BotaoApagar, CampoTexto, Opcoes } from './Campo';
 import { Folha } from './Folha';
+
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['cadastroCategoria', 'hoje', 'transacoes'] as const;
 
 const TIPOS: { id: 'despesa' | 'receita'; nome: string }[] = [
   { id: 'despesa', nome: 'Despesa' },
@@ -25,7 +28,8 @@ const TIPOS: { id: 'despesa' | 'receita'; nome: string }[] = [
  * tracejado que não fazia nada — não havia onde gravar.
  */
 export function CadastroCategoria() {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t, paleta } = useTema();
 
   const c = estado.cadastroCategoria;

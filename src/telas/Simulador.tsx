@@ -6,12 +6,16 @@ import { deDigitos, formatar, percentual } from '../dominio/dinheiro';
 import { metaEscolhida } from '../dominio/metas';
 import { taxas } from '../dominio/taxas';
 import { metas, projecao } from '../estado/derivados';
-import { useLoja } from '../estado/store';
+import { useRecorte, useDespachar } from '../estado/store';
 import { useTema } from '../tema/TemaContext';
 import { Pilulas } from './folhas/PilulasDeConta';
 
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['simTaxaId', 'contas', 'simMetaId', 'simDigitos', 'rascunho', 'metas', 'transacoes', 'hoje'] as const;
+
 export function Simulador() {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t } = useTema();
 
   const valor = deDigitos(estado.simDigitos);

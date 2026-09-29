@@ -56,6 +56,10 @@ describe('transição de tela', () => {
     // `flexGrow` importa: sem ele o embrulho não herda a altura do ScrollView
     // e telas curtas param de esticar até o rodapé.
     expect(estilo.flexGrow).toBe(1);
+    // E `flexShrink` é o par dele na tela com rolagem própria (o Extrato): o
+    // pai tem altura fixa, e sem encolher o embrulho passa da tela e a lista
+    // não rola.
+    expect(estilo.flexShrink).toBe(1);
   });
 
   it('pergunta ao sistema se a pessoa pediu menos movimento', async () => {

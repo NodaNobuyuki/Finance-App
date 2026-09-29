@@ -5,11 +5,14 @@ import { Icone } from '../../componentes/Icone';
 import { Teclado } from '../../componentes/Teclado';
 import { categoriasPorTipo, icones } from '../../dominio/categorias';
 import { deDigitos, formatar } from '../../dominio/dinheiro';
-import { useLoja } from '../../estado/store';
+import { useRecorte, useDespachar } from '../../estado/store';
 import { sans } from '../../tema/fontes';
 import { comAlfa, resolverCor } from '../../tema/paletas';
 import { useTema } from '../../tema/TemaContext';
 import { Folha } from './Folha';
+
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['rascunho', 'contas', 'categorias'] as const;
 
 /**
  * Nova transação.
@@ -18,7 +21,8 @@ import { Folha } from './Folha';
  * lançamento é escrito no estado local e confirmado na hora; sync é depois.
  */
 export function NovaTransacao() {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t, paleta } = useTema();
 
   const r = estado.rascunho;

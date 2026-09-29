@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react-native';
 import React from 'react';
+import { ICONE_ORFA } from '../../dominio/categorias';
 import { hojeReal, inicioDaSemana } from '../../dominio/datas';
 import { Tela } from '../../dominio/tipos';
 import {
@@ -140,6 +141,27 @@ describe('app vazio', () => {
     expect(tela.queryByText('Salário')).toBeNull();
   });
 
+  it('o Extrato desenha só o começo de um mês cheio, não o mês inteiro', async () => {
+    // A lista é virtualizada: um mês com centenas de lançamentos não pode virar
+    // centenas de linhas montadas de uma vez. Se isto quebrar, alguém trocou o
+    // SectionList por um map de novo.
+    const base = estadoInicial.transacoes[0];
+    const cheio: Estado = {
+      ...estadoInicial,
+      transacoes: Array.from({ length: 300 }, (_, i) => ({
+        ...base,
+        id: `cheio-${i}`,
+        descricao: 'Linha de teste',
+        ocorridoEm: `2026-08-0${(i % 5) + 1}`,
+      })),
+    };
+    const tela = await montar(<Extrato />, cheio);
+
+    const desenhadas = tela.queryAllByText('Linha de teste').length;
+    expect(desenhadas).toBeGreaterThan(0);
+    expect(desenhadas).toBeLessThan(300);
+  });
+
   it('o Extrato mostra o mês visível no cabeçalho, não o dia de hoje', async () => {
     const julho = await montar(<Extrato />, { ...estadoInicial, mesVisivel: '2026-07-01' });
     expect(julho.getByText('Julho 2026')).toBeTruthy();
@@ -224,6 +246,23 @@ describe('estados-limite', () => {
  */
 const NOVO_ID = (id: string) => `u-${id}`;
 
+type No = { props?: Record<string, unknown>; children?: (No | string)[] | null };
+
+/**
+ * Todo `d` de `Path` renderizado. Percorre só os filhos: as props de lista
+ * virtualizada carregam referência circular e `JSON.stringify` não passa.
+ */
+function desenhos(raiz: unknown): string[] {
+  const achados: string[] = [];
+  const visitar = (no: No | string | null) => {
+    if (no === null || typeof no === 'string') return;
+    if (typeof no.props?.d === 'string') achados.push(no.props.d);
+    no.children?.forEach(visitar);
+  };
+  (Array.isArray(raiz) ? raiz : [raiz]).forEach(visitar);
+  return achados;
+}
+
 function comVocabularioProprio(base: Estado): Estado {
   return {
     ...base,
@@ -271,6 +310,10 @@ describe('vocabulário próprio do usuário', () => {
     // pode aparecer em tela nenhuma: se aparecer, alguém cravou um id.
     const tela = await montar(no, proprio);
     expect(tela.queryByText('Sem categoria')).toBeNull();
+    // Id cravado que só pinta ícone e cor não escreve "Sem categoria" — foi
+    // assim que o catálogo de desafios passou pelo guarda de texto. O desenho
+    // do buraco na árvore denuncia do mesmo jeito.
+    expect(desenhos(tela.toJSON())).not.toContain(ICONE_ORFA);
   });
 
   it('o Lote oferece as categorias da pessoa, não as de fábrica', async () => {

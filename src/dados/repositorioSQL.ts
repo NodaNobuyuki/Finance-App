@@ -4,9 +4,9 @@ import { Conta, Meta, Origem, ProgressoDesafio, Transacao } from '../dominio/tip
 import { CorRef } from '../tema/paletas';
 import { diferencaDeChaves, diferencaPorId, Diferenca, vazia } from './diff';
 import { aplicarMigracoes } from './migracoes';
-import { MotorSQL, Parametro } from './motor';
+import { ehRecusaDeRestricao, MotorSQL, Parametro } from './motor';
 import { EstadoPersistido } from './persistido';
-import { RepositorioLocal } from './repositorio';
+import { Recusa, RepositorioLocal } from './repositorio';
 
 /**
  * Persistência em SQL, escrita contra `MotorSQL` — não contra `expo-sqlite`.
@@ -260,23 +260,47 @@ export function criarRepositorioSQL(
   async function sincronizar<T extends { id: string }, L>(
     tabela: Tabela<T, L>,
     d: Diferenca<T>,
-  ): Promise<void> {
-    if (vazia(d)) return;
+  ): Promise<Recusa[]> {
+    if (vazia(d)) return [];
     const marcas = tabela.colunas.map(() => '?').join(', ');
+    const atribuicoes = tabela.colunas
+      .filter((c) => c !== 'id')
+      .map((c) => `${c} = excluded.${c}`)
+      .join(', ');
     const agora = agoraMs();
+    const recusadas: Recusa[] = [];
 
-    // `INSERT OR REPLACE` cobre inserção e atualização com um comando só; a
-    // chave primária é o id, então não há caminho para duplicar linha.
-    for (const item of [...d.inserir, ...d.atualizar]) {
-      await motor.executar(
-        `INSERT OR REPLACE INTO ${tabela.nome} (${tabela.colunas.join(', ')}) VALUES (${marcas})`,
-        tabela.paraLinha(item, agora),
-      );
-    }
-
+    // Remoção antes da escrita: trocar uma linha por outra com o mesmo
+    // `id_externo` na mesma gravação tem de liberar a chave antes de ocupá-la.
     for (const id of d.remover) {
       await motor.executar(`DELETE FROM ${tabela.nome} WHERE id = ?`, [id]);
     }
+
+    // Upsert pela chave primária, e SÓ por ela. Era `INSERT OR REPLACE`, que
+    // resolve conflito em QUALQUER restrição única apagando a linha que estava
+    // lá: um segundo lançamento com o mesmo FITID fazia o primeiro sumir do
+    // disco sem aviso, enquanto a memória seguia mostrando os dois.
+    for (const item of [...d.inserir, ...d.atualizar]) {
+      try {
+        await motor.executar(
+          `INSERT INTO ${tabela.nome} (${tabela.colunas.join(', ')}) VALUES (${marcas})
+           ON CONFLICT (id) DO UPDATE SET ${atribuicoes}`,
+          tabela.paraLinha(item, agora),
+        );
+      } catch (erro) {
+        // Restrição violada desfaz só este comando — o SQLite mantém a
+        // transação viva e o resto do lote entra. Qualquer outra falha é o
+        // mundo quebrando, e aí a gravação inteira volta atrás.
+        //
+        // O par de uma transferência pode, em tese, perder uma ponta aqui. Na
+        // prática as pontas não têm `id_externo` nem campo nulo, e travar o
+        // disco inteiro por uma linha era a perda maior.
+        if (!ehRecusaDeRestricao(erro)) throw erro;
+        recusadas.push({ tabela: tabela.nome, id: item.id });
+      }
+    }
+
+    return recusadas;
   }
 
   async function gravarPreferencias(p: Preferencias): Promise<void> {
@@ -338,22 +362,25 @@ export function criarRepositorioSQL(
       try {
         // Uma transação para o estado inteiro: ou o disco reflete um instante
         // coerente, ou não muda nada. Metade de um lote gravado seria pior que
-        // nada — o saldo derivado passaria a somar lançamento sem par.
-        await motor.emTransacao(async () => {
-          await sincronizar(TABELA_CONTAS, diferencaPorId(antes?.contas ?? [], depois.contas));
-          await sincronizar(
-            TABELA_TRANSACOES,
-            diferencaPorId(antes?.transacoes ?? [], depois.transacoes),
-          );
-          await sincronizar(TABELA_METAS, diferencaPorId(antes?.metas ?? [], depois.metas));
-          await sincronizar(
-            TABELA_CATEGORIAS,
-            diferencaPorId(antes?.categorias ?? [], depois.categorias),
-          );
-          await sincronizar(
-            TABELA_PROGRESSO_DESAFIOS,
-            diferencaPorId(antes?.progressoDesafios ?? [], depois.progressoDesafios),
-          );
+        // nada — o saldo derivado passaria a somar lançamento sem par. A única
+        // exceção é a linha recusada por restrição, que fica de fora sozinha.
+        return await motor.emTransacao(async () => {
+          const recusadas = [
+            ...(await sincronizar(TABELA_CONTAS, diferencaPorId(antes?.contas ?? [], depois.contas))),
+            ...(await sincronizar(
+              TABELA_TRANSACOES,
+              diferencaPorId(antes?.transacoes ?? [], depois.transacoes),
+            )),
+            ...(await sincronizar(TABELA_METAS, diferencaPorId(antes?.metas ?? [], depois.metas))),
+            ...(await sincronizar(
+              TABELA_CATEGORIAS,
+              diferencaPorId(antes?.categorias ?? [], depois.categorias),
+            )),
+            ...(await sincronizar(
+              TABELA_PROGRESSO_DESAFIOS,
+              diferencaPorId(antes?.progressoDesafios ?? [], depois.progressoDesafios),
+            )),
+          ];
 
           if (antes?.diasSemGasto !== depois.diasSemGasto) {
             const d = diferencaDeChaves(antes?.diasSemGasto ?? [], depois.diasSemGasto);
@@ -366,6 +393,7 @@ export function criarRepositorioSQL(
           }
 
           await gravarPreferencias(preferenciasDe(depois));
+          return { recusadas };
         });
       } catch (causa) {
         throw new EscritaFalhou('o estado', causa);

@@ -75,6 +75,18 @@ describe('semente em qualquer dia', () => {
     expect(new Set(dias).size).toBe(dias.length);
   });
 
+  it.each(DIAS_VARIADOS)('%s: nenhum dia sem gasto teve despesa', (hoje) => {
+    // Mesma regra que a v9 impõe ao banco: "não gastei" desmentido por uma
+    // despesa é dado contraditório, e a demo não pode ensinar o contrário.
+    const s = semente(hoje);
+    const comDespesa = new Set(
+      s.transacoes
+        .filter((t) => t.valorCentavos < 0 && t.transferenciaId === undefined)
+        .map((t) => t.ocorridoEm),
+    );
+    for (const d of s.diasSemGasto) expect(comDespesa.has(d)).toBe(false);
+  });
+
   it.each(DIAS_VARIADOS)('%s: as 5 semanas anteriores têm todas registro', (hoje) => {
     const dias = new Set(semente(hoje).diasSemGasto);
     const estaSemana = inicioDaSemana(hoje);

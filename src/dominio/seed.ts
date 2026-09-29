@@ -149,7 +149,6 @@ function metasDemo(hoje: DiaISO): Meta[] {
  * catálogo (`progressoDe`).
  */
 const progressoDesafios: ProgressoDesafio[] = [
-  { id: 'catg', aceito: true, progresso: 12 },
   { id: 'assin', aceito: true, progresso: 1 },
 ];
 
@@ -168,17 +167,28 @@ const progressoDesafios: ProgressoDesafio[] = [
  * A progressão 2 → 3 → 4 → 4 → 3+ conta uma história de hábito sendo formado,
  * em vez de um platô que nenhuma pessoa real teria na primeira semana.
  */
-function diasSemGastoDemo(hoje: DiaISO): DiaISO[] {
+function diasSemGastoDemo(hoje: DiaISO, transacoes: Transacao[]): DiaISO[] {
   const estaSemana = inicioDaSemana(hoje);
   // Por semana (da mais antiga à anterior), quais dias da semana foram
   // marcados — 0 = segunda. Só dias no começo da semana, porque as transações
   // da demo caem nos últimos dias e dia repetido não contaria duas vezes.
   const porSemana = [[0, 2], [0, 1, 3], [0, 1, 2, 3], [0, 1, 2, 4], [0, 2, 3]];
 
-  return porSemana.flatMap((dias, i) => {
-    const inicio = somarDias(estaSemana, -7 * (porSemana.length - i));
-    return dias.map((d) => somarDias(inicio, d));
-  });
+  // Os lançamentos da demo cobrem os últimos 7 dias, e em começo de semana
+  // isso invade a semana anterior. Dia com despesa não pode ser "não gastei";
+  // tirá-lo não muda a trilha, porque a própria despesa já registra o dia.
+  const comDespesa = new Set(
+    transacoes
+      .filter((t) => t.valorCentavos < 0 && t.transferenciaId === undefined)
+      .map((t) => t.ocorridoEm),
+  );
+
+  return porSemana
+    .flatMap((dias, i) => {
+      const inicio = somarDias(estaSemana, -7 * (porSemana.length - i));
+      return dias.map((d) => somarDias(inicio, d));
+    })
+    .filter((dia) => !comDespesa.has(dia));
 }
 
 /**
@@ -211,14 +221,15 @@ export type Semente = {
 };
 
 export function semente(hoje: DiaISO): Semente {
+  const transacoes = transacoesDemo(hoje);
   return {
     perfil: { nome: 'Marina' },
     contas,
-    transacoes: transacoesDemo(hoje),
+    transacoes,
     metas: metasDemo(hoje),
     categorias: categoriasDemo(),
     progressoDesafios,
-    diasSemGasto: diasSemGastoDemo(hoje),
+    diasSemGasto: diasSemGastoDemo(hoje, transacoes),
   };
 }
 

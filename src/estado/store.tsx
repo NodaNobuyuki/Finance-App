@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
+import React, { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
 import {
   Categoria,
@@ -33,6 +33,7 @@ import {
 import { GerarId, idsSequenciais, uuidV7 } from '../dominio/ids';
 import { contaPadraoDeMeta, guardadoDaMeta, metaEscolhida } from '../dominio/metas';
 import { Semente, semente, vazia } from '../dominio/seed';
+import { semanasEmDia } from './derivados';
 import {
   Conta,
   Meta,
@@ -427,7 +428,8 @@ export type Acao =
   | { tipo: 'REGISTRO_RAPIDO'; categoriaId: string; valorCentavos: Centavos }
   | { tipo: 'DESFAZER'; transacaoIds: string[]; diasSemGasto: DiaISO[] }
   | { tipo: 'CONFIRMAR_MOVIMENTO_META' }
-  | { tipo: 'AVANCAR_DESAFIO'; desafioId: string; automatico: boolean; rotulo: string }
+  /** Sem mais payload: o que o toque faz depende da medida, lida do catálogo. */
+  | { tipo: 'AVANCAR_DESAFIO'; desafioId: string }
   | { tipo: 'ACEITAR_DESAFIO'; desafioId: string; nome: string }
   | { tipo: 'LOTE_VALOR'; dia: DiaISO; texto: string }
   | { tipo: 'LOTE_CATEGORIA'; dia: DiaISO; categoriaId: string }
@@ -541,6 +543,19 @@ function toastDeRegistro(
       : { rotulo: 'Desfazer', acao: desfazer },
     duracaoMs: 4200,
   };
+}
+
+/**
+ * A constância de verdade, para o fechamento da semana.
+ *
+ * Era "Sua constância subiu para 6 semanas seguidas" cravado — o número da
+ * demo, dito a quem tinha zero semanas e a quem tinha vinte.
+ */
+function fraseDeConstancia(e: Estado): string {
+  const n = semanasEmDia(e);
+  if (n === 0) return 'A meta ficou para a próxima — a sequência recomeça segunda.';
+  if (n === 1) return '1 semana em dia. A sequência começou.';
+  return `${n} semanas seguidas em dia.`;
 }
 
 function avisar(seq: number, texto: string, sub?: string): Toast {
@@ -1407,24 +1422,41 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
     }
 
     case 'AVANCAR_DESAFIO': {
-      // Desafio automático não avança no toque: ele reflete os registros da semana.
-      if (a.automatico) {
-        return {
-          ...e,
-          folha: { tipo: 'nova' },
-          rascunho: { ...RASCUNHO_VAZIO, contaId: e.rascunho.contaId },
-        };
+      // A tela mandava `automatico` junto, e o reducer acreditava: tela e
+      // catálogo decidindo a mesma coisa por caminhos separados.
+      const definicao = definicoesDesafios.find((x) => x.id === a.desafioId);
+      if (!definicao) return e;
+
+      switch (definicao.medida) {
+        // Medida derivada não avança no toque: o toque leva aonde o progresso
+        // de verdade acontece.
+        case 'registros':
+          return {
+            ...e,
+            folha: { tipo: 'nova' },
+            rascunho: { ...RASCUNHO_VAZIO, contaId: e.rascunho.contaId },
+          };
+        case 'categorizados':
+          return aplicarAcao(d, e, { tipo: 'IR_PARA', tela: 'extrato' });
+        case 'manual': {
+          const seq = e.seq + 1;
+          const progressoDesafios = comProgresso(e, a.desafioId, (p) => ({
+            ...p,
+            progresso: p.progresso + 1,
+          }));
+          const agora = Math.min(
+            definicao.alvo,
+            progressoDe(definicao, progressoDesafios).progresso,
+          );
+          return {
+            ...e,
+            seq,
+            progressoDesafios,
+            toast: avisar(seq, `${definicao.nome}: ${agora} de ${definicao.alvo}`),
+          };
+        }
       }
-      const seq = e.seq + 1;
-      return {
-        ...e,
-        seq,
-        progressoDesafios: comProgresso(e, a.desafioId, (p) => ({
-          ...p,
-          progresso: p.progresso + 1,
-        })),
-        toast: avisar(seq, `Dia registrado em “${a.rotulo}”`),
-      };
+      return e;
     }
 
     case 'ACEITAR_DESAFIO': {
@@ -1478,6 +1510,10 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         );
       }
       seq += 1;
+      // Só o que a pessoa marcou como "não gastei". Os dias com valor já estão
+      // registrados pela transação que acabaram de ganhar; pô-los aqui também
+      // gravava "dia sem gasto" num dia em que houve gasto.
+      const semGasto = a.pendentes.filter((dia) => e.lote[dia]?.semGasto);
       const texto =
         a.pendentes.length === 1
           ? 'Dia colocado em dia'
@@ -1486,7 +1522,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         ...e,
         seq,
         transacoes: ordenar([...novos, ...e.transacoes]),
-        diasSemGasto: [...new Set([...e.diasSemGasto, ...a.pendentes])],
+        diasSemGasto: [...new Set([...e.diasSemGasto, ...semGasto])],
         lote: {},
         tela: e.fechando ? 'resumo' : 'home',
         fecharPasso: e.fechando ? 2 : 1,
@@ -1498,7 +1534,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
             acao: {
               tipo: 'DESFAZER',
               transacaoIds: novos.map((t) => t.id),
-              diasSemGasto: a.pendentes,
+              diasSemGasto: semGasto,
             },
           },
           duracaoMs: 4200,
@@ -1540,9 +1576,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         toast: avisar(
           seq,
           'Semana fechada',
-          e.intencao
-            ? `Foco da próxima: ${e.intencao.toLowerCase()}`
-            : 'Sua constância subiu para 6 semanas seguidas',
+          e.intencao ? `Foco da próxima: ${e.intencao.toLowerCase()}` : fraseDeConstancia(e),
         ),
       };
     }
@@ -1743,7 +1777,41 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
    Contexto
    ──────────────────────────────────────────────────────────────── */
 
-type Loja = { estado: Estado; despachar: React.Dispatch<Acao> };
+/**
+ * A loja por fora do React: estado, despacho e quem está ouvindo.
+ *
+ * Era `useReducer` com o `Estado` inteiro no valor do contexto — e aí cada
+ * tecla do teclado numérico, que só troca `rascunho`, re-renderizava todo
+ * componente que chamava `useLoja()`: a tela atrás da folha, cada linha do
+ * Extrato, a navegação. Memoizar derivado por derivado tratava o sintoma. Com a
+ * loja por fora, o contexto carrega um objeto que nunca muda, e cada componente
+ * assina só o recorte que lê (`useRecorte`, `useSeletor`).
+ */
+type Loja = {
+  obter: () => Estado;
+  despachar: React.Dispatch<Acao>;
+  assinar: (ouvinte: () => void) => () => void;
+};
+
+function criarLoja(reducer: (e: Estado, a: Acao) => Estado, inicial: Estado): Loja {
+  let estado = inicial;
+  const ouvintes = new Set<() => void>();
+  return {
+    obter: () => estado,
+    despachar: (a) => {
+      const novo = reducer(estado, a);
+      // Ação que devolve o mesmo estado não acorda ninguém — igual ao
+      // `useReducer`, que também pulava o render nesse caso.
+      if (novo === estado) return;
+      estado = novo;
+      for (const ouvir of ouvintes) ouvir();
+    },
+    assinar: (ouvinte) => {
+      ouvintes.add(ouvinte);
+      return () => ouvintes.delete(ouvinte);
+    },
+  };
+}
 
 const ContextoDaLoja = createContext<Loja | null>(null);
 
@@ -1756,16 +1824,81 @@ export function LojaProvider({
   inicial?: Estado;
   deps?: Dependencias;
 }) {
-  const reducer = useMemo(() => criarReducer(deps), [deps]);
-  const [estado, despachar] = useReducer(reducer, inicial);
-  const valor = useMemo(() => ({ estado, despachar }), [estado]);
-  return <ContextoDaLoja.Provider value={valor}>{children}</ContextoDaLoja.Provider>;
+  // Criada uma vez por montagem. `inicial` e `deps` só valem na montagem, como
+  // o segundo argumento do `useReducer` — trocar a loja no meio da sessão
+  // jogaria fora tudo o que a pessoa fez.
+  const [loja] = useState(() => criarLoja(criarReducer(deps), inicial));
+  return <ContextoDaLoja.Provider value={loja}>{children}</ContextoDaLoja.Provider>;
 }
 
-export function useLoja(): Loja {
-  const ctx = useContext(ContextoDaLoja);
-  if (!ctx) throw new Error('useLoja precisa estar dentro de <LojaProvider>');
-  return ctx;
+function useContextoDaLoja(): Loja {
+  const loja = useContext(ContextoDaLoja);
+  if (!loja) throw new Error('A loja precisa estar dentro de <LojaProvider>');
+  return loja;
+}
+
+/** O despacho. Estável: nunca provoca render por si. */
+export function useDespachar(): React.Dispatch<Acao> {
+  return useContextoDaLoja().despachar;
+}
+
+/**
+ * Um valor tirado do estado, e o componente só re-renderiza quando ELE muda.
+ *
+ * `igual` decide o que é "mudou": `Object.is` por padrão, `igualRaso` para
+ * objeto montado na hora (é o que `useRecorte` usa). O seletor pode ser uma
+ * função nova a cada render — o cache é por estado E por seletor, e resultado
+ * igual ao anterior devolve a referência anterior, que é o que segura o React.
+ */
+export function useSeletor<T>(
+  seletor: (e: Estado) => T,
+  igual: (a: T, b: T) => boolean = Object.is,
+): T {
+  const loja = useContextoDaLoja();
+  const [cache] = useState(() => ({
+    estado: undefined as Estado | undefined,
+    seletor: undefined as ((e: Estado) => T) | undefined,
+    valor: undefined as T | undefined,
+    temValor: false,
+  }));
+
+  const obterValor = (): T => {
+    const estado = loja.obter();
+    if (cache.temValor && cache.estado === estado && cache.seletor === seletor) {
+      return cache.valor as T;
+    }
+    const valor = seletor(estado);
+    const estavel = cache.temValor && igual(cache.valor as T, valor) ? (cache.valor as T) : valor;
+    Object.assign(cache, { estado, seletor, valor: estavel, temValor: true });
+    return estavel;
+  };
+
+  return useSyncExternalStore(loja.assinar, obterValor, obterValor);
+}
+
+/** Mesmas chaves, mesmos valores por referência. */
+export function igualRaso<T extends object>(a: T, b: T): boolean {
+  if (a === b) return true;
+  const chaves = Object.keys(a) as (keyof T)[];
+  if (chaves.length !== Object.keys(b).length) return false;
+  return chaves.every((k) => Object.is(a[k], b[k]));
+}
+
+/**
+ * As chaves do estado que o componente lê — e só elas o acordam.
+ *
+ * Devolve `Pick<Estado, K>`, então derivado que peça uma chave a mais não
+ * compila: esquecer uma chave aqui não vira tela velha em silêncio, vira erro
+ * de tipo. As chaves vão numa constante de módulo, fora do componente.
+ */
+export function useRecorte<K extends keyof Estado>(chaves: readonly K[]): Pick<Estado, K> {
+  return useSeletor((e) => recortar(e, chaves), igualRaso);
+}
+
+export function recortar<K extends keyof Estado>(e: Estado, chaves: readonly K[]): Pick<Estado, K> {
+  const recorte = {} as Pick<Estado, K>;
+  for (const k of chaves) recorte[k] = e[k];
+  return recorte;
 }
 
 /**
@@ -1777,8 +1910,8 @@ export function useLoja(): Loja {
  * volta do segundo plano — que é quando isso acontece na prática.
  */
 export function useSincronizarDia(relogio: () => DiaISO = hojeReal) {
-  const { estado, despachar } = useLoja();
-  const atual = estado.hoje;
+  const despachar = useDespachar();
+  const atual = useSeletor((e) => e.hoje);
 
   useEffect(() => {
     const conferir = () => {

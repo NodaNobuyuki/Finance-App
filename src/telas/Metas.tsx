@@ -6,12 +6,16 @@ import { Vazio } from '../componentes/Vazio';
 import { icones } from '../dominio/categorias';
 import { formatar } from '../dominio/dinheiro';
 import { metas, totalGuardado } from '../estado/derivados';
-import { useLoja } from '../estado/store';
+import { useRecorte, useDespachar } from '../estado/store';
 import { resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
 
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['metas', 'transacoes', 'hoje'] as const;
+
 export function Metas() {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t, paleta } = useTema();
   const lista = metas(estado);
 

@@ -3,10 +3,13 @@ import { View } from 'react-native';
 import { categoria } from '../dominio/categorias';
 import { comSinal } from '../dominio/dinheiro';
 import { Transacao } from '../dominio/tipos';
-import { useLoja } from '../estado/store';
+import { useRecorte, useDespachar } from '../estado/store';
 import { comAlfa, resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
 import { Disco, Toque, Txt } from './basicos';
+
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['contas', 'categorias'] as const;
 
 export function ItemTransacao({
   tx,
@@ -21,7 +24,8 @@ export function ItemTransacao({
    */
   recategorizavel?: boolean;
 }) {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t, paleta } = useTema();
   const cat = categoria(estado.categorias, tx.categoriaId);
   const cor = resolverCor(cat.cor, paleta);

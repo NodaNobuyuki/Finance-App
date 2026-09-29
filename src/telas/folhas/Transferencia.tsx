@@ -4,10 +4,13 @@ import { BotaoPrincipal, Txt } from '../../componentes/basicos';
 import { Teclado } from '../../componentes/Teclado';
 import { deDigitos, formatar } from '../../dominio/dinheiro';
 import { saldoDaConta } from '../../dominio/saldo';
-import { useLoja } from '../../estado/store';
+import { useRecorte, useDespachar } from '../../estado/store';
 import { useTema } from '../../tema/TemaContext';
 import { Folha } from './Folha';
 import { PilulasDeConta } from './PilulasDeConta';
+
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['rascunho', 'contas', 'transferenciaDestinoId', 'transacoes'] as const;
 
 /**
  * Mover dinheiro entre duas contas suas — pagar a fatura do cartão, tirar da
@@ -17,7 +20,8 @@ import { PilulasDeConta } from './PilulasDeConta';
  * mesmo `transferenciaId`, que move saldo e não conta como gasto nem ganho.
  */
 export function Transferencia() {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t } = useTema();
 
   const valor = deDigitos(estado.rascunho.digitos);

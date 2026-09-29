@@ -2,10 +2,13 @@ import React, { useEffect } from 'react';
 import { Animated, View } from 'react-native';
 import { DURACAO, useEntrada } from './animacao';
 import { icones } from '../dominio/categorias';
-import { useLoja } from '../estado/store';
+import { useRecorte, useDespachar } from '../estado/store';
 import { useTema } from '../tema/TemaContext';
 import { Toque, Txt } from './basicos';
 import { Icone } from './Icone';
+
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['toast'] as const;
 
 /**
  * Confirmação de ação.
@@ -15,7 +18,8 @@ import { Icone } from './Icone';
  * este componente só a despacha.
  */
 export function Toast() {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t } = useTema();
   const toast = estado.toast;
   const id = toast?.id;

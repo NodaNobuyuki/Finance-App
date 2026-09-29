@@ -4,10 +4,13 @@ import { BotaoPrincipal, Toque, Txt } from '../../componentes/basicos';
 import { Teclado } from '../../componentes/Teclado';
 import { deDigitos, formatar } from '../../dominio/dinheiro';
 import { metas } from '../../estado/derivados';
-import { useLoja } from '../../estado/store';
+import { useRecorte, useDespachar } from '../../estado/store';
 import { useTema } from '../../tema/TemaContext';
 import { Folha } from './Folha';
 import { PilulasDeConta } from './PilulasDeConta';
+
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['rascunho', 'contas', 'metas', 'transacoes', 'hoje'] as const;
 
 /** Atalhos de valor, em centavos. */
 const ATALHOS = [5000, 10000, 20000];
@@ -21,7 +24,8 @@ const ATALHOS = [5000, 10000, 20000];
  * assim que o toast de desfazer sumisse.
  */
 export function MovimentoMeta({ metaId, retirar }: { metaId: string; retirar: boolean }) {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t } = useTema();
 
   const meta = metas(estado).find((m) => m.id === metaId);
@@ -128,7 +132,7 @@ export function MovimentoMeta({ metaId, retirar }: { metaId: string; retirar: bo
 }
 
 function PilulaValor({ centavos }: { centavos: number }) {
-  const { despachar } = useLoja();
+  const despachar = useDespachar();
   const { t } = useTema();
   return (
     <Toque

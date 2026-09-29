@@ -13,9 +13,12 @@ import { categoria } from '../dominio/categorias';
 import { rotuloIntervalo } from '../dominio/datas';
 import { formatar } from '../dominio/dinheiro';
 import { resumoDaSemana, semana } from '../estado/derivados';
-import { useLoja } from '../estado/store';
+import { useRecorte, useDespachar } from '../estado/store';
 import { resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
+
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['fechando', 'categorias', 'hoje', 'metaSemanal', 'transacoes', 'diasSemGasto'] as const;
 
 /**
  * Resumo da semana — a recompensa do ciclo.
@@ -24,7 +27,8 @@ import { useTema } from '../tema/TemaContext';
  * só no cabeçalho e no botão.
  */
 export function Resumo() {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t, paleta } = useTema();
 
   const s = semana(estado);

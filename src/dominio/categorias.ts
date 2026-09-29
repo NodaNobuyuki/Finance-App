@@ -46,6 +46,41 @@ export type Categoria = {
 export type ModeloDeCategoria = Omit<Categoria, 'limiteCentavos'>;
 
 /**
+ * Ícones avulsos da interface, no mesmo formato das categorias.
+ *
+ * Vem antes do catálogo de fábrica porque alguns desenhos são dos dois — o
+ * talher do Restaurante é também o do desafio sem delivery. Um path só, para
+ * a troca de um ícone não deixar o outro para trás.
+ */
+export const icones = {
+  inicio: 'M3 10.5L12 3l9 7.5V21H3zM9.5 21v-6h5v6',
+  extrato: 'M5 3h14v18H5zM9 8h6M9 12h6M9 16h4',
+  habitos:
+    'M12 3c1.2 3 4.5 4.2 4.5 8a4.5 4.5 0 01-9 0c0-1.6.7-2.6 1.5-3.5.3 1.2 1 1.8 1.8 1.8-.6-2.4-.4-4.6 1.2-6.3z',
+  metas:
+    'M12 21a9 9 0 100-18 9 9 0 000 18zM12 16a4 4 0 100-8 4 4 0 000 8zM12 13.2a1.2 1.2 0 100-2.4 1.2 1.2 0 000 2.4',
+  mais: 'M12 5v14M5 12h14',
+  check: 'M20 6L9 17l-5-5',
+  voltar: 'M15 5l-7 7 7 7',
+  fechar: 'M18 6L6 18M6 6l12 12',
+  grafico: 'M3 17l6-6 4 4 8-8M21 7h-5M21 7v5',
+  lampada:
+    'M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.5.4.8 1 .8 1.6h5.4c0-.6.3-1.2.8-1.6A6 6 0 0012 3z',
+  calendario: 'M4 6h16v15H4zM4 10h16M8 3v4M16 3v4',
+  calendarioOk: 'M4 5h16v16H4zM4 10h16M8 3v4M16 3v4M9.2 15.4l1.9 1.9 3.7-3.9',
+  calendarioMais: 'M4 5h16v16H4zM4 10h16M8 3v4M16 3v4M12 13v4M10 15h4',
+  relogio: 'M12 8v4.6l3 1.8M21 12a9 9 0 11-9-9',
+  desfazer: 'M3 8h11a5 5 0 010 10H8M3 8l4-4M3 8l4 4',
+  lixeira: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6',
+  lapis: 'M4 20h4L19 9a2.1 2.1 0 00-3-3L5 17zM14 6l4 4',
+  transferir: 'M4 8h13M13 4l4 4-4 4M20 16H7M11 12l-4 4 4 4',
+  talheres: 'M6 3v7a2 2 0 004 0V3M8 10v11M17 3c-1.4 2-2 4-2 6h4c0-2-.6-4-2-6zM17 9v12',
+  carro:
+    'M5 13l1.6-4.6A2 2 0 018.5 7h7a2 2 0 011.9 1.4L19 13v5h-3v-2H8v2H5zM7.6 15.4h.01M16.4 15.4h.01',
+  repetir: 'M4 9a5 5 0 015-5h9M18 4l3 3-3 3M20 15a5 5 0 01-5 5H6M6 20l-3-3 3-3',
+} as const;
+
+/**
  * Catálogo de FÁBRICA — semente, não fonte de consulta.
  *
  * Quem lê daqui é `criarEstadoInicial` e a migration v6, e mais ninguém: as
@@ -70,15 +105,14 @@ export const categoriasDeFabrica: Record<string, ModeloDeCategoria> = {
     nome: 'Restaurante',
     tipo: 'despesa',
     cor: hex('#c0562b'),
-    icone: 'M6 3v7a2 2 0 004 0V3M8 10v11M17 3c-1.4 2-2 4-2 6h4c0-2-.6-4-2-6zM17 9v12',
+    icone: icones.talheres,
   },
   transporte: {
     id: 'transporte',
     nome: 'Transporte',
     tipo: 'despesa',
     cor: hex('#2f6f8f'),
-    icone:
-      'M5 13l1.6-4.6A2 2 0 018.5 7h7a2 2 0 011.9 1.4L19 13v5h-3v-2H8v2H5zM7.6 15.4h.01M16.4 15.4h.01',
+    icone: icones.carro,
   },
   casa: {
     id: 'casa',
@@ -120,7 +154,7 @@ export const categoriasDeFabrica: Record<string, ModeloDeCategoria> = {
     nome: 'Assinaturas',
     tipo: 'despesa',
     cor: hex('#4a5f8a'),
-    icone: 'M4 9a5 5 0 015-5h9M18 4l3 3-3 3M20 15a5 5 0 01-5 5H6M6 20l-3-3 3-3',
+    icone: icones.repetir,
   },
   salario: {
     id: 'salario',
@@ -204,13 +238,19 @@ export function categoriasPorTipo(
  * Preserva o id original para que a linha continue rastreável e possa ser
  * recategorizada, em vez de virar um registro anônimo.
  */
+/**
+ * O ícone do buraco. Exportado para o guarda de `telas.test.tsx`: id cravado
+ * que só pinta ícone e cor não mostra o texto "Sem categoria", e escapava.
+ */
+export const ICONE_ORFA = 'M12 21a9 9 0 100-18 9 9 0 000 18zM12 8v5M12 16.5h.01';
+
 function categoriaOrfa(id: string): Categoria {
   return {
     id,
     nome: 'Sem categoria',
     tipo: 'despesa',
     cor: token('inkFaint'),
-    icone: 'M12 21a9 9 0 100-18 9 9 0 000 18zM12 8v5M12 16.5h.01',
+    icone: ICONE_ORFA,
     // Categoria que não existe mais não tem teto: o limite dela foi apagado
     // junto, e o gasto órfão não pode estourar orçamento nenhum.
     limiteCentavos: 0,
@@ -254,28 +294,3 @@ export const coresDeCategoria: CorRef[] = [
 export const iconesDeCategoria: string[] = [
   ...new Set(Object.values(categoriasDeFabrica).map((c) => c.icone)),
 ];
-
-/** Ícones avulsos da interface, no mesmo formato das categorias. */
-export const icones = {
-  inicio: 'M3 10.5L12 3l9 7.5V21H3zM9.5 21v-6h5v6',
-  extrato: 'M5 3h14v18H5zM9 8h6M9 12h6M9 16h4',
-  habitos:
-    'M12 3c1.2 3 4.5 4.2 4.5 8a4.5 4.5 0 01-9 0c0-1.6.7-2.6 1.5-3.5.3 1.2 1 1.8 1.8 1.8-.6-2.4-.4-4.6 1.2-6.3z',
-  metas:
-    'M12 21a9 9 0 100-18 9 9 0 000 18zM12 16a4 4 0 100-8 4 4 0 000 8zM12 13.2a1.2 1.2 0 100-2.4 1.2 1.2 0 000 2.4',
-  mais: 'M12 5v14M5 12h14',
-  check: 'M20 6L9 17l-5-5',
-  voltar: 'M15 5l-7 7 7 7',
-  fechar: 'M18 6L6 18M6 6l12 12',
-  grafico: 'M3 17l6-6 4 4 8-8M21 7h-5M21 7v5',
-  lampada:
-    'M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.5.4.8 1 .8 1.6h5.4c0-.6.3-1.2.8-1.6A6 6 0 0012 3z',
-  calendario: 'M4 6h16v15H4zM4 10h16M8 3v4M16 3v4',
-  calendarioOk: 'M4 5h16v16H4zM4 10h16M8 3v4M16 3v4M9.2 15.4l1.9 1.9 3.7-3.9',
-  calendarioMais: 'M4 5h16v16H4zM4 10h16M8 3v4M16 3v4M12 13v4M10 15h4',
-  relogio: 'M12 8v4.6l3 1.8M21 12a9 9 0 11-9-9',
-  desfazer: 'M3 8h11a5 5 0 010 10H8M3 8l4-4M3 8l4 4',
-  lixeira: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6',
-  lapis: 'M4 20h4L19 9a2.1 2.1 0 00-3-3L5 17zM14 6l4 4',
-  transferir: 'M4 8h13M13 4l4 4-4 4M20 16H7M11 12l-4 4 4 4',
-} as const;

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { useLoja } from '../estado/store';
-import { EstadoPersistido, mudouAlgoPersistido, recortePersistido } from './persistido';
+import { GravacaoRecusada } from '../dominio/erros';
+import { useRecorte } from '../estado/store';
+import { CHAVES_PERSISTIDAS, EstadoPersistido, mudouAlgoPersistido } from './persistido';
 import { RepositorioLocal } from './repositorio';
 
 /**
@@ -24,7 +25,9 @@ export function usePersistencia(
   repositorio: RepositorioLocal | null,
   aoFalhar?: (erro: unknown) => void,
 ) {
-  const { estado } = useLoja();
+  // Só o recorte persistido acorda este gancho: tecla no teclado numérico nem
+  // chega a rodar o efeito.
+  const atual = useRecorte(CHAVES_PERSISTIDAS);
   const ultimoGravado = useRef<EstadoPersistido | null>(null);
   const fila = useRef<Promise<void>>(Promise.resolve());
   const falhar = useRef(aoFalhar);
@@ -41,7 +44,6 @@ export function usePersistencia(
   useEffect(() => {
     if (!repositorio) return;
 
-    const atual = recortePersistido(estado);
     const anterior = ultimoGravado.current;
 
     // Primeira passada: este estado acabou de vir do banco (ou é a semente que
@@ -56,6 +58,13 @@ export function usePersistencia(
 
     fila.current = fila.current
       .then(() => repositorio.salvar(anterior, atual))
+      .then(({ recusadas }) => {
+        // Recusa por restrição NÃO volta o ponto de comparação: reenviar a
+        // mesma linha bateria na mesma restrição, e era esse reenvio eterno
+        // que travava todas as gravações seguintes. O resto já está no disco;
+        // a linha recusada fica só na memória, e a pessoa precisa saber disso.
+        if (recusadas.length > 0) falhar.current?.(new GravacaoRecusada(recusadas));
+      })
       .catch((erro) => {
         // Falha de gravação não derruba a tela — o estado em memória segue
         // correto e o app continua usável. Mas o ponto de comparação volta
@@ -65,5 +74,5 @@ export function usePersistencia(
         ultimoGravado.current = anterior;
         falhar.current?.(erro);
       });
-  }, [estado, repositorio]);
+  }, [atual, repositorio]);
 }

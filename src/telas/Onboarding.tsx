@@ -4,10 +4,13 @@ import { BotaoPrincipal, Hero, Rotulo, Toque, Txt } from '../componentes/basicos
 import { Teclado } from '../componentes/Teclado';
 import { deDigitos, empilharDigitos, formatar, removerDigito } from '../dominio/dinheiro';
 import { Conta } from '../dominio/tipos';
-import { useLoja } from '../estado/store';
+import { useRecorte, useDespachar } from '../estado/store';
 import { sans } from '../tema/fontes';
 import { useTema } from '../tema/TemaContext';
 import { Passos } from './Resumo';
+
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['onboarding'] as const;
 
 /**
  * Primeiro uso, em 3 passos: nome → primeira conta → primeira meta.
@@ -25,7 +28,8 @@ const TIPOS: { id: Conta['tipo']; nome: string }[] = [
 ];
 
 export function Onboarding() {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t } = useTema();
 
   const o = estado.onboarding;

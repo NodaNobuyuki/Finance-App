@@ -1,3 +1,5 @@
+import { hex, token, CorRef } from '../tema/paletas';
+import { icones } from './categorias';
 import { Centavos } from './dinheiro';
 import { ProgressoDesafio } from './tipos';
 
@@ -20,96 +22,127 @@ import { ProgressoDesafio } from './tipos';
  * continua intacto.
  */
 
-export type DefinicaoDesafio = {
+type BaseDesafio = {
   id: string;
   nome: string;
-  sub: string;
   /** Subtítulo quando o desafio ainda é opcional (não foi aceito). */
   subOff: string;
-  alvo: number;
   unidade: string;
   acao: string;
-  /** Progresso vem dos registros da semana, não de toque manual. */
-  automatico?: boolean;
   /** Já vem aceito de fábrica — quem instala hoje encontra este ativo. */
   aceitoPorPadrao: boolean;
-  categoriaId: string;
+  /**
+   * Desenho e cor são do desafio, não emprestados de uma categoria.
+   *
+   * Eram `categoriaId: 'restaurante'`, `'contas'`, `'salario'`… — ids de
+   * fábrica resolvidos contra as categorias DA PESSOA. Quem apagava ou nunca
+   * teve "Restaurante" via o ícone do buraco no desafio. Desafio é conteúdo
+   * nosso, categoria é vocabulário dela: um não pode depender do outro.
+   */
+  icone: string;
+  cor: CorRef;
   /** Quanto o desafio evita de gasto, em centavos. */
   economiaCentavos: Centavos;
 };
 
+/**
+ * Como o progresso é medido — e é isto que decide o que o catálogo PODE dizer.
+ *
+ * Medida derivada não tem alvo nem subtítulo no catálogo: os dois saem do
+ * estado em `desafios()`. Era aí que o catálogo mentia — "Registrar 4 vezes"
+ * para quem escolheu 6 no ritual, "2 lançamentos sem categoria" para todo
+ * mundo, "a semana fecha domingo" para quem fecha no sábado.
+ */
+export type DefinicaoDesafio =
+  /** Registros da semana contra `metaSemanal`. Tocar abre o lançamento. */
+  | (BaseDesafio & { medida: 'registros' })
+  /** Lançamentos do mês com categoria que existe, contra todos do mês. */
+  | (BaseDesafio & { medida: 'categorizados' })
+  /** Quem avança é o toque da pessoa; alvo e subtítulo são do catálogo. */
+  | (BaseDesafio & { medida: 'manual'; alvo: number; sub: string });
+
 export const definicoesDesafios: DefinicaoDesafio[] = [
   {
     id: 'reg4',
-    nome: 'Registrar 4 vezes nesta semana',
-    sub: 'a semana fecha domingo',
+    medida: 'registros',
+    nome: 'Bater a meta de registros da semana',
     subOff: '',
-    alvo: 4,
     unidade: 'registros',
     acao: 'Registrar agora',
-    automatico: true,
     aceitoPorPadrao: true,
-    categoriaId: 'salario',
+    icone: icones.calendarioOk,
+    cor: token('up'),
     economiaCentavos: 0,
   },
   {
     id: 'catg',
+    medida: 'categorizados',
     nome: 'Categorizar tudo do mês',
-    sub: '2 lançamentos sem categoria',
     subOff: '',
-    alvo: 14,
     unidade: 'lançamentos',
-    acao: 'Revisar 1',
+    acao: 'Revisar no Extrato',
     aceitoPorPadrao: true,
-    categoriaId: 'contas',
+    icone: icones.lapis,
+    cor: hex('#8a6d3b'),
     economiaCentavos: 0,
   },
+  // Os subtítulos dos manuais não prometem prazo ("termina sexta", "termina no
+  // fim da semana"): o progresso não guarda quando começou, então prazo
+  // nenhum é verdade. Nem números em R$ "do mês passado" — eram da demo.
   {
     id: 'assin',
-    nome: 'Revisar as assinaturas',
-    sub: '3 assinaturas ativas',
+    medida: 'manual',
+    nome: 'Revisar 3 assinaturas',
+    sub: 'uma por vez: ainda vale o que custa?',
     subOff: '',
     alvo: 3,
     unidade: 'assinaturas',
-    acao: 'Revisar 1',
+    acao: 'Revisei 1',
     aceitoPorPadrao: true,
-    categoriaId: 'assinaturas',
+    icone: icones.repetir,
+    cor: hex('#4a5f8a'),
     economiaCentavos: 0,
   },
   {
     id: 'delivery',
+    medida: 'manual',
     nome: 'Semana sem delivery',
-    sub: 'termina no fim da semana',
-    subOff: 'opcional · R$ 312 no mês passado',
+    sub: 'marque cada dia sem pedir comida',
+    subOff: 'opcional · 7 dias sem pedir comida',
     alvo: 7,
     unidade: 'dias',
     acao: 'Marcar hoje',
     aceitoPorPadrao: false,
-    categoriaId: 'restaurante',
+    icone: icones.talheres,
+    cor: hex('#c0562b'),
     economiaCentavos: 31200,
   },
   {
     id: 'cafe',
+    medida: 'manual',
     nome: '5 dias sem café fora',
-    sub: 'termina sexta',
-    subOff: 'opcional · R$ 12 por dia',
+    sub: 'marque cada dia sem café fora',
+    subOff: 'opcional · um cafezinho a menos por dia',
     alvo: 5,
     unidade: 'dias',
     acao: 'Marcar hoje',
     aceitoPorPadrao: false,
-    categoriaId: 'restaurante',
+    icone: icones.talheres,
+    cor: hex('#c0562b'),
     economiaCentavos: 6000,
   },
   {
     id: 'uber',
+    medida: 'manual',
     nome: 'Semana sem app de transporte',
-    sub: 'termina no fim da semana',
-    subOff: 'opcional · R$ 244 no mês passado',
+    sub: 'marque cada dia sem corrida por app',
+    subOff: 'opcional · 7 dias sem corrida por app',
     alvo: 7,
     unidade: 'dias',
     acao: 'Marcar hoje',
     aceitoPorPadrao: false,
-    categoriaId: 'transporte',
+    icone: icones.carro,
+    cor: hex('#2f6f8f'),
     economiaCentavos: 24400,
   },
 ];

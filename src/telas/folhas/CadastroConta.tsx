@@ -5,10 +5,13 @@ import { Teclado } from '../../componentes/Teclado';
 import { deDigitos, empilharDigitos, formatar, removerDigito } from '../../dominio/dinheiro';
 import { saldoDaConta } from '../../dominio/saldo';
 import { Conta } from '../../dominio/tipos';
-import { useLoja } from '../../estado/store';
+import { useRecorte, useDespachar } from '../../estado/store';
 import { useTema } from '../../tema/TemaContext';
 import { BotaoApagar, CampoTexto, Opcoes } from './Campo';
 import { Folha } from './Folha';
+
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['transacoes', 'contas', 'cadastroConta'] as const;
 
 const TIPOS: { id: Conta['tipo']; nome: string }[] = [
   { id: 'corrente', nome: 'Conta corrente' },
@@ -24,7 +27,8 @@ const TIPOS: { id: Conta['tipo']; nome: string }[] = [
  * uma segunda — ficava sem caminho.
  */
 export function CadastroConta() {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t } = useTema();
 
   const c = estado.cadastroConta;

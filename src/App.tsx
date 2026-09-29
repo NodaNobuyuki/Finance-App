@@ -18,9 +18,11 @@ import { useBanco } from './dados/boot';
 import { RepositorioLocal } from './dados/repositorio';
 import { usePersistencia } from './dados/usePersistencia';
 import { mensagemParaOUsuario } from './dominio/erros';
-import { LojaProvider, useLoja, useSincronizarDia } from './estado/store';
+import { Tela } from './dominio/tipos';
+import { LojaProvider, useDespachar, useSeletor, useSincronizarDia } from './estado/store';
 import { Categorias } from './telas/Categorias';
 import { Extrato } from './telas/Extrato';
+import { FaixaSemSalvar, FalhaAoAbrir } from './telas/FalhaAoAbrir';
 import { FecharSemana } from './telas/FecharSemana';
 import { Habitos } from './telas/Habitos';
 import { Inicio } from './telas/Inicio';
@@ -39,9 +41,16 @@ import { Ritual } from './telas/folhas/Ritual';
 import { Transferencia } from './telas/folhas/Transferencia';
 import { TemaProvider, useTema } from './tema/TemaContext';
 
+/**
+ * Telas que trazem a própria rolagem e por isso ficam fora do `ScrollView` da
+ * `Casca`. Lista virtualizada dentro de outra rolagem vertical renderiza tudo
+ * de uma vez — o RN avisa, e a virtualização some.
+ */
+const TELAS_COM_ROLAGEM_PROPRIA: ReadonlySet<Tela> = new Set<Tela>(['extrato']);
+
 function TelaAtual() {
-  const { estado } = useLoja();
-  switch (estado.tela) {
+  const tela = useSeletor((e) => e.tela);
+  switch (tela) {
     case 'extrato':
       return <Extrato />;
     case 'metas':
@@ -65,13 +74,13 @@ function TelaAtual() {
 }
 
 function FolhaAtual() {
-  const { estado } = useLoja();
-  if (!estado.folha) return null;
-  switch (estado.folha.tipo) {
+  const folha = useSeletor((e) => e.folha);
+  if (!folha) return null;
+  switch (folha.tipo) {
     case 'nova':
       return <NovaTransacao />;
     case 'movimentoMeta':
-      return <MovimentoMeta metaId={estado.folha.metaId} retirar={estado.folha.retirar} />;
+      return <MovimentoMeta metaId={folha.metaId} retirar={folha.retirar} />;
     case 'transferencia':
       return <Transferencia />;
     case 'ritual':
@@ -83,14 +92,22 @@ function FolhaAtual() {
     case 'categoria':
       return <CadastroCategoria />;
     case 'recategorizar':
-      return <Recategorizar transacaoId={estado.folha.transacaoId} />;
+      return <Recategorizar transacaoId={folha.transacaoId} />;
     default:
       return null;
   }
 }
 
-function Casca({ repositorio }: { repositorio: RepositorioLocal }) {
-  const { estado, despachar } = useLoja();
+function Casca({
+  repositorio,
+  semDisco,
+}: {
+  repositorio: RepositorioLocal;
+  semDisco: boolean;
+}) {
+  const tela = useSeletor((e) => e.tela);
+  const onboardingConcluido = useSeletor((e) => e.onboardingConcluido);
+  const despachar = useDespachar();
   const { t, paleta } = useTema();
 
   useSincronizarDia();
@@ -101,10 +118,11 @@ function Casca({ repositorio }: { repositorio: RepositorioLocal }) {
 
   // Primeiro uso ocupa a tela inteira: sem nav, sem folha, sem saída lateral.
   // Enquanto não há uma conta, não existe nada que as outras telas possam mostrar.
-  if (!estado.onboardingConcluido) {
+  if (!onboardingConcluido) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: t.canvas }}>
         <StatusBar style={paleta.escuro ? 'light' : 'dark'} />
+        {semDisco ? <FaixaSemSalvar /> : null}
         <Onboarding />
       </SafeAreaView>
     );
@@ -113,24 +131,46 @@ function Casca({ repositorio }: { repositorio: RepositorioLocal }) {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.canvas }}>
       <StatusBar style={paleta.escuro ? 'light' : 'dark'} />
+      {semDisco ? <FaixaSemSalvar /> : null}
       <View style={{ flex: 1, backgroundColor: t.canvas }}>
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1 }}
-          showsVerticalScrollIndicator={false}
-          // Rola até o topo quando a tela muda, senão o usuário cai no meio
-          // do conteúdo anterior.
-          key={estado.tela}
-        >
-          <Transicao chave={estado.tela}>
-            <TelaAtual />
-          </Transicao>
-        </ScrollView>
+        {TELAS_COM_ROLAGEM_PROPRIA.has(tela) ? (
+          // Sem ScrollView em volta, a remontagem pela troca de componente já
+          // devolve a lista ao topo.
+          <View style={{ flex: 1 }}>
+            <Transicao chave={tela}>
+              <TelaAtual />
+            </Transicao>
+          </View>
+        ) : (
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ flexGrow: 1 }}
+            showsVerticalScrollIndicator={false}
+            // Rola até o topo quando a tela muda, senão o usuário cai no meio
+            // do conteúdo anterior.
+            key={tela}
+          >
+            <Transicao chave={tela}>
+              <TelaAtual />
+            </Transicao>
+          </ScrollView>
+        )}
 
         <NavInferior />
         <Toast />
         <FolhaAtual />
       </View>
+    </SafeAreaView>
+  );
+}
+
+/** A tela de falha fica fora da `Casca`: não há loja, porque não há dados. */
+function FundoDaFalha({ children }: { children: React.ReactNode }) {
+  const { t, paleta } = useTema();
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.canvas }}>
+      <StatusBar style={paleta.escuro ? 'light' : 'dark'} />
+      {children}
     </SafeAreaView>
   );
 }
@@ -146,15 +186,25 @@ export default function App() {
     IBMPlexMono_600SemiBold,
   });
 
-  const boot = useBanco();
+  const { boot, tentarDeNovo, usarSemSalvar } = useBanco();
 
   // Fontes e banco carregam em paralelo; a splash do Expo cobre os dois.
   if (!fontesProntas || !boot) return null;
 
+  if (boot.tipo === 'falhou') {
+    return (
+      <TemaProvider>
+        <FundoDaFalha>
+          <FalhaAoAbrir aoTentar={tentarDeNovo} aoUsarSemSalvar={usarSemSalvar} />
+        </FundoDaFalha>
+      </TemaProvider>
+    );
+  }
+
   return (
     <TemaProvider>
       <LojaProvider inicial={boot.inicial}>
-        <Casca repositorio={boot.repositorio} />
+        <Casca repositorio={boot.repositorio} semDisco={boot.semDisco} />
       </LojaProvider>
     </TemaProvider>
   );

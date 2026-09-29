@@ -127,11 +127,15 @@ describe('fechar e reabrir', () => {
 
     // A demo já traz dias sem gasto das semanas anteriores — é deles que sai a
     // trilha de constância. O que este teste guarda é que os dois dias fechados
-    // agora entraram, sem duplicar nada, e sobreviveram a fechar e reabrir.
-    expect(depois.diasSemGasto).toEqual(expect.arrayContaining(pendentes));
-    expect(depois.diasSemGasto).toHaveLength(criarEstadoDemo(AGORA).diasSemGasto.length + 2);
+    // sobreviveram a fechar e reabrir, cada um pelo caminho certo: o de valor
+    // como despesa, o de "não gastei" como dia sem gasto — e só ele ali.
+    expect(depois.diasSemGasto).toContain(pendentes[1]);
+    expect(depois.diasSemGasto).not.toContain(pendentes[0]);
+    expect(depois.diasSemGasto).toHaveLength(criarEstadoDemo(AGORA).diasSemGasto.length + 1);
     expect(new Set(depois.diasSemGasto).size).toBe(depois.diasSemGasto.length);
-    expect(depois.transacoes.some((t) => t.valorCentavos === -4250)).toBe(true);
+    expect(
+      depois.transacoes.some((t) => t.valorCentavos === -4250 && t.ocorridoEm === pendentes[0]),
+    ).toBe(true);
   });
 
   it('ajuste do ritual sobrevive', async () => {
@@ -152,8 +156,8 @@ describe('fechar e reabrir', () => {
     const motor = criarMotorNode();
     await sessao(motor, [
       { tipo: 'ACEITAR_DESAFIO', desafioId: 'cafe', nome: '5 dias sem café fora' },
-      { tipo: 'AVANCAR_DESAFIO', desafioId: 'cafe', automatico: false, rotulo: 'x' },
-      { tipo: 'AVANCAR_DESAFIO', desafioId: 'cafe', automatico: false, rotulo: 'x' },
+      { tipo: 'AVANCAR_DESAFIO', desafioId: 'cafe' },
+      { tipo: 'AVANCAR_DESAFIO', desafioId: 'cafe' },
     ]);
     const depois = await sessao(motor);
 

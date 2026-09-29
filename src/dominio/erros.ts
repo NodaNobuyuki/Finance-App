@@ -91,9 +91,33 @@ export class EscritaFalhou extends ErroDeInfra {
   }
 }
 
+/**
+ * O banco recusou linhas por restrição do esquema; o resto foi gravado.
+ *
+ * É a exceção à regra do `ErroDeInfra`: repetir NÃO conserta, porque a mesma
+ * linha bate na mesma restrição. Por isso quem grava não reenvia — avisa. Na
+ * prática é bug nosso (o estado deixou passar algo que o esquema proíbe), e a
+ * linha recusada vive só na memória até o app fechar.
+ */
+export class GravacaoRecusada extends ErroDeInfra {
+  constructor(readonly recusadas: { tabela: string; id: string }[]) {
+    super(
+      'gravacao-recusada',
+      `O banco recusou ${recusadas.length} linha(s): ${recusadas
+        .map((r) => `${r.tabela}/${r.id}`)
+        .join(', ')}`,
+    );
+  }
+}
+
 /** Texto curto para o usuário. Infra nunca expõe detalhe técnico. */
 export function mensagemParaOUsuario(erro: unknown): string {
   if (erro instanceof ErroDeDominio) return erro.message;
+  if (erro instanceof GravacaoRecusada) {
+    return erro.recusadas.length === 1
+      ? 'Uma alteração não pôde ser salva e some ao fechar o app.'
+      : `${erro.recusadas.length} alterações não puderam ser salvas e somem ao fechar o app.`;
+  }
   if (erro instanceof ErroDeInfra) return 'Não deu para salvar agora. Vamos tentar de novo.';
   return 'Algo deu errado.';
 }

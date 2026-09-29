@@ -2,10 +2,13 @@ import React from 'react';
 import { View } from 'react-native';
 import { icones } from '../dominio/categorias';
 import { Tela } from '../dominio/tipos';
-import { useLoja } from '../estado/store';
+import { useRecorte, useDespachar } from '../estado/store';
 import { useTema } from '../tema/TemaContext';
 import { Toque, Txt } from './basicos';
 import { Icone } from './Icone';
+
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['tela'] as const;
 
 const ABAS_ESQUERDA: { tela: Tela; nome: string; icone: string }[] = [
   { tela: 'home', nome: 'Início', icone: icones.inicio },
@@ -18,7 +21,8 @@ const ABAS_DIREITA: { tela: Tela; nome: string; icone: string }[] = [
 ];
 
 export function NavInferior() {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t } = useTema();
 
   const aba = ({ tela, nome, icone }: { tela: Tela; nome: string; icone: string }) => {

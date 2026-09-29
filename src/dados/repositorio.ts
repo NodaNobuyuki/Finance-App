@@ -1,5 +1,20 @@
 import { EstadoPersistido } from './persistido';
 
+/** Linha que o banco recusou por violar uma restrição do esquema. */
+export type Recusa = { tabela: string; id: string };
+
+export type Gravacao = {
+  /**
+   * O que ficou fora do disco. Vazio no caminho normal.
+   *
+   * A recusa é por linha: o resto da gravação entra. Quando uma linha ruim
+   * derrubava a gravação inteira, o reenvio levava a mesma linha de novo e
+   * batia na mesma restrição — nenhuma escrita chegava mais ao disco, e tudo o
+   * que a pessoa fizesse dali em diante sumia ao fechar o app.
+   */
+  recusadas: Recusa[];
+};
+
 /**
  * O contrato de persistência local.
  *
@@ -20,8 +35,11 @@ export interface RepositorioLocal {
    * Recebe os dois lados porque o diff é por identidade: assim uma escrita
    * custa as linhas que mudaram, não a tabela inteira. `antes` é `null` no
    * primeiro salvamento, que grava tudo.
+   *
+   * Lança só quando o mundo falha (disco, banco) — aí nada foi gravado e vale
+   * reenviar. Restrição violada não lança: volta em `recusadas`.
    */
-  salvar(antes: EstadoPersistido | null, depois: EstadoPersistido): Promise<void>;
+  salvar(antes: EstadoPersistido | null, depois: EstadoPersistido): Promise<Gravacao>;
 
   /** Zera o banco mantendo o esquema. */
   apagarTudo(): Promise<void>;

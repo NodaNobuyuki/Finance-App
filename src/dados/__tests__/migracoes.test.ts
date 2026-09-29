@@ -238,6 +238,33 @@ describe('aplicar do zero', () => {
     expect(sobrou).toEqual([]);
   });
 
+  it('a v9 tira do "dia sem gasto" só o dia desmentido por uma despesa', async () => {
+    const motor = criarMotorNode();
+    await ateAVersao(motor, 8);
+    const lancar = (id: string, dia: string, valor: number, transferencia: string | null) =>
+      motor.executar(
+        `INSERT INTO transacoes (id, conta_id, categoria_id, valor_centavos, ocorrido_em,
+           descricao, origem, criado_em, atualizado_em, transferencia_id)
+         VALUES (?, 'c', 'k', ?, ?, 'x', 'manual', 1, 1, ?)`,
+        [id, valor, dia, transferencia],
+      );
+    await lancar('gasto', '2026-03-02', -4250, null);
+    await lancar('salario', '2026-03-03', 500000, null);
+    await lancar('aporte', '2026-03-04', -10000, 'par');
+    for (const dia of ['2026-03-01', '2026-03-02', '2026-03-03', '2026-03-04']) {
+      await motor.executar(`INSERT INTO dias_sem_gasto (dia) VALUES (?)`, [dia]);
+    }
+
+    expect(await aplicarMigracoes(motor)).toBe(VERSAO_ESPERADA);
+
+    const dias = await motor.consultar<{ dia: string }>(
+      `SELECT dia FROM dias_sem_gasto ORDER BY dia`,
+    );
+    // Sai o dia 2, que teve despesa. Ficam o dia vazio, o de salário e o do
+    // aporte: receita e transferência não desmentem "não gastei".
+    expect(dias.map((d) => d.dia)).toEqual(['2026-03-01', '2026-03-03', '2026-03-04']);
+  });
+
   it('é idempotente — rodar de novo não faz nada', async () => {
     const motor = criarMotorNode();
     await aplicarMigracoes(motor);

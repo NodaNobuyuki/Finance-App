@@ -33,3 +33,21 @@ export interface MotorSQL {
 
   fechar(): Promise<void>;
 }
+
+/**
+ * A escrita bateu numa restrição do esquema — UNIQUE, NOT NULL, CHECK.
+ *
+ * É a falha que repetir não conserta: a mesma linha bate na mesma restrição
+ * toda vez. Distinguir isto de disco cheio é o que impede uma linha ruim de
+ * travar todas as gravações seguintes.
+ *
+ * Reconhecida pela mensagem porque quem escreve o texto é o próprio SQLite
+ * ("UNIQUE constraint failed: …"), igual no aparelho e no Node — já o objeto
+ * de erro, cada driver embrulha do seu jeito. Nem `instanceof Error` é
+ * confiável: o erro do módulo nativo pode vir de outro realm (é o que acontece
+ * com o `node:sqlite` dentro do Jest), então só a mensagem é lida.
+ */
+export function ehRecusaDeRestricao(erro: unknown): boolean {
+  const mensagem = (erro as { message?: unknown } | null)?.message;
+  return typeof mensagem === 'string' && /constraint failed/i.test(mensagem);
+}

@@ -328,6 +328,25 @@ export const migracoes: Migracao[] = [
       `DELETE FROM preferencias WHERE chave = 'contexto'`,
     ],
   },
+  {
+    versao: 9,
+    nome: 'dia-sem-gasto-nao-tem-gasto',
+    sql: [
+      // O Lote gravava TODOS os dias que colocava em dia como "dia sem gasto",
+      // inclusive os que ganharam um lançamento de despesa ali mesmo. A trilha
+      // não sentia — o dia continua registrado pela transação —, mas o dado
+      // dizia o contrário do que aconteceu, e o primeiro desafio que contasse
+      // dias sem gasto contaria errado.
+      //
+      // Sai só o dia desmentido por uma DESPESA. Receita e transferência não
+      // são gasto: "não gastei" num dia de salário continua verdade.
+      `DELETE FROM dias_sem_gasto
+         WHERE dia IN (
+           SELECT ocorrido_em FROM transacoes
+            WHERE valor_centavos < 0 AND transferencia_id IS NULL
+         )`,
+    ],
+  },
 ];
 
 async function versaoAtual(motor: MotorSQL): Promise<number> {

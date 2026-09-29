@@ -5,10 +5,13 @@ import { Teclado } from '../../componentes/Teclado';
 import { somarDias } from '../../dominio/datas';
 import { deDigitos, empilharDigitos, formatar, removerDigito } from '../../dominio/dinheiro';
 import { rotuloDePrazo } from '../../dominio/metas';
-import { useLoja } from '../../estado/store';
+import { useRecorte, useDespachar } from '../../estado/store';
 import { useTema } from '../../tema/TemaContext';
 import { BotaoApagar, CampoTexto, Opcoes } from './Campo';
 import { Folha } from './Folha';
+
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['hoje', 'contas', 'cadastroMeta'] as const;
 
 /**
  * Prazos em dias a partir de hoje.
@@ -27,7 +30,8 @@ const PRAZOS: { id: string; nome: string; dias: number | null }[] = [
 ];
 
 export function CadastroMeta() {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t } = useTema();
 
   const c = estado.cadastroMeta;

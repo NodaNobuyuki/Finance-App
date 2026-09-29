@@ -1,7 +1,19 @@
 import { primeiroDoMes, somarMeses } from '../../dominio/datas';
 import { Transacao } from '../../dominio/tipos';
-import { navegacaoDeMes, transacoesDoMesVisivel, transacoesFiltradas } from '../derivados';
-import { Acao, criarReducer, dependenciasDeTeste, Estado, estadoInicial, estadoVazio } from '../store';
+import {
+  agruparPorDia,
+  navegacaoDeMes,
+  transacoesDoMesVisivel,
+  transacoesFiltradas,
+} from '../derivados';
+import {
+  Acao,
+  criarReducer,
+  dependenciasDeTeste,
+  Estado,
+  estadoInicial,
+  estadoVazio,
+} from '../store';
 
 /**
  * O mês do Extrato.
@@ -119,6 +131,65 @@ describe('mês visível × resto do app', () => {
     const julho = aplicar(comHistorico, { tipo: 'MES_VISIVEL', passo: -1 });
     const depois = aplicar(julho, { tipo: 'DIA_MUDOU', dia: '2026-09-01' });
     expect(depois.mesVisivel).toBe('2026-07-01');
+  });
+});
+
+describe('agrupamento por dia', () => {
+  it('dias do mais recente para o mais antigo, com o total de cada um', () => {
+    const grupos = agruparPorDia([
+      tx('2026-08-01', -500),
+      tx('2026-08-03', -1000),
+      tx('2026-08-01', 2000),
+      tx('2026-08-02', -300),
+    ]);
+
+    expect(grupos.map((g) => g.dia)).toEqual(['2026-08-03', '2026-08-02', '2026-08-01']);
+    expect(grupos.map((g) => g.totalCentavos)).toEqual([-1000, -300, 1500]);
+  });
+
+  it('dentro do dia, mantém a ordem em que as linhas chegaram', () => {
+    // A lista chega na ordem do estado; reordenar aqui trocaria linhas de lugar
+    // no Extrato sem ninguém ter pedido.
+    const a = tx('2026-08-04');
+    const b = tx('2026-08-02');
+    const c = tx('2026-08-04');
+    const d = tx('2026-08-04');
+
+    const [quatro, dois] = agruparPorDia([a, b, c, d]);
+    expect(quatro.itens.map((t) => t.id)).toEqual([a.id, c.id, d.id]);
+    expect(dois.itens.map((t) => t.id)).toEqual([b.id]);
+  });
+
+  it('lista vazia não tem dia nenhum', () => {
+    expect(agruparPorDia([])).toEqual([]);
+  });
+
+  it('não perde nem duplica linha num mês cheio', () => {
+    // Era um `filter` por dia; a troca por uma passada só não pode mudar o
+    // que sai, só o custo.
+    const mes = Array.from({ length: 900 }, (_, i) =>
+      tx(`2026-08-${String((i % 31) + 1).padStart(2, '0')}`, -(i + 1)),
+    );
+    const grupos = agruparPorDia(mes);
+
+    expect(grupos).toHaveLength(31);
+    expect(grupos.flatMap((g) => g.itens)).toHaveLength(900);
+    expect(grupos.reduce((a, g) => a + g.totalCentavos, 0)).toBe(
+      mes.reduce((a, t) => a + t.valorCentavos, 0),
+    );
+  });
+});
+
+describe('limite antigo da navegação', () => {
+  it('vem do lançamento mais antigo, esteja ele onde estiver na lista', () => {
+    // A lista não chega ordenada: lançamento retroativo entra no fim.
+    const foraDeOrdem: Estado = {
+      ...comHistorico,
+      transacoes: [tx('2026-08-02'), tx('2026-05-10'), tx('2026-07-15')],
+      mesVisivel: '2026-06-01',
+    };
+    expect(navegacaoDeMes(foraDeOrdem).podeVoltar).toBe(true);
+    expect(navegacaoDeMes({ ...foraDeOrdem, mesVisivel: '2026-05-01' }).podeVoltar).toBe(false);
   });
 });
 

@@ -4,10 +4,13 @@ import { Toque, Txt } from '../../componentes/basicos';
 import { Icone } from '../../componentes/Icone';
 import { categoria, categoriasPorTipo } from '../../dominio/categorias';
 import { comSinal } from '../../dominio/dinheiro';
-import { useLoja } from '../../estado/store';
+import { useRecorte, useDespachar } from '../../estado/store';
 import { comAlfa, resolverCor } from '../../tema/paletas';
 import { useTema } from '../../tema/TemaContext';
 import { Folha } from './Folha';
+
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['categorias', 'transacoes'] as const;
 
 /**
  * Trocar a categoria de um lançamento já feito.
@@ -18,7 +21,8 @@ import { Folha } from './Folha';
  * hipotético.
  */
 export function Recategorizar({ transacaoId }: { transacaoId: string }) {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t, paleta } = useTema();
 
   const tx = estado.transacoes.find((x) => x.id === transacaoId);

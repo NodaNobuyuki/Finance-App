@@ -5,9 +5,9 @@
   "dependencies": {
     "@expo-google-fonts/ibm-plex-mono": "^0.4.1",
     "@expo-google-fonts/ibm-plex-sans": "^0.4.1",
-    "expo": "~57.0.20",
-    "expo-font": "~57.0.3",
-    "expo-sqlite": "~57.0.2",
+    "expo": "~57.0.26",
+    "expo-font": "~57.0.4",
+    "expo-sqlite": "~57.0.3",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
     "react-native": "0.86.3",

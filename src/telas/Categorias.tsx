@@ -6,12 +6,16 @@ import { categoriasPorTipo, icones } from '../dominio/categorias';
 import { formatar } from '../dominio/dinheiro';
 import { somaPorCategoria, totalEntradas } from '../dominio/saldo';
 import { orcamento, orcamentosPorCategoria, transacoesDoMes } from '../estado/derivados';
-import { useLoja } from '../estado/store';
+import { useRecorte, useDespachar } from '../estado/store';
 import { comAlfa, resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
 
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['editandoCategorias', 'categorias', 'abaCategorias', 'hoje', 'transacoes'] as const;
+
 export function Categorias() {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t, paleta } = useTema();
 
   const doMes = transacoesDoMes(estado);

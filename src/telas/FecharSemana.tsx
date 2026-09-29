@@ -6,9 +6,12 @@ import { icones } from '../dominio/categorias';
 import { rotuloDia } from '../dominio/datas';
 import { formatar } from '../dominio/dinheiro';
 import { diasRegistrados, semana } from '../estado/derivados';
-import { useLoja } from '../estado/store';
+import { useRecorte, useDespachar } from '../estado/store';
 import { useTema } from '../tema/TemaContext';
 import { Passos } from './Resumo';
+
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['intencaoSel', 'fecharPasso', 'hoje', 'metaSemanal', 'transacoes', 'diasSemGasto'] as const;
 
 /**
  * Fechamento da semana em 3 passos:
@@ -17,7 +20,8 @@ import { Passos } from './Resumo';
  * O passo 2 vive em `Resumo` porque é a mesma tela que a Home abre sozinha.
  */
 export function FecharSemana() {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t } = useTema();
 
   const s = semana(estado);

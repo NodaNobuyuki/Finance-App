@@ -1,7 +1,8 @@
 import { act, render } from '@testing-library/react-native';
 import React from 'react';
 import { Text } from 'react-native';
-import { Acao, LojaProvider, useLoja } from '../../estado/store';
+import { GravacaoRecusada, mensagemParaOUsuario } from '../../dominio/erros';
+import { Acao, LojaProvider, useDespachar, useSeletor } from '../../estado/store';
 import { EstadoPersistido } from '../persistido';
 import { RepositorioLocal } from '../repositorio';
 import { criarRepositorioMemoria } from '../repositorioMemoria';
@@ -16,6 +17,7 @@ import { usePersistencia } from '../usePersistencia';
 function repositorioEspiao(base: RepositorioLocal = criarRepositorioMemoria()) {
   const chamadas: { antes: EstadoPersistido | null; depois: EstadoPersistido }[] = [];
   let falharNaProxima: Error | null = null;
+  let recusarNaProxima = false;
 
   const repo: RepositorioLocal = {
     ...base,
@@ -26,7 +28,17 @@ function repositorioEspiao(base: RepositorioLocal = criarRepositorioMemoria()) {
         throw erro;
       }
       chamadas.push({ antes, depois });
-      return base.salvar(antes, depois);
+      const gravacao = await base.salvar(antes, depois);
+      if (recusarNaProxima) {
+        recusarNaProxima = false;
+        // Recusa a primeira transação nova, como o banco faria com um FITID
+        // repetido.
+        const nova = depois.transacoes.find(
+          (t) => !antes?.transacoes.some((a) => a.id === t.id),
+        )!;
+        return { recusadas: [{ tabela: 'transacoes', id: nova.id }] };
+      }
+      return gravacao;
     },
   };
 
@@ -35,6 +47,9 @@ function repositorioEspiao(base: RepositorioLocal = criarRepositorioMemoria()) {
     chamadas,
     falharUmaVez: (erro: Error) => {
       falharNaProxima = erro;
+    },
+    recusarUmaVez: () => {
+      recusarNaProxima = true;
     },
   };
 }
@@ -50,10 +65,10 @@ async function montar(repo: RepositorioLocal | null, aoFalhar?: (e: unknown) => 
   let despachar!: React.Dispatch<Acao>;
 
   function Sonda() {
-    const loja = useLoja();
-    despachar = loja.despachar;
+    despachar = useDespachar();
+    const quantas = useSeletor((e) => e.transacoes.length);
     usePersistencia(repo, aoFalhar);
-    return <Text>{String(loja.estado.transacoes.length)}</Text>;
+    return <Text>{String(quantas)}</Text>;
   }
 
   // `render` desta versão do RNTL devolve Promise e já embrulha em `act` por
@@ -163,6 +178,26 @@ describe('usePersistencia', () => {
     expect(chamadas).toHaveLength(1);
     const salvos = chamadas[0].depois.transacoes.length - chamadas[0].antes!.transacoes.length;
     expect(salvos).toBe(2);
+  });
+
+  it('linha recusada avisa, e a gravação seguinte não a reenvia', async () => {
+    const { repo, chamadas, recusarUmaVez } = repositorioEspiao();
+    const avisos: unknown[] = [];
+    const { agir } = await montar(repo, (e) => avisos.push(e));
+
+    recusarUmaVez();
+    await agir({ tipo: 'REGISTRO_RAPIDO', categoriaId: 'mercado', valorCentavos: 1000 });
+
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]).toBeInstanceOf(GravacaoRecusada);
+    expect(mensagemParaOUsuario(avisos[0])).toMatch(/some ao fechar o app/);
+
+    await agir({ tipo: 'REGISTRO_RAPIDO', categoriaId: 'lazer', valorCentavos: 2000 });
+
+    // Ao contrário da falha de disco, o ponto de comparação avançou: reenviar a
+    // linha recusada bateria na mesma restrição para sempre.
+    expect(chamadas[1].antes!.transacoes).toBe(chamadas[0].depois.transacoes);
+    expect(avisos).toHaveLength(1);
   });
 
   it('sem repositório, o app funciona e não tenta gravar', async () => {

@@ -3,9 +3,12 @@ import { ScrollView, View } from 'react-native';
 import { BotaoPrincipal, Rotulo, Toque, Txt } from '../../componentes/basicos';
 import { diasRitual } from '../../dominio/datas';
 import { resumoDoRitual } from '../../estado/derivados';
-import { useLoja } from '../../estado/store';
+import { useRecorte, useDespachar } from '../../estado/store';
 import { useTema } from '../../tema/TemaContext';
 import { Folha } from './Folha';
+
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['ritualPrimeira', 'ritualDiaFechamento', 'metaSemanal'] as const;
 
 const METAS = [
   { n: 3, sub: 'dias alternados' },
@@ -21,7 +24,8 @@ const METAS = [
  * de um momento fixo — sem isso o resto do loop não tem âncora.
  */
 export function Ritual() {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t } = useTema();
   const primeira = estado.ritualPrimeira;
 

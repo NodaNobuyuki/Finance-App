@@ -198,7 +198,7 @@ describe('desafios vêm do catálogo', () => {
   });
 
   it('quem instalou hoje começa todo progresso em zero', () => {
-    const manual = desafios(estadoVazio).ativos.filter((d) => !d.automatico);
+    const manual = desafios(estadoVazio).ativos.filter((d) => d.medida === 'manual');
     for (const d of manual) expect(d.atual).toBe(0);
   });
 
@@ -206,14 +206,14 @@ describe('desafios vêm do catálogo', () => {
     // Simula um usuário antigo: progresso só dos desafios que existiam.
     const antigo: Estado = {
       ...estadoVazio,
-      progressoDesafios: [{ id: 'catg', aceito: true, progresso: 4 }],
+      progressoDesafios: [{ id: 'assin', aceito: true, progresso: 2 }],
     };
     const { ativos, disponiveis } = desafios(antigo);
     const conhecidos = [...ativos, ...disponiveis].map((d) => d.id);
 
-    // Se a definição viesse do banco, só 'catg' apareceria.
+    // Se a definição viesse do banco, só 'assin' apareceria.
     expect(conhecidos.sort()).toEqual(definicoesDesafios.map((d) => d.id).sort());
-    expect(ativos.find((d) => d.id === 'catg')!.atual).toBe(4);
+    expect(ativos.find((d) => d.id === 'assin')!.atual).toBe(2);
   });
 
   it('aceitar grava só o progresso, não a definição', () => {
@@ -230,8 +230,6 @@ describe('desafios vêm do catálogo', () => {
     const depois = aplicar(estadoVazio, {
       tipo: 'AVANCAR_DESAFIO',
       desafioId: 'assin',
-      automatico: false,
-      rotulo: 'Revisar as assinaturas',
     });
 
     expect(progressoDe(definicoesDesafios[2], depois.progressoDesafios).progresso).toBe(1);
@@ -241,8 +239,6 @@ describe('desafios vêm do catálogo', () => {
     const depois = aplicar(estadoVazio, {
       tipo: 'AVANCAR_DESAFIO',
       desafioId: 'desafio-que-nao-existe',
-      automatico: false,
-      rotulo: 'x',
     });
     expect(depois.progressoDesafios).toEqual([]);
   });

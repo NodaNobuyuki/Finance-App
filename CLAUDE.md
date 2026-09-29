@@ -205,13 +205,13 @@ Tudo que entra na tela usa a mesma frase — surge com uma leve subida — e só
 src/dominio/    dinheiro (centavos), saldo derivado, guardado das metas,
                 categorias, taxas, datas, ids, erros, seed
 src/dados/      persistência: motor SQL, migrations, repositórios
-src/estado/     store (reducer + context) e derivados (seleções)
+src/estado/     store (reducer + loja assinável) e derivados (seleções)
 src/componentes/ primitivos que leem tokens do tema, e a gramática de movimento
 src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em Onboarding
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = lint + tipos + 463 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = lint + tipos + 516 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
@@ -233,6 +233,12 @@ Estado (memória, sempre a fonte)
 **Nada é aguardado pela interface.** A gravação é efeito pós-render; o usuário vê saldo e toast na hora. O gatilho é comparação por referência — como o reducer é imutável, digitar no teclado numérico não encosta no banco.
 
 **A escrita é diff por id**, não reescrita de tabela: registrar um gasto grava uma linha. Falha de gravação devolve o ponto de comparação para trás, então a próxima escrita reenvia o que se perdeu.
+
+**Restrição violada recusa a linha, não a gravação.** Reenviar só conserta falha do mundo; linha que bate numa restrição do esquema bate de novo a cada reenvio, e com a gravação inteira voltando atrás nenhuma escrita chegava mais ao disco — tudo desde então sumia ao fechar o app. Agora `salvar()` devolve `{ recusadas }`: o resto entra, o ponto de comparação avança, e `GravacaoRecusada` vira toast dizendo que aquilo some ao fechar. É um `ErroDeInfra` que **não** vale retentar, a exceção declarada à regra.
+
+**Upsert é pela chave primária, nunca `INSERT OR REPLACE`.** O `OR REPLACE` resolve conflito em *qualquer* restrição única apagando a linha que já estava lá: um segundo lançamento com o mesmo FITID fazia o primeiro sumir do disco sem aviso, com a memória ainda mostrando os dois. `ON CONFLICT (id) DO UPDATE` deixa o índice `(conta_id, id_externo)` falhar de verdade, e a remoção roda antes da escrita para que trocar uma linha por outra com o mesmo FITID na mesma gravação não seja conflito. O repositório de memória impõe a mesma unicidade — é a suíte de contrato que segura isso nos dois. **Isto é rede de segurança, não dedupe:** o OFX ainda precisa detectar duplicata antes de chegar ao estado.
+
+**O boot nunca lança; falha é tela, não queda calada.** `abrirBanco()` devolve `pronto` ou `falhou`. Antes, falha de leitura rejeitava a promessa sem ninguém ouvir (app em branco para sempre) e banco que não abria caía sozinho para memória — para quem já tinha dados, isso é o **onboarding de novo**, como se tudo tivesse sumido. Agora `FalhaAoAbrir` diz que nada foi apagado e oferece "Tentar de novo" ou "Usar sem salvar"; este último é escolha explícita, não mexe no disco, e deixa a `FaixaSemSalvar` fixa no topo, porque toast some e quem registra um gasto ali acharia que ele foi salvo.
 
 **`MotorSQL` existe para o SQL ser testável.** `expo-sqlite` é nativo e não roda no Jest; sem esse seam, migrations só seriam exercitadas no aparelho. A mesma suíte de contrato roda contra memória e contra SQLite de verdade (`node:sqlite`, embutido no Node 24). Sem cobertura sobra só `motorExpo.ts`, que é repasse puro.
 
@@ -376,12 +382,14 @@ O que estava cravado, e o que cada um causava:
 | `Lote.tsx` | 5 categorias de despesa | pílula "Sem categoria" clicável; vocabulário da pessoa nunca aparecia |
 | `store.tsx` (`ABRIR_NOVA`, `RASCUNHO_TIPO`, `RASCUNHO_VAZIO`) | `'mercado'`, `'salario'`, `'cartao'` | folha de lançamento pré-selecionada em "Sem categoria" depois de apagar a categoria |
 | `derivados.ts` (`insights`) | `'assinaturas'` | insight sumia para quem apagasse a categoria, e nunca via a que a pessoa criou |
+| `desafios.ts` (`categoriaId`) | `'salario'`, `'contas'`, `'assinaturas'`, `'restaurante'`, `'transporte'` | desafio pintado com o ícone do buraco para quem não tinha a categoria — e o guarda de texto não via |
 
 A forma da correção é sempre a mesma: **resolver contra o que a pessoa tem, não contra um literal.** `categoriaPadrao(categorias, tipo)` devolve a primeira do tipo (e `''` quando não há nenhuma — não lança, pelo motivo de `categoria()`); `categoriasDoLote(e)` deriva as cinco pílulas do histórico, com o `sort` estável do JS deixando o desempate na ordem da lista da pessoa; o insight anualiza a maior categoria que também gastou no mês anterior, suprimida quando repetiria a que "Concentração" já nomeia.
 
 **Os dois guardas que impedem a volta**, e os dois foram verificados falhando com o bug reintroduzido — guarda que não falha no código antigo é fachada:
 
 - **`telas.test.tsx` ganhou um terceiro estado: `comVocabularioProprio`.** A suíte montava tudo contra a demo e contra o app vazio, e **as duas trazem os ids de fábrica** — foi isso que deixou o defeito viver. Agora todo id de categoria, meta e conta é reescrito para um que o catálogo não conhece, com as transações remapeadas junto, e além de montar, nenhuma tela pode mostrar `"Sem categoria"`: com tudo apontando para categoria válida, esse texto só aparece se alguém cravou um id.
+- **O mesmo guarda procura o desenho do buraco, não só o texto.** Id cravado que só pinta ícone e cor não escreve "Sem categoria" — foi assim que o catálogo de desafios passou verde. `ICONE_ORFA` é exportado para isso, e a busca percorre só os filhos da árvore porque as props da `SectionList` têm referência circular.
 - **`categorias.test.ts` cobre o reducer**, que o teste de tela não alcança: `NovaTransacao` é montada direto, sem passar por `ABRIR_NOVA`, então o padrão do rascunho só tem caminho por ali.
 
 ### O destino do Simulador é escolha, não constante
@@ -395,6 +403,30 @@ O botão "Guardar em vez de gastar" fecha o loop de custo de oportunidade — é
 **Sem meta nenhuma, o botão não mente:** vira "Criar uma meta" e abre `ABRIR_META`, porque criar a meta é o que de fato falta. E `SIM_GUARDAR` sem destino passou a avisar no toast, como "retirar mais do que está guardado" — foi o `return e` calado que deixou o defeito escondido tanto tempo.
 
 O teste que trava isso mora em `primeiroUso.test.ts`, e é lá porque o que ele exercita é justamente o que a demo escondia: conclui o onboarding, confirma que a meta **não** tem id `'reserva'`, e guarda. Com uma conta só, o par cai na mesma conta e o saldo não se move — o teste afirma isso de propósito.
+
+### Desafio mede pelo estado sempre que dá
+
+Desafio é conteúdo nosso, então tem ícone e cor **próprios** no catálogo — não pega emprestado de categoria, que é vocabulário da pessoa. Os desenhos que os dois compartilham (talher, carro, setas de assinatura) moram em `icones`, um path só.
+
+`DefinicaoDesafio` é união por `medida`, e é ela que decide o que o catálogo **pode** dizer:
+
+| medida | alvo | subtítulo | o toque |
+|---|---|---|---|
+| `registros` | `metaSemanal` | dia de fechamento do ritual | abre o lançamento |
+| `categorizados` | lançamentos do mês (sem transferência) | quantos estão sem categoria | vai ao Extrato |
+| `manual` | do catálogo | do catálogo | +1 no progresso |
+
+Medida derivada não tem alvo nem subtítulo no catálogo — os dois saem do estado em `desafios()`. Era aí que o catálogo mentia: "Registrar 4 vezes" para quem escolheu 6 no ritual, "2 lançamentos sem categoria" para todo mundo, "a semana fecha domingo" para quem fecha no sábado. Mês sem lançamento não é "tudo categorizado": alvo zero nunca completa.
+
+`AVANCAR_DESAFIO` só leva o `desafioId`; o reducer lê a medida do catálogo. A tela mandava `automatico` junto e o reducer acreditava.
+
+Os manuais **não prometem prazo** ("termina sexta"): `ProgressoDesafio` não guarda quando começou, então prazo nenhum é verdade. Dar início e fim a desafio é modelo novo, não texto. Os `economiaCentavos` continuam sendo estimativa e `economizado()` não tem leitor em tela — se voltar a aparecer, precisa virar conta sobre o que existe.
+
+O fechamento da semana diz a constância de `semanasEmDia()`. Era "6 semanas seguidas" cravado.
+
+### Dia sem gasto é só o que a pessoa declarou
+
+O Lote gravava **todos** os dias que colocava em dia em `diasSemGasto`, inclusive o que ganhava uma despesa ali mesmo. A trilha não sentia, porque a despesa já registra o dia, mas o dado dizia o contrário do que aconteceu. Agora só entra o dia marcado "não gastei". A migration v9 apaga os dias desmentidos por **despesa** — receita e transferência não desmentem "não gastei" — e a semente da demo filtra do mesmo jeito: em começo de semana os lançamentos dela invadiam a semana anterior e caíam em cima de "dias sem gasto".
 
 ### Orçamento é a soma dos tetos, e o teto mora na categoria
 
@@ -416,7 +448,27 @@ Os dois placeholders viraram conta sobre o que existe, e o tipo sumiu junto com 
 - Sem retentativa ativa de gravação: o reenvio pega carona na próxima mudança. Um outbox resolve, se virar problema
 - Nenhuma tela lê do banco sob demanda — o estado inteiro é carregado no boot. Aguenta bem os primeiros anos; a saída é paginar por período no repositório
 
-**Próximo ciclo:** `SectionList` no Extrato (o agrupamento em `agruparPorDia` já encaixa, e ele hoje é O(n·dias)) e memoização dos derivados. Depois disso, o salto real é o **development build (EAS)**: ele destrava o item 2 da ordem de ingestão (OFX/CSV + share sheet), as notificações Android, e encerra o acoplamento com o SDK que o Expo Go da loja publica.
+### O Extrato rola sozinho
+
+É a única tela fora do `ScrollView` da `Casca` (`TELAS_COM_ROLAGEM_PROPRIA` em `App.tsx`): `SectionList` dentro de outra rolagem vertical desenha tudo de uma vez e a virtualização vira enfeite. Cabeçalho, chips e os três vazios entram como `ListHeaderComponent` / `ListEmptyComponent`. Por isso a `Transicao` tem `flexShrink: 1` além do `flexGrow` — no pai de altura fixa, sem encolher, o embrulho mede a lista inteira, passa da tela e nada rola.
+
+`agruparPorDia` é uma passada só (era O(n·dias)) e `navegacaoDeMes` acha o mínimo sem ordenar. Os derivados do Extrato recebem **fatias** do `Estado` (`RecorteDoExtrato`), não ele inteiro, e a tela memoiza por campo: com uma folha aberta por cima, cada tecla troca o `Estado` e nada do recorte mudou. `telas.test.tsx` trava a virtualização com um mês de 300 linhas — verificado falhando com o `map` antigo.
+
+### Cada componente assina o que lê
+
+A loja mora **fora** do React (`criarLoja` em `store.tsx`) e o contexto carrega um objeto que nunca muda. Era `useReducer` com o `Estado` inteiro no valor do contexto: cada tecla do teclado numérico, que só troca `rascunho`, re-renderizava a tela atrás da folha, cada linha do Extrato e a navegação. Memoizar derivado por derivado — o que estava planejado — tratava o sintoma.
+
+Três ganchos, e **`useLoja` não existe mais** — de propósito, para ninguém voltar a assinar tudo sem perceber:
+
+- **`useRecorte(CHAVES)`** — o padrão das telas. Devolve `Pick<Estado, K>` com igualdade rasa; `CHAVES` é constante de módulo.
+- **`useSeletor(fn, igual?)`** — um valor só (`e => e.tela`). Seletor inline pode: o cache é por estado e por seletor, e resultado igual devolve a referência anterior.
+- **`useDespachar()`** — estável, nunca provoca render.
+
+**Os derivados recebem `Pick<Estado, …>`, não `Estado`.** É isso que torna o recorte seguro: se uma tela esquecer uma chave que um derivado lê, o **tipo** acusa — não vira tela velha em silêncio. Chave a mais só custa render a mais; chave a menos não compila. Derivado novo nasce pedindo só o que lê.
+
+`assinatura.test.tsx` conta commits com `Profiler`: digitar na folha não re-renderiza Início nem Extrato, e registrar um gasto re-renderiza. Verificado falhando com o recorte sem igualdade rasa. Não mede tempo — não diz nada sobre o aparelho —, mede que o React nem chamou o componente.
+
+**Próximo ciclo:** o salto real é o **development build (EAS)**: ele destrava o item 2 da ordem de ingestão (OFX/CSV + share sheet), as notificações Android, e encerra o acoplamento com o SDK que o Expo Go da loja publica.
 
 **Decisão em aberto:** a v1 vale ser 100% local, sem backend. Não perde o loop comportamental, dispensa auth e infra, e encurta muito o caminho até a loja. Backend entra quando houver sync entre aparelhos ou receita — mesmo critério já aplicado ao Open Finance.
 

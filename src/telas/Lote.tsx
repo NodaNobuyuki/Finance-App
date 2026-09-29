@@ -6,10 +6,13 @@ import { categoriaPadrao, icones } from '../dominio/categorias';
 import { rotuloDia } from '../dominio/datas';
 import { deTextoLivre } from '../dominio/dinheiro';
 import { categoriasDoLote, semana } from '../estado/derivados';
-import { useLoja } from '../estado/store';
+import { useRecorte, useDespachar } from '../estado/store';
 import { comAlfa, resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
 import { mono } from '../tema/fontes';
+
+/** O que esta tela lê do estado — e só isto a acorda. */
+const CHAVES = ['lote', 'categorias', 'hoje', 'metaSemanal', 'transacoes', 'diasSemGasto'] as const;
 
 /**
  * Colocar em dia.
@@ -18,7 +21,8 @@ import { mono } from '../tema/fontes';
  * aberto, com "não gastei" como resposta legítima.
  */
 export function Lote() {
-  const { estado, despachar } = useLoja();
+  const estado = useRecorte(CHAVES);
+  const despachar = useDespachar();
   const { t, paleta } = useTema();
 
   const { pendentes } = semana(estado);
