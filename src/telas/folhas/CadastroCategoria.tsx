@@ -37,9 +37,7 @@ export function CadastroCategoria() {
   const podeSalvar = c.nome.trim().length > 0;
   const cor = resolverCor(c.cor, paleta);
 
-  const usos = editando
-    ? estado.transacoes.filter((tx) => tx.categoriaId === c.id).length
-    : 0;
+  const usos = editando ? estado.transacoes.filter((tx) => tx.categoriaId === c.id).length : 0;
 
   // O teto só existe para despesa: receita não é gasto para limitar.
   const temLimite = c.tipo === 'despesa';
@@ -214,15 +212,7 @@ export function CadastroCategoria() {
   );
 }
 
-function Pastilha({
-  cor,
-  ativa,
-  aoTocar,
-}: {
-  cor: CorRef;
-  ativa: boolean;
-  aoTocar: () => void;
-}) {
+function Pastilha({ cor, ativa, aoTocar }: { cor: CorRef; ativa: boolean; aoTocar: () => void }) {
   const { t, paleta } = useTema();
   const resolvida = resolverCor(cor, paleta);
   return (

@@ -33,9 +33,7 @@ function repositorioEspiao(base: RepositorioLocal = criarRepositorioMemoria()) {
         recusarNaProxima = false;
         // Recusa a primeira transação nova, como o banco faria com um FITID
         // repetido.
-        const nova = depois.transacoes.find(
-          (t) => !antes?.transacoes.some((a) => a.id === t.id),
-        )!;
+        const nova = depois.transacoes.find((t) => !antes?.transacoes.some((a) => a.id === t.id))!;
         return { recusadas: [{ tabela: 'transacoes', id: nova.id }] };
       }
       return gravacao;

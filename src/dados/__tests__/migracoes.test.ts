@@ -202,9 +202,9 @@ describe('aplicar do zero', () => {
     const motor = criarMotorNode();
     await aplicarMigracoes(motor);
 
-    const colunas = (
-      await motor.consultar<{ name: string }>('PRAGMA table_info(transacoes)')
-    ).map((c) => c.name);
+    const colunas = (await motor.consultar<{ name: string }>('PRAGMA table_info(transacoes)')).map(
+      (c) => c.name,
+    );
     expect(colunas).toContain('transferencia_id');
     expect(colunas).toContain('meta_id');
   });

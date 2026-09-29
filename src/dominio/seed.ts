@@ -148,9 +148,7 @@ function metasDemo(hoje: DiaISO): Meta[] {
  * começa tudo em zero, e é a ausência de linha que faz valer o padrão do
  * catálogo (`progressoDe`).
  */
-const progressoDesafios: ProgressoDesafio[] = [
-  { id: 'assin', aceito: true, progresso: 1 },
-];
+const progressoDesafios: ProgressoDesafio[] = [{ id: 'assin', aceito: true, progresso: 1 }];
 
 /**
  * Dias em que a Marina declarou não ter gasto nada, nas 5 semanas anteriores.
@@ -172,7 +170,13 @@ function diasSemGastoDemo(hoje: DiaISO, transacoes: Transacao[]): DiaISO[] {
   // Por semana (da mais antiga à anterior), quais dias da semana foram
   // marcados — 0 = segunda. Só dias no começo da semana, porque as transações
   // da demo caem nos últimos dias e dia repetido não contaria duas vezes.
-  const porSemana = [[0, 2], [0, 1, 3], [0, 1, 2, 3], [0, 1, 2, 4], [0, 2, 3]];
+  const porSemana = [
+    [0, 2],
+    [0, 1, 3],
+    [0, 1, 2, 3],
+    [0, 1, 2, 4],
+    [0, 2, 3],
+  ];
 
   // Os lançamentos da demo cobrem os últimos 7 dias, e em começo de semana
   // isso invade a semana anterior. Dia com despesa não pode ser "não gastei";

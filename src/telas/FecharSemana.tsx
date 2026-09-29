@@ -11,7 +11,14 @@ import { useTema } from '../tema/TemaContext';
 import { Passos } from './Resumo';
 
 /** O que esta tela lê do estado — e só isto a acorda. */
-const CHAVES = ['intencaoSel', 'fecharPasso', 'hoje', 'metaSemanal', 'transacoes', 'diasSemGasto'] as const;
+const CHAVES = [
+  'intencaoSel',
+  'fecharPasso',
+  'hoje',
+  'metaSemanal',
+  'transacoes',
+  'diasSemGasto',
+] as const;
 
 /**
  * Fechamento da semana em 3 passos:

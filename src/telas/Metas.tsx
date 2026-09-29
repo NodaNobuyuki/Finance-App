@@ -39,10 +39,7 @@ export function Metas() {
             </Txt>
           </View>
 
-          <Toque
-            aoTocar={() => despachar({ tipo: 'ABRIR_META' })}
-            rotuloAcessivel="Nova meta"
-          >
+          <Toque aoTocar={() => despachar({ tipo: 'ABRIR_META' })} rotuloAcessivel="Nova meta">
             <View
               style={{
                 flexDirection: 'row',

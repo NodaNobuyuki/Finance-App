@@ -11,7 +11,16 @@ import { useTema } from '../tema/TemaContext';
 import { Pilulas } from './folhas/PilulasDeConta';
 
 /** O que esta tela lê do estado — e só isto a acorda. */
-const CHAVES = ['simTaxaId', 'contas', 'simMetaId', 'simDigitos', 'rascunho', 'metas', 'transacoes', 'hoje'] as const;
+const CHAVES = [
+  'simTaxaId',
+  'contas',
+  'simMetaId',
+  'simDigitos',
+  'rascunho',
+  'metas',
+  'transacoes',
+  'hoje',
+] as const;
 
 export function Simulador() {
   const estado = useRecorte(CHAVES);

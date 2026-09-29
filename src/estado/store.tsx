@@ -34,14 +34,7 @@ import { GerarId, idsSequenciais, uuidV7 } from '../dominio/ids';
 import { contaPadraoDeMeta, guardadoDaMeta, metaEscolhida } from '../dominio/metas';
 import { Semente, semente, vazia } from '../dominio/seed';
 import { semanasEmDia } from './derivados';
-import {
-  Conta,
-  Meta,
-  Perfil,
-  ProgressoDesafio,
-  Tela,
-  Transacao,
-} from '../dominio/tipos';
+import { Conta, Meta, Perfil, ProgressoDesafio, Tela, Transacao } from '../dominio/tipos';
 import { CorRef, token } from '../tema/paletas';
 
 /* ────────────────────────────────────────────────────────────────
@@ -952,8 +945,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
               icone: existente.icone,
               // Fila vazia para limite zero: abrir a folha com "0" na tela
               // faria o primeiro dígito digitado virar "0X".
-              limiteDigitos:
-                existente.limiteCentavos > 0 ? String(existente.limiteCentavos) : '',
+              limiteDigitos: existente.limiteCentavos > 0 ? String(existente.limiteCentavos) : '',
             }
           : { ...CADASTRO_CATEGORIA_VAZIO, tipo: a.tipoCategoria ?? e.abaCategorias },
       };
@@ -1042,9 +1034,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       // Sem nenhuma categoria do tipo não há o que escolher ao lançar, e o
       // rascunho apontaria para o vazio. Mesma regra da última conta — e é ela
       // que faz "tabela vazia" significar sempre "instalação anterior à v6".
-      const irmas = e.categorias.filter(
-        (c) => c.tipo === categoria.tipo && c.id !== categoria.id,
-      );
+      const irmas = e.categorias.filter((c) => c.tipo === categoria.tipo && c.id !== categoria.id);
       if (irmas.length === 0) {
         return {
           ...e,
@@ -1074,10 +1064,11 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
           e.rascunho.categoriaId === categoria.id
             ? {
                 ...e.rascunho,
-                categoriaId: categoriasPorTipo(
-                  e.categorias.filter((c) => c.id !== categoria.id),
-                  e.rascunho.tipo,
-                )[0]?.id ?? '',
+                categoriaId:
+                  categoriasPorTipo(
+                    e.categorias.filter((c) => c.id !== categoria.id),
+                    e.rascunho.tipo,
+                  )[0]?.id ?? '',
               }
             : e.rascunho,
         filtroCategoria: e.filtroCategoria === categoria.id ? 'todas' : e.filtroCategoria,
@@ -1267,7 +1258,8 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         categoriaId: e.rascunho.categoriaId,
         valorCentavos: e.rascunho.tipo === 'despesa' ? -valor : valor,
         ocorridoEm: e.hoje,
-        descricao: e.rascunho.descricao.trim() || categoria(e.categorias, e.rascunho.categoriaId).nome,
+        descricao:
+          e.rascunho.descricao.trim() || categoria(e.categorias, e.rascunho.categoriaId).nome,
       });
       const rotulo = `${e.rascunho.tipo === 'despesa' ? 'Despesa' : 'Receita'} de ${formatar(valor)} registrada`;
       return {
@@ -1664,8 +1656,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
             // Quem estava olhando o mês corrente continua olhando o mês
             // corrente depois da virada; quem tinha navegado para trás fica
             // onde estava.
-            mesVisivel:
-              mesDe(e.mesVisivel) === mesDe(e.hoje) ? primeiroDoMes(a.dia) : e.mesVisivel,
+            mesVisivel: mesDe(e.mesVisivel) === mesDe(e.hoje) ? primeiroDoMes(a.dia) : e.mesVisivel,
           };
 
     case 'AVISAR': {

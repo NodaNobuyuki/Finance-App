@@ -21,7 +21,15 @@ import { resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
 
 /** O que esta tela lê do estado — e só isto a acorda. */
-const CHAVES = ['transacoes', 'mesVisivel', 'filtroConta', 'filtroCategoria', 'hoje', 'contas', 'categorias'] as const;
+const CHAVES = [
+  'transacoes',
+  'mesVisivel',
+  'filtroConta',
+  'filtroCategoria',
+  'hoje',
+  'contas',
+  'categorias',
+] as const;
 
 /** Seta do seletor de mês. Apagada quando não há para onde ir. */
 function SetaDeMes({ passo, ativa, rotulo }: { passo: -1 | 1; ativa: boolean; rotulo: string }) {

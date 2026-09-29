@@ -18,9 +18,10 @@ jest.mock('../motorExpo', () => ({ abrirMotorExpo: jest.fn() }));
  * calado para a memória — para quem já tinha dados, o onboarding de novo.
  */
 
-function repositorioQue(
-  sobrescrever: Partial<RepositorioLocal>,
-): { repo: RepositorioLocal; fechado: () => boolean } {
+function repositorioQue(sobrescrever: Partial<RepositorioLocal>): {
+  repo: RepositorioLocal;
+  fechado: () => boolean;
+} {
   let fechou = false;
   const repo: RepositorioLocal = {
     ...criarRepositorioMemoria(),

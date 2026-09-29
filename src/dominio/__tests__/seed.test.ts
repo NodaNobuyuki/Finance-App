@@ -63,17 +63,20 @@ describe('semente em qualquer dia', () => {
     expect(ultimos7).toHaveLength(14);
   });
 
-  it.each(DIAS_VARIADOS)('%s: os dias sem gasto ficam no passado, fora da semana corrente', (hoje) => {
-    const dias = semente(hoje).diasSemGasto;
-    const estaSemana = inicioDaSemana(hoje);
+  it.each(DIAS_VARIADOS)(
+    '%s: os dias sem gasto ficam no passado, fora da semana corrente',
+    (hoje) => {
+      const dias = semente(hoje).diasSemGasto;
+      const estaSemana = inicioDaSemana(hoje);
 
-    // Nenhum invade a semana corrente: a constância dela tem de sair do que a
-    // pessoa registrar agora, não da semente.
-    for (const d of dias) expect(d < estaSemana).toBe(true);
-    // E nenhum é mais antigo do que as 5 semanas que a trilha mostra.
-    for (const d of dias) expect(d >= somarDias(estaSemana, -35)).toBe(true);
-    expect(new Set(dias).size).toBe(dias.length);
-  });
+      // Nenhum invade a semana corrente: a constância dela tem de sair do que a
+      // pessoa registrar agora, não da semente.
+      for (const d of dias) expect(d < estaSemana).toBe(true);
+      // E nenhum é mais antigo do que as 5 semanas que a trilha mostra.
+      for (const d of dias) expect(d >= somarDias(estaSemana, -35)).toBe(true);
+      expect(new Set(dias).size).toBe(dias.length);
+    },
+  );
 
   it.each(DIAS_VARIADOS)('%s: nenhum dia sem gasto teve despesa', (hoje) => {
     // Mesma regra que a v9 impõe ao banco: "não gastei" desmentido por uma

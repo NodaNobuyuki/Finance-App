@@ -4,7 +4,7 @@ name: Verificar
 # Se passar aqui, passa lá — não há checagem exclusiva do CI.
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
   workflow_dispatch:
 

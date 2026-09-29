@@ -28,9 +28,7 @@ export function Categorias() {
   // movimento da categoria.
   const gastos = somaPorCategoria(doMes);
   const totalDe = (id: string) =>
-    despesa
-      ? (gastos[id] ?? 0)
-      : totalEntradas(doMes.filter((tx) => tx.categoriaId === id));
+    despesa ? (gastos[id] ?? 0) : totalEntradas(doMes.filter((tx) => tx.categoriaId === id));
 
   const orcamentos = new Map(orcamentosPorCategoria(estado).map((o) => [o.categoria.id, o]));
   const mes = orcamento(estado);
@@ -176,9 +174,7 @@ export function Categorias() {
                   despachar({ tipo: 'IR_PARA', tela: 'extrato' });
                 }}
                 estilo={{ width: '31.5%' }}
-                rotuloAcessivel={
-                  editando ? `Editar ${cat.nome}` : `Ver lançamentos de ${cat.nome}`
-                }
+                rotuloAcessivel={editando ? `Editar ${cat.nome}` : `Ver lançamentos de ${cat.nome}`}
               >
                 <View
                   style={{

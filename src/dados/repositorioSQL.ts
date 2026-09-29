@@ -366,7 +366,10 @@ export function criarRepositorioSQL(
         // exceção é a linha recusada por restrição, que fica de fora sozinha.
         return await motor.emTransacao(async () => {
           const recusadas = [
-            ...(await sincronizar(TABELA_CONTAS, diferencaPorId(antes?.contas ?? [], depois.contas))),
+            ...(await sincronizar(
+              TABELA_CONTAS,
+              diferencaPorId(antes?.contas ?? [], depois.contas),
+            )),
             ...(await sincronizar(
               TABELA_TRANSACOES,
               diferencaPorId(antes?.transacoes ?? [], depois.transacoes),

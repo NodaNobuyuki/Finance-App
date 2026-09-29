@@ -98,13 +98,7 @@ function FolhaAtual() {
   }
 }
 
-function Casca({
-  repositorio,
-  semDisco,
-}: {
-  repositorio: RepositorioLocal;
-  semDisco: boolean;
-}) {
+function Casca({ repositorio, semDisco }: { repositorio: RepositorioLocal; semDisco: boolean }) {
   const tela = useSeletor((e) => e.tela);
   const onboardingConcluido = useSeletor((e) => e.onboardingConcluido);
   const despachar = useDespachar();

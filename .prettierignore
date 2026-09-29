@@ -9,3 +9,6 @@ design/
 
 # Documentação é prosa: reflow automático só gera ruído no diff.
 *.md
+
+# Escrito pelo Claude Code no formato dele — formatar só gera diff a cada permissão salva.
+.claude/

@@ -17,7 +17,16 @@ import { comAlfa, resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
 
 /** O que esta tela lê do estado — e só isto a acorda. */
-const CHAVES = ['lembrete', 'categorias', 'progressoDesafios', 'ritualDiaFechamento', 'hoje', 'metaSemanal', 'transacoes', 'diasSemGasto'] as const;
+const CHAVES = [
+  'lembrete',
+  'categorias',
+  'progressoDesafios',
+  'ritualDiaFechamento',
+  'hoje',
+  'metaSemanal',
+  'transacoes',
+  'diasSemGasto',
+] as const;
 
 const LEMBRETES = [
   { id: 'domingo', nome: 'Domingo à noite' },
@@ -163,8 +172,7 @@ export function Habitos() {
                     aoTocar={
                       d.completo
                         ? undefined
-                        : () =>
-                            despachar({ tipo: 'AVANCAR_DESAFIO', desafioId: d.id })
+                        : () => despachar({ tipo: 'AVANCAR_DESAFIO', desafioId: d.id })
                     }
                     rotuloAcessivel={d.acaoLabel}
                   >

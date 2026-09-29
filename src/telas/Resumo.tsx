@@ -18,7 +18,14 @@ import { resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
 
 /** O que esta tela lê do estado — e só isto a acorda. */
-const CHAVES = ['fechando', 'categorias', 'hoje', 'metaSemanal', 'transacoes', 'diasSemGasto'] as const;
+const CHAVES = [
+  'fechando',
+  'categorias',
+  'hoje',
+  'metaSemanal',
+  'transacoes',
+  'diasSemGasto',
+] as const;
 
 /**
  * Resumo da semana — a recompensa do ciclo.
@@ -88,7 +95,10 @@ export function Resumo() {
                   {formatar(c.valorCentavos)}
                 </Txt>
               </View>
-              <Barra pct={c.pct} cor={resolverCor(categoria(estado.categorias, c.categoriaId).cor, paleta)} />
+              <Barra
+                pct={c.pct}
+                cor={resolverCor(categoria(estado.categorias, c.categoriaId).cor, paleta)}
+              />
               <Txt tamanho={11} cor={t.inkFaint}>
                 {c.pct}% do que você gastou
               </Txt>

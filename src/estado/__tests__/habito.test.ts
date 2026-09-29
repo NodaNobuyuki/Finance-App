@@ -721,9 +721,7 @@ describe('desafios derivados não repetem o que o catálogo dizia', () => {
 
     expect(catg.completo).toBe(false);
     expect(catg.atual).toBe(catg.alvo - soltos);
-    expect(catg.sub).toBe(
-      `${soltos} ${soltos === 1 ? 'lançamento' : 'lançamentos'} sem categoria`,
-    );
+    expect(catg.sub).toBe(`${soltos} ${soltos === 1 ? 'lançamento' : 'lançamentos'} sem categoria`);
   });
 
   it('mês sem lançamento não conta como tudo categorizado', () => {

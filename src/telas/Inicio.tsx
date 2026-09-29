@@ -24,7 +24,20 @@ import { resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
 
 /** O que esta tela lê do estado — e só isto a acorda. */
-const CHAVES = ['perfil', 'insightIdx', 'contas', 'mostrarSaldo', 'categorias', 'intencao', 'semanaFechada', 'ritualDiaFechamento', 'hoje', 'metaSemanal', 'transacoes', 'diasSemGasto'] as const;
+const CHAVES = [
+  'perfil',
+  'insightIdx',
+  'contas',
+  'mostrarSaldo',
+  'categorias',
+  'intencao',
+  'semanaFechada',
+  'ritualDiaFechamento',
+  'hoje',
+  'metaSemanal',
+  'transacoes',
+  'diasSemGasto',
+] as const;
 
 export function Inicio() {
   const estado = useRecorte(CHAVES);
