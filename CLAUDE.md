@@ -118,10 +118,15 @@ interface RawTransaction {
 
 **OFX**
 - OFX 1.x é SGML, não XML — tags sem fechamento. Parser XML padrão quebra.
-- Encoding costuma ser `cp1252`/`ISO-8859-1`, não UTF-8. Ler como UTF-8 corrompe acentuação.
+- Encoding varia, e **o cabeçalho mente**: banco antigo manda `cp1252`, o extrato de conta do Nubank é UTF-8, e a fatura do mesmo Nubank declara `CHARSET:1252` sendo ASCII puro. `ingestao/texto.ts` decide pelos bytes — UTF-8 válido é UTF-8, o resto é cp1252 —, decodificando em JS porque o `TextDecoder` não é garantido no Hermes.
+- Folha pode vir com ou sem fechamento (`<MEMO>x</MEMO>` no Nubank, `<MEMO>x` no formato clássico); agregado (`<STMTTRN>`) sempre fecha. O adapter lê por tag de abertura, e o fixture derivado `sgml-cp1252-sem-fechamento.ofx` tem de dar o mesmo extrato que o original UTF-8.
+- Fixture `.ofx` é `binary` no `.gitattributes`: o `eol=lf` do repositório apagaria o CRLF que o teste existe para exercitar.
 - Cartão de crédito usa `CREDITCARDMSGSRSV1`; conta usa `BANKMSGSRSV1`. Caminhos distintos.
 - Data no formato `YYYYMMDDHHMMSS[-3:BRT]`.
-- Alguns bancos invertem a convenção de sinal em fatura de cartão.
+- Alguns bancos invertem a convenção de sinal em fatura de cartão. O Nubank não: compra negativa, `Pagamento recebido` positivo.
+- Valor sem float: `centavos()` lê `-19.90`, `-19,90` e `1.234,56`, e recusa o ambíguo (`0.123`, `12.345.6`) em vez de chutar — a linha é pulada e contada.
+- Sem FITID, o id é hash de data, valor, texto e ordem de aparição: estável entre exportações sobrepostas, e dois cafés iguais no mesmo dia não colidem.
+- `Pagamento recebido` na fatura e o pagamento saindo da conta são as **duas pontas de uma transferência**, não receita e despesa. Importados como linhas comuns, contariam o gasto duas vezes (compras no cartão + boleto da fatura).
 
 **Notificações Android**
 - `NotificationListenerService` é permissão sensível na Play Store. Exige justificativa na publicação e tela de consentimento explícita.
@@ -211,7 +216,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = formatação + lint + tipos + 574 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = formatação + lint + tipos + 611 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
