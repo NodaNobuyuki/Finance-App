@@ -211,7 +211,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = lint + tipos + 516 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = formatação + lint + tipos + 516 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
