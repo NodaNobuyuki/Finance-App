@@ -58,6 +58,7 @@ describe('aplicar do zero', () => {
     expect(await tabelas(motor)).toEqual([
       'categorias',
       'contas',
+      'decisoes_recorrencia',
       'dias_sem_gasto',
       'metas',
       'preferencias',

@@ -33,6 +33,7 @@ import {
 } from '../dominio/dinheiro';
 import { GerarId, idsSequenciais, uuidV7 } from '../dominio/ids';
 import { contaPadraoDeMeta, guardadoDaMeta, metaEscolhida } from '../dominio/metas';
+import { DecisaoRecorrencia, detectarRecorrencias } from '../dominio/recorrencia';
 import { Semente, semente, vazia } from '../dominio/seed';
 import { EstadoPersistido, hidratar } from '../dados/persistido';
 import { aplicarImportacao } from '../ingestao/aplicar';
@@ -234,6 +235,12 @@ export type Estado = {
    * trilha de semanas e streak são derivados, não contadores gravados.
    */
   diasSemGasto: DiaISO[];
+  /**
+   * O que a pessoa disse de cada gasto que se repete. A recorrência em si é
+   * derivada do histórico (`detectarRecorrencias`); só a decisão é dela, e só
+   * ela vai para o disco — a divisão de definição × progresso do desafio.
+   */
+  decisoesDeRecorrencia: DecisaoRecorrencia[];
 
   /** Já passou pelo primeiro uso. Persistido: só acontece uma vez. */
   onboardingConcluido: boolean;
@@ -353,6 +360,7 @@ function estadoDe(hoje: DiaISO, s: Semente, onboardingConcluido: boolean): Estad
     categorias: s.categorias,
     progressoDesafios: s.progressoDesafios,
     diasSemGasto: s.diasSemGasto,
+    decisoesDeRecorrencia: [],
 
     onboardingConcluido,
     onboarding: ONBOARDING_VAZIO,
@@ -527,6 +535,14 @@ export type Acao =
   /** Mescla na escolha que já havia para a linha. */
   | { tipo: 'IMPORTACAO_ESCOLHA'; idExterno: string; escolha: Escolha }
   | { tipo: 'CONFIRMAR_IMPORTACAO' }
+  /** `null` apaga a decisão: a recorrência volta a ser sugestão. */
+  | {
+      tipo: 'DECIDIR_RECORRENCIA';
+      chave: string;
+      decisao: DecisaoRecorrencia['decisao'] | null;
+    }
+  /** Lança a recorrência confirmada que venceu. Só a chave: o resto o reducer deriva. */
+  | { tipo: 'LANCAR_RECORRENCIA'; chave: string }
   /** A folha de compartilhar recebeu o backup gerado em `emMs`. */
   | { tipo: 'BACKUP_EXPORTADO'; emMs: number }
   /** Troca todo o dado do usuário pelo de um backup já validado (`lerBackup`). */
@@ -2048,6 +2064,95 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
     case 'RESTAURAR': {
       const seq = e.seq + 1;
       return { ...a.estado, seq, toast: avisar(seq, a.texto ?? 'Dados restaurados') };
+    }
+
+    case 'DECIDIR_RECORRENCIA': {
+      const anterior = e.decisoesDeRecorrencia.find((x) => x.id === a.chave)?.decisao ?? null;
+      if (anterior === a.decisao) return e;
+      const resto = e.decisoesDeRecorrencia.filter((x) => x.id !== a.chave);
+      const seq = e.seq + 1;
+      const desfazer = {
+        rotulo: 'Desfazer',
+        acao: { tipo: 'DECIDIR_RECORRENCIA', chave: a.chave, decisao: anterior } as const,
+      };
+      return {
+        ...e,
+        seq,
+        decisoesDeRecorrencia:
+          a.decisao === null ? resto : [...resto, { id: a.chave, decisao: a.decisao }],
+        toast:
+          a.decisao === 'confirmada'
+            ? {
+                ...avisar(seq, 'Recorrência confirmada', 'O app avisa quando ela vencer.'),
+                acao: desfazer,
+              }
+            : a.decisao === 'ignorada'
+              ? { ...avisar(seq, 'Não aparece mais como recorrente'), acao: desfazer }
+              : avisar(seq, 'Desfeito'),
+      };
+    }
+
+    case 'LANCAR_RECORRENCIA': {
+      // Derivada de novo aqui, não recebida da tela: tela e reducer resolvendo
+      // a recorrência por caminhos separados é divergência esperando aparecer
+      // — a lição do `SIM_GUARDAR`.
+      const r = detectarRecorrencias(e.transacoes, e.hoje).find((x) => x.chave === a.chave);
+      const confirmada = e.decisoesDeRecorrencia.some(
+        (x) => x.id === a.chave && x.decisao === 'confirmada',
+      );
+      const seq = e.seq + 1;
+      if (!r || !confirmada || r.proxima > e.hoje) {
+        return {
+          ...e,
+          seq,
+          toast: avisar(seq, 'Nada a lançar', 'Esta recorrência já está em dia.'),
+        };
+      }
+
+      // Conta apagada desde o último mês: o lançamento precisa cair numa que
+      // exista, senão fica fora do saldo de todas.
+      const contaId = e.contas.some((c) => c.id === r.contaId)
+        ? r.contaId
+        : (e.contas[0]?.id ?? '');
+      const tx: Transacao = {
+        ...novaTransacao(d, {
+          contaId,
+          categoriaId: r.categoriaId,
+          valorCentavos: r.valorCentavos,
+          ocorridoEm: r.proxima,
+          descricao: r.descricao,
+        }),
+        // O texto da fonte, não o nome dado pela pessoa: é ele que mantém o
+        // lançamento na mesma recorrência, e o mês seguinte andar.
+        descricaoOriginal: r.textoOriginal,
+      };
+      const valor = formatar(-r.valorCentavos);
+
+      return {
+        ...e,
+        seq,
+        transacoes: ordenar([tx, ...e.transacoes]),
+        // Valor fixo é o certo; o variável é o do mês passado, e a pessoa
+        // precisa de um caminho direto para corrigi-lo quando a conta chegar.
+        toast: r.valorFixo
+          ? {
+              id: seq,
+              texto: `${r.descricao} lançada`,
+              sub: `${valor} · ${rotuloCurto(r.proxima, e.hoje).toLowerCase()}`,
+              acao: {
+                rotulo: 'Desfazer',
+                acao: { tipo: 'DESFAZER', transacaoIds: [tx.id], diasSemGasto: [] },
+              },
+              duracaoMs: 4200,
+            }
+          : {
+              id: seq,
+              texto: `${r.descricao} lançada com ${valor}`,
+              sub: 'É o valor do mês passado — ajuste quando a conta chegar.',
+              acao: { rotulo: 'Ajustar', acao: { tipo: 'ABRIR_LANCAMENTO', transacaoId: tx.id } },
+              duracaoMs: 6000,
+            },
+      };
     }
 
     case 'BACKUP_EXPORTADO':

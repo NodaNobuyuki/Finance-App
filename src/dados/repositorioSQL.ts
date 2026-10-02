@@ -1,5 +1,6 @@
 import { EscritaFalhou, LeituraFalhou } from '../dominio/erros';
 import { Categoria } from '../dominio/categorias';
+import { DecisaoRecorrencia } from '../dominio/recorrencia';
 import { Conta, Meta, Origem, ProgressoDesafio, Transacao } from '../dominio/tipos';
 import { CorRef } from '../tema/paletas';
 import { diferencaDeChaves, diferencaPorId, Diferenca, vazia } from './diff';
@@ -76,6 +77,11 @@ type LinhaProgressoDesafio = {
   id: string;
   aceito: number;
   progresso: number;
+};
+
+type LinhaDecisaoRecorrencia = {
+  id: string;
+  decisao: string;
 };
 
 /* ── Tabelas, cada uma com seu mapeamento ─────────────────────── */
@@ -226,6 +232,13 @@ const TABELA_PROGRESSO_DESAFIOS: Tabela<ProgressoDesafio, LinhaProgressoDesafio>
   }),
 };
 
+const TABELA_DECISOES_RECORRENCIA: Tabela<DecisaoRecorrencia, LinhaDecisaoRecorrencia> = {
+  nome: 'decisoes_recorrencia',
+  colunas: ['id', 'decisao', 'atualizado_em'],
+  paraLinha: (r, agoraMs) => [r.id, r.decisao, agoraMs],
+  daLinha: (l) => ({ id: l.id, decisao: l.decisao as DecisaoRecorrencia['decisao'] }),
+};
+
 /* ── Preferências (escalares) ─────────────────────────────────── */
 
 type Preferencias = Pick<
@@ -339,16 +352,18 @@ export function criarRepositorioSQL(
           prefs.map((p) => [p.chave, JSON.parse(p.valor)]),
         ) as Preferencias;
 
-        const [contas, transacoes, metas, categorias, progressos, dias] = await Promise.all([
-          motor.consultar<LinhaConta>(`SELECT * FROM contas`),
-          motor.consultar<LinhaTransacao>(
-            `SELECT * FROM transacoes ORDER BY ocorrido_em DESC, criado_em DESC`,
-          ),
-          motor.consultar<LinhaMeta>(`SELECT * FROM metas`),
-          motor.consultar<LinhaCategoria>(`SELECT * FROM categorias`),
-          motor.consultar<LinhaProgressoDesafio>(`SELECT * FROM progresso_desafios`),
-          motor.consultar<{ dia: string }>(`SELECT dia FROM dias_sem_gasto ORDER BY dia`),
-        ]);
+        const [contas, transacoes, metas, categorias, progressos, dias, decisoes] =
+          await Promise.all([
+            motor.consultar<LinhaConta>(`SELECT * FROM contas`),
+            motor.consultar<LinhaTransacao>(
+              `SELECT * FROM transacoes ORDER BY ocorrido_em DESC, criado_em DESC`,
+            ),
+            motor.consultar<LinhaMeta>(`SELECT * FROM metas`),
+            motor.consultar<LinhaCategoria>(`SELECT * FROM categorias`),
+            motor.consultar<LinhaProgressoDesafio>(`SELECT * FROM progresso_desafios`),
+            motor.consultar<{ dia: string }>(`SELECT dia FROM dias_sem_gasto ORDER BY dia`),
+            motor.consultar<LinhaDecisaoRecorrencia>(`SELECT * FROM decisoes_recorrencia`),
+          ]);
 
         return {
           contas: contas.map(TABELA_CONTAS.daLinha),
@@ -357,6 +372,7 @@ export function criarRepositorioSQL(
           categorias: categorias.map(TABELA_CATEGORIAS.daLinha),
           progressoDesafios: progressos.map(TABELA_PROGRESSO_DESAFIOS.daLinha),
           diasSemGasto: dias.map((d) => d.dia),
+          decisoesDeRecorrencia: decisoes.map(TABELA_DECISOES_RECORRENCIA.daLinha),
           ...guardadas,
         } satisfies EstadoPersistido;
       } catch (causa) {
@@ -389,6 +405,10 @@ export function criarRepositorioSQL(
               TABELA_PROGRESSO_DESAFIOS,
               diferencaPorId(antes?.progressoDesafios ?? [], depois.progressoDesafios),
             )),
+            ...(await sincronizar(
+              TABELA_DECISOES_RECORRENCIA,
+              diferencaPorId(antes?.decisoesDeRecorrencia ?? [], depois.decisoesDeRecorrencia),
+            )),
           ];
 
           if (antes?.diasSemGasto !== depois.diasSemGasto) {
@@ -419,6 +439,7 @@ export function criarRepositorioSQL(
             'categorias',
             'progresso_desafios',
             'dias_sem_gasto',
+            'decisoes_recorrencia',
             'preferencias',
           ]) {
             await motor.executar(`DELETE FROM ${tabela}`);

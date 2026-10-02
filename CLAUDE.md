@@ -64,11 +64,11 @@ transactions     (id, account_id, category_id, amount_cents, occurred_at,
                   description, raw_description, external_id, source, created_at,
                   transfer_id, goal_id)
 goals            (id, user_id, name, target_cents, opening_cents, deadline, account_id)
-recurring_rules  (id, user_id, template, frequency, next_occurrence)
+recurrence_decisions (id = chave do texto, user_id, decision[confirmed|ignored])
 challenges       (id, user_id, type, target, progress, started_at, completed_at)
 ```
 
-Não há tabela de orçamento: o teto do mês é `SUM(categories.limit_cents)` — ver "Orçamento é a soma dos tetos".
+Não há tabela de orçamento: o teto do mês é `SUM(categories.limit_cents)` — ver "Orçamento é a soma dos tetos". Nem de regra de recorrência: ela é derivada do histórico, e só a decisão da pessoa é gravada — ver "Recorrência é derivada".
 
 **Saldo de conta é derivado**, nunca armazenado como valor mutável:
 
@@ -138,7 +138,7 @@ interface RawTransaction {
 1. Manual rápido — ✅ pronto
 2. OFX/CSV + share sheet do Android — **OFX pelo seletor de arquivo ✅ pronto** (roda no Expo Go, iPhone incluso); CSV e receber o arquivo pelo share sheet ainda faltam, e o share sheet exige development build (EAS)
 3. Notificações Android
-4. Recorrência inferida (elimina ingestão do que é previsível)
+4. Recorrência inferida (elimina ingestão do que é previsível) — **despesa mensal ✅ pronta**; receita (salário) ainda não
 5. E-mail via OAuth (cobre iOS)
 6. Open Finance via agregador — só quando houver receita, é custo recorrente por usuário
 
@@ -204,7 +204,7 @@ Tudo que entra na tela usa a mesma frase — surge com uma leve subida — e só
 
 ## Estado atual
 
-**App Expo rodando** (`src/`), portado do protótipo `design/Poupa Hábitos.dc.html`. 9 telas — Início, Extrato, Metas, Categorias, Hábitos, Simulador, Lote, Resumo, Fechar semana — mais 8 folhas: Nova transação (que também edita), Movimento de meta (guardar/retirar), Transferência, Detalhe de transferência, Ritual e os cadastros de conta, meta e categoria. 13 paletas, teclado numérico próprio, toast com undo.
+**App Expo rodando** (`src/`), portado do protótipo `design/Poupa Hábitos.dc.html`. 10 telas — Início, Extrato, Metas, Categorias, Hábitos, Simulador, Lote, Resumo, Fechar semana, Recorrentes — mais 8 folhas: Nova transação (que também edita), Movimento de meta (guardar/retirar), Transferência, Detalhe de transferência, Ritual e os cadastros de conta, meta e categoria. 13 paletas, teclado numérico próprio, toast com undo.
 
 ```
 src/dominio/    dinheiro (centavos), saldo derivado, guardado das metas,
@@ -216,7 +216,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = formatação + lint + tipos + 669 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = formatação + lint + tipos + 712 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
@@ -496,6 +496,24 @@ O toast conta **linhas do arquivo**, não linhas criadas: a pessoa reconhece "16
 - A categoria aprendida casa texto exato: "Parcela 1/2" e "Parcela 2/2" não se reconhecem. Normalizar isso é saber o formato do banco — mora no adapter, quando doer
 - Sem retentativa ativa de gravação: o reenvio pega carona na próxima mudança. Um outbox resolve, se virar problema
 - Nenhuma tela lê do banco sob demanda — o estado inteiro é carregado no boot. Aguenta bem os primeiros anos; a saída é paginar por período no repositório
+
+### Recorrência é derivada; só a decisão é da pessoa
+
+`detectarRecorrencias()` (`dominio/recorrencia.ts`) agrupa as despesas pelo texto do banco normalizado (`descricaoOriginal ?? descricao`) e, em cada grupo, anda de trás para frente enquanto as ocorrências caírem **uma por mês** (25 a 35 dias) com valor até 25% diferente. Duas seguidas bastam, porque quem confirma é a pessoa; lançamento no meio da sequência quebra a corrida, e é isso que deixa o mercado de toda semana de fora. Sem ocorrência há mais de 45 dias, sai da lista — cancelada ou esquecida. Parcela não precisa de regra: "Parcela 6/12" e "7/12" são textos diferentes.
+
+Não há tabela de regras, e é de propósito: regra gravada envelheceria no primeiro extrato antigo importado, como o contador de semanas da v3. A migration v11 cria `decisoes_recorrencia`, com o `id` sendo a chave do texto — o que a pessoa disse: **confirmada** (conta no comprometido do mês e avisa ao vencer), **ignorada** (some de tudo) ou nada (sugestão). É a divisão de definição × progresso do desafio.
+
+**Lançar é um toque, nunca sozinho.** A confirmada vencida aparece na Home com "Lançar"; `LANCAR_RECORRENCIA` só leva a chave e o reducer deriva o resto, pela lição do `SIM_GUARDAR`. O lançamento cai no dia do vencimento, com `origem: 'manual'` — foi a pessoa que lançou — e com o **texto do banco** em `descricaoOriginal`, não o nome que ela deu à linha: sem isso, "Streamingbr" renomeado para "Netflix" cairia noutra chave, a recorrência nunca andaria para o mês seguinte e o aviso não sumiria. Valor fixo tem desfazer; valor variável sai com o do mês passado e o toast oferece "Ajustar", que abre a edição.
+
+Quando o OFX daquele mês chega, o lançamento feito pela recorrência não tem FITID, então cai em "possível duplicata" — o mesmo caminho da ponta de transferência criada pela importação.
+
+O custo é o loop do produto: a tela Recorrentes mostra o comprometido do mês, o do ano e quanto viraria em 5 anos guardado todo mês no CDI (`acumuladoDeAportes`, arredondando mês a mês, centavo inteiro).
+
+**Pendências da recorrência:**
+- Só despesa. Salário é o mais previsível de todos, mas o loop é sobre gasto; entra quando houver o que fazer com ele
+- Valor variável lançado com o valor do mês passado não casa com o OFX se a pessoa não ajustar — vira linha a mais
+- Vencimento pelo dia da última ocorrência: a do dia 31 que caiu em 28/02 passa a vencer dia 28 dali em diante
+- A demo não tem histórico de meses anteriores (os saldos dela estão cravados no protótipo), então a tela abre vazia nela; para ver no aparelho, importe dois ou mais meses de OFX
 
 ### O Extrato rola sozinho
 
