@@ -16,6 +16,8 @@ import {
   insights,
   lembreteDeBackup,
   orcamento,
+  recorrencias,
+  rotuloDoVencimento,
   resumoDoMes,
   semana,
   statusDoRegistro,
@@ -40,6 +42,7 @@ const CHAVES = [
   'transacoes',
   'diasSemGasto',
   'ultimoBackupEm',
+  'decisoesDeRecorrencia',
 ] as const;
 
 export function Inicio() {
@@ -58,6 +61,7 @@ export function Inicio() {
   const recentes = transacoesDoMes(estado).slice(0, 5);
   const corOrcamento = corDoNivel(orc.nivel, t);
   const avisoDeBackup = lembreteDeBackup(estado);
+  const rec = recorrencias(estado);
 
   /** Um quadradinho da trilha da semana. */
   const celulaDoDia = (d: DiaDaSemana) => {
@@ -548,6 +552,84 @@ export function Inicio() {
             )}
           </View>
         </View>
+
+        {/* Recorrentes: o que venceu vem com o lançar à mão — o previsível não
+            precisa ser digitado. Sem nada vencido, a linha leva à tela, com a
+            sugestão nova primeiro e o custo do comprometido depois. */}
+        {rec.vencidas.length > 0 ? (
+          <View
+            style={{
+              gap: 12,
+              borderRadius: 18,
+              borderWidth: 1,
+              borderColor: t.accent,
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+            }}
+          >
+            <Txt tamanho={10} peso={600} maiusculas espacamento={0.8} cor={t.accent}>
+              Venceu
+            </Txt>
+            {rec.vencidas.slice(0, 3).map((r) => (
+              <View key={r.chave} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Txt tamanho={13} peso={600} linhas={1}>
+                    {r.descricao}
+                  </Txt>
+                  <Txt tamanho={11.5} numerico cor={t.inkSoft}>
+                    {r.valorFixo ? '' : '≈ '}
+                    {formatar(-r.valorCentavos)} · {rotuloDoVencimento(r.proxima, estado.hoje)}
+                  </Txt>
+                </View>
+                <Toque
+                  aoTocar={() => despachar({ tipo: 'LANCAR_RECORRENCIA', chave: r.chave })}
+                  rotuloAcessivel={`Lançar ${r.descricao}`}
+                >
+                  <Txt tamanho={12.5} peso={600} cor={t.accent}>
+                    Lançar
+                  </Txt>
+                </Toque>
+              </View>
+            ))}
+          </View>
+        ) : rec.sugeridas.length > 0 || rec.confirmadas.length > 0 ? (
+          <Toque
+            aoTocar={() => despachar({ tipo: 'IR_PARA', tela: 'recorrentes' })}
+            rotuloAcessivel="Ver gastos recorrentes"
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                borderRadius: 18,
+                borderWidth: 1,
+                borderColor: t.line,
+                paddingVertical: 13,
+                paddingHorizontal: 16,
+              }}
+            >
+              <Icone path={icones.repetir} tamanho={18} cor={t.accent} espessura={1.8} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Txt tamanho={12.5} peso={600}>
+                  {rec.sugeridas.length > 0
+                    ? rec.sugeridas.length === 1
+                      ? '1 gasto parece se repetir todo mês'
+                      : `${rec.sugeridas.length} gastos parecem se repetir todo mês`
+                    : `Recorrentes · ${formatar(rec.mensalCentavos)} por mês`}
+                </Txt>
+                <Txt tamanho={11.5} cor={t.inkSoft} entrelinha={1.4}>
+                  {rec.sugeridas.length > 0
+                    ? 'Confirme e o app avisa quando eles vencerem.'
+                    : `${formatarRedondo(rec.investidoCentavos)} em 5 anos, se investido.`}
+                </Txt>
+              </View>
+              <Txt tamanho={12.5} peso={600} cor={t.accent}>
+                {rec.sugeridas.length > 0 ? 'Revisar' : 'Ver'}
+              </Txt>
+            </View>
+          </Toque>
+        ) : null}
 
         {/* Backup: só quando há o que perder. O toque já exporta — o aviso é
             o próprio caminho, não um recado que manda procurar em Hábitos. */}

@@ -23,6 +23,7 @@ import { Inicio } from '../Inicio';
 import { Lote } from '../Lote';
 import { Metas } from '../Metas';
 import { Onboarding } from '../Onboarding';
+import { Recorrentes } from '../Recorrentes';
 import { Resumo } from '../Resumo';
 import { Simulador } from '../Simulador';
 import { CadastroCategoria } from '../folhas/CadastroCategoria';
@@ -63,6 +64,7 @@ const TELAS: {
   { nome: 'lote', no: <Lote />, texto: 'Colocar em dia' },
   { nome: 'resumo', no: <Resumo />, texto: 'Resumo da semana' },
   { nome: 'fechar', no: <FecharSemana />, texto: 'Fechar a semana' },
+  { nome: 'recorrentes', no: <Recorrentes />, texto: 'Recorrentes' },
   { nome: 'nova transação', no: <NovaTransacao />, texto: 'Nova transação' },
   {
     nome: 'guardar na meta',
@@ -222,6 +224,43 @@ describe('app vazio', () => {
 
     const primeiroUso = await montar(<Onboarding />, estadoVazio);
     expect(primeiroUso.getByText('Restaurar backup')).toBeTruthy();
+  });
+
+  it('Recorrentes vazio explica de onde elas vêm e oferece importar', async () => {
+    const tela = await montar(<Recorrentes />, estadoVazio);
+    expect(tela.getByText('Nenhum gasto repetido ainda')).toBeTruthy();
+    expect(tela.getByText('Importar extrato')).toBeTruthy();
+  });
+
+  it('a recorrência sugerida pede decisão; a confirmada vencida oferece lançar, também na Home', async () => {
+    const mes = (dia: string, id: string) => ({
+      ...estadoInicial.transacoes[0],
+      id,
+      valorCentavos: -4490,
+      ocorridoEm: dia,
+      descricao: 'Streamingbr',
+      descricaoOriginal: 'Streamingbr',
+    });
+    const comHistorico: Estado = {
+      ...estadoInicial,
+      hoje: '2026-10-16',
+      transacoes: [mes('2026-08-15', 'a'), mes('2026-09-15', 'b')],
+    };
+
+    const sugerida = await montar(<Recorrentes />, comHistorico);
+    expect(sugerida.getByText('É recorrente')).toBeTruthy();
+    const homeSugerida = await montar(<Inicio />, comHistorico);
+    expect(homeSugerida.getByText('1 gasto parece se repetir todo mês')).toBeTruthy();
+
+    const confirmada: Estado = {
+      ...comHistorico,
+      decisoesDeRecorrencia: [{ id: 'streamingbr', decisao: 'confirmada' }],
+    };
+    const tela = await montar(<Recorrentes />, confirmada);
+    expect(tela.getByText('Lançar')).toBeTruthy();
+    const home = await montar(<Inicio />, confirmada);
+    expect(home.getByText('Venceu')).toBeTruthy();
+    expect(home.getByLabelText('Lançar Streamingbr')).toBeTruthy();
   });
 
   it('a Home avisa do backup só quando há o que perder', async () => {

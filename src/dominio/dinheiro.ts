@@ -105,6 +105,26 @@ export function renderPor(principal: Centavos, taxaMensalBps: number, meses: num
   return Math.round(principal * Math.pow(1 + taxaMensalBps / 10000, meses));
 }
 
+/**
+ * Quanto um valor guardado TODO MÊS vira depois de `meses`, rendendo a cada
+ * mês — o custo de oportunidade de um gasto que se repete.
+ *
+ * Arredonda mês a mês, como um extrato faria: o resultado é sempre centavo
+ * inteiro, e nenhum float sai daqui.
+ */
+export function acumuladoDeAportes(
+  mensal: Centavos,
+  taxaMensalBps: number,
+  meses: number,
+): Centavos {
+  if (mensal <= 0) return 0;
+  let saldo = 0;
+  for (let i = 0; i < meses; i++) {
+    saldo = Math.round((saldo * (10000 + taxaMensalBps)) / 10000) + mensal;
+  }
+  return saldo;
+}
+
 /** Percentual inteiro de `parte` sobre `todo`, protegido contra divisão por zero. */
 export function percentual(parte: Centavos, todo: Centavos): number {
   if (todo === 0) return 0;

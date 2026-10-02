@@ -21,9 +21,10 @@ import {
   somarDias,
   somarMeses,
 } from '../dominio/datas';
-import { Centavos, formatar, percentual, renderPor } from '../dominio/dinheiro';
+import { acumuladoDeAportes, Centavos, formatar, percentual, renderPor } from '../dominio/dinheiro';
 import { DefinicaoDesafio, definicoesDesafios, progressoDe } from '../dominio/desafios';
 import { guardadoDaMeta, rotuloDePrazo, totalGuardado as somarGuardado } from '../dominio/metas';
+import { detectarRecorrencias, Recorrencia } from '../dominio/recorrencia';
 import {
   ehTransferencia,
   semTransferencias,
@@ -957,4 +958,74 @@ export function rotuloDoUltimoBackup(e: Pick<Estado, 'ultimoBackupEm' | 'hoje'>)
   if (dias <= 0) return 'Último backup hoje.';
   if (dias === 1) return 'Último backup ontem.';
   return `Último backup há ${dias} dias.`;
+}
+
+/* ── Recorrência ──────────────────────────────────────────────── */
+
+/** Horizonte do custo de oportunidade — o mesmo "em 5 anos" do Simulador. */
+export const MESES_DO_CUSTO = 60;
+
+export type RecorrenciaVista = Recorrencia & {
+  /** Confirmada e com o vencimento já chegado: é a que a Home oferece lançar. */
+  vencida: boolean;
+  anualCentavos: Centavos;
+  /** O mesmo valor guardado todo mês, rendendo no CDI por `MESES_DO_CUSTO`. */
+  investidoCentavos: Centavos;
+};
+
+export type Recorrencias = {
+  /** O que a pessoa disse que é recorrente — conta no comprometido do mês. */
+  confirmadas: RecorrenciaVista[];
+  /** Detectadas e ainda sem decisão. */
+  sugeridas: RecorrenciaVista[];
+  /** Das confirmadas, as que já venceram e não foram lançadas. */
+  vencidas: RecorrenciaVista[];
+  mensalCentavos: Centavos;
+  anualCentavos: Centavos;
+  investidoCentavos: Centavos;
+};
+
+/**
+ * As recorrências pela decisão da pessoa. Ignorada some de tudo; confirmada
+ * entra no total do mês e avisa ao vencer; sem decisão é sugestão.
+ *
+ * O custo é o loop do produto aplicado ao gasto que a pessoa nem vê mais: a
+ * assinatura de R$ 44,90 é R$ 538,80 no ano e bem mais que isso investida.
+ */
+export function recorrencias(
+  e: Pick<Estado, 'transacoes' | 'hoje' | 'decisoesDeRecorrencia'>,
+): Recorrencias {
+  const decisao = new Map(e.decisoesDeRecorrencia.map((d) => [d.id, d.decisao]));
+  const cdi = taxa('cdi').bpsMensal;
+  const vistas = detectarRecorrencias(e.transacoes, e.hoje)
+    .filter((r) => decisao.get(r.chave) !== 'ignorada')
+    .map((r): RecorrenciaVista => {
+      const mensal = -r.valorCentavos;
+      return {
+        ...r,
+        vencida: decisao.get(r.chave) === 'confirmada' && r.proxima <= e.hoje,
+        anualCentavos: mensal * 12,
+        investidoCentavos: acumuladoDeAportes(mensal, cdi, MESES_DO_CUSTO),
+      };
+    });
+
+  const confirmadas = vistas.filter((r) => decisao.get(r.chave) === 'confirmada');
+  const soma = (f: (r: RecorrenciaVista) => Centavos) => confirmadas.reduce((a, r) => a + f(r), 0);
+  return {
+    confirmadas,
+    sugeridas: vistas.filter((r) => !decisao.has(r.chave)),
+    vencidas: confirmadas.filter((r) => r.vencida),
+    mensalCentavos: soma((r) => -r.valorCentavos),
+    anualCentavos: soma((r) => r.anualCentavos),
+    investidoCentavos: soma((r) => r.investidoCentavos),
+  };
+}
+
+/** "venceu há 2 dias", "vence hoje", "próxima em 13 dias". */
+export function rotuloDoVencimento(proxima: DiaISO, hoje: DiaISO): string {
+  const dias = diferencaEmDias(hoje, proxima);
+  if (dias === 0) return 'vence hoje';
+  if (dias === 1) return 'vence amanhã';
+  if (dias > 1) return `próxima em ${dias} dias`;
+  return dias === -1 ? 'venceu ontem' : `venceu há ${-dias} dias`;
 }

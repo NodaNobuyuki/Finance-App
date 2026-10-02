@@ -30,6 +30,7 @@ import { Lote } from './telas/Lote';
 import { Metas } from './telas/Metas';
 import { Onboarding } from './telas/Onboarding';
 import { Resumo } from './telas/Resumo';
+import { Recorrentes } from './telas/Recorrentes';
 import { Simulador } from './telas/Simulador';
 import { CadastroCategoria } from './telas/folhas/CadastroCategoria';
 import { CadastroConta } from './telas/folhas/CadastroConta';
@@ -68,6 +69,8 @@ function TelaAtual() {
       return <Resumo />;
     case 'fechar':
       return <FecharSemana />;
+    case 'recorrentes':
+      return <Recorrentes />;
     case 'home':
     default:
       return <Inicio />;

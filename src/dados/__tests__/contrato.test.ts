@@ -179,6 +179,25 @@ describe.each(implementacoes)('repositório: %s', (_nome, criar) => {
     expect(Object.keys(lido!.progressoDesafios[0]).sort()).toEqual(['aceito', 'id', 'progresso']);
   });
 
+  it('a decisão sobre uma recorrência volta, e desfeita sai do disco', async () => {
+    const antes = base();
+    const com = {
+      ...antes,
+      decisoesDeRecorrencia: [
+        { id: 'streamingbr', decisao: 'confirmada' as const },
+        { id: 'enel', decisao: 'ignorada' as const },
+      ],
+    };
+    await repo.salvar(null, com);
+    expect((await repo.carregar())!.decisoesDeRecorrencia).toEqual(
+      expect.arrayContaining(com.decisoesDeRecorrencia),
+    );
+
+    const sem = { ...com, decisoesDeRecorrencia: [com.decisoesDeRecorrencia[0]] };
+    await repo.salvar(com, sem);
+    expect((await repo.carregar())!.decisoesDeRecorrencia).toEqual(sem.decisoesDeRecorrencia);
+  });
+
   it('o instante do último backup volta como número, e a ausência como null', async () => {
     await repo.salvar(null, { ...base(), ultimoBackupEm: 1_759_420_800_123 });
     expect((await repo.carregar())!.ultimoBackupEm).toBe(1_759_420_800_123);
