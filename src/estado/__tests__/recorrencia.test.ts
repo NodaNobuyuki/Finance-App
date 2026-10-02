@@ -209,4 +209,34 @@ describe('o extrato do mês chegando depois', () => {
     const [linha] = montarPrevia(extrato, 'cartao', {}, e).linhas;
     expect(linha).toMatchObject({ situacao: 'duplicata', mesma: true });
   });
+
+  it('a conta de luz lançada com o valor do mês passado fica com o do banco — não conta duas vezes', () => {
+    const fazer = sessao();
+    const lancou = fazer(confirmar('enel'), { tipo: 'LANCAR_RECORRENCIA', chave: 'enel' });
+    const extrato: ExtratoLido = {
+      tipoDeConta: 'conta',
+      transacoes: [
+        {
+          idExterno: 'FITID-LUZ',
+          valorCentavos: -20310,
+          ocorridoEm: '2026-10-13',
+          descricaoOriginal: 'Enel',
+          origem: 'ofx',
+        },
+      ],
+      ignoradas: 0,
+    };
+    const depois = fazer(
+      { tipo: 'ABRIR_IMPORTACAO', extrato },
+      { tipo: 'IMPORTACAO_CONTA', contaId: 'corrente' },
+      { tipo: 'CONFIRMAR_IMPORTACAO' },
+    );
+
+    const luz = depois.transacoes.filter(
+      (t) => t.ocorridoEm >= '2026-10-01' && t.descricaoOriginal === 'Enel',
+    );
+    expect(luz).toHaveLength(1);
+    expect(luz[0]).toMatchObject({ valorCentavos: -20310, idExterno: 'FITID-LUZ' });
+    expect(depois.transacoes).toHaveLength(lancou.transacoes.length);
+  });
 });

@@ -1,5 +1,6 @@
 import { Categoria, categoriaExisteEm } from '../dominio/categorias';
 import { DiaISO, diferencaEmDias } from '../dominio/datas';
+import { chaveDeRecorrencia } from '../dominio/recorrencia';
 import { Conta, Transacao } from '../dominio/tipos';
 import { ExtratoLido, TransacaoBruta } from './tipos';
 
@@ -63,6 +64,14 @@ export type Previa = {
  */
 export const JANELA_DUPLICATA = 2;
 
+/**
+ * Janela para a linha com o MESMO TEXTO DO BANCO e outro valor — a conta de
+ * luz lançada pela recorrência com o valor do mês passado. Mais larga que a de
+ * duplicata porque a conta não vence no mesmo dia todo mês; segura porque o
+ * texto idêntico ao do banco, numa linha sem FITID, só vem de lá.
+ */
+export const JANELA_MESMO_TEXTO = 5;
+
 /** O boleto da fatura e o crédito no cartão compensam com um dia ou dois de diferença. */
 export const JANELA_TRANSFERENCIA = 3;
 
@@ -99,17 +108,30 @@ export function montarPrevia(
     const escolha = escolhas[bruta.idExterno] ?? {};
     const categoriaId = aprendidas.get(chave(bruta.valorCentavos, bruta.descricaoOriginal)) ?? '';
 
-    const existente = maisProxima(
-      e.transacoes,
-      (t) =>
-        t.contaId === contaId &&
-        t.valorCentavos === bruta.valorCentavos &&
-        // Linha com FITID é outro registro do banco, não "a mesma".
-        t.idExterno === undefined &&
-        !usadas.has(t.id),
-      bruta.ocorridoEm,
-      JANELA_DUPLICATA,
-    );
+    // Linha com FITID é outro registro do banco, não "a mesma".
+    const candidata = (t: Transacao) =>
+      t.contaId === contaId && t.idExterno === undefined && !usadas.has(t.id);
+    const texto = chaveDeRecorrencia({ descricao: bruta.descricaoOriginal });
+    const existente =
+      maisProxima(
+        e.transacoes,
+        (t) => candidata(t) && t.valorCentavos === bruta.valorCentavos,
+        bruta.ocorridoEm,
+        JANELA_DUPLICATA,
+      ) ??
+      // Valor diferente só com o texto do banco igual: é o lançamento que a
+      // recorrência fez com o valor do mês passado. Sem isto ele ficava ao lado
+      // do valor real, e a conta de luz contava duas vezes no mês.
+      maisProxima(
+        e.transacoes,
+        (t) =>
+          candidata(t) &&
+          t.transferenciaId === undefined &&
+          Math.sign(t.valorCentavos) === Math.sign(bruta.valorCentavos) &&
+          chaveDeRecorrencia(t) === texto,
+        bruta.ocorridoEm,
+        JANELA_MESMO_TEXTO,
+      );
     if (existente && escolha.mesma !== false) {
       usadas.add(existente.id);
       linhas.push({ situacao: 'duplicata', bruta, existente, mesma: true, categoriaId });

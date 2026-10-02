@@ -191,6 +191,81 @@ describe('possível duplicata', () => {
   });
 });
 
+describe('o mesmo texto do banco com outro valor', () => {
+  const linha = cartao.transacoes[0];
+  /** A linha que a recorrência lançaria: o texto do banco, o valor do mês passado, sem FITID. */
+  const lancada = (campos: Partial<Transacao> = {}): Estado => {
+    const t: Transacao = {
+      id: 'lancada',
+      contaId: 'cartao',
+      categoriaId: 'assinaturas',
+      valorCentavos: linha.valorCentavos - 300,
+      ocorridoEm: '2026-08-13',
+      descricao: 'Como a pessoa chama',
+      descricaoOriginal: linha.descricaoOriginal,
+      origem: 'manual',
+      criadoEm: 1,
+      ...campos,
+    };
+    return { ...estadoInicial, transacoes: [t, ...estadoInicial.transacoes] };
+  };
+  const situacao = (e: Estado) =>
+    montarPrevia(cartao, 'cartao', {}, e).linhas.find((l) => l.bruta.idExterno === linha.idExterno)!
+      .situacao;
+
+  it('é possível duplicata, e "é a mesma" fica com o valor do banco', () => {
+    const e = lancada();
+    expect(situacao(e)).toBe('duplicata');
+
+    const depois = sessao(e).importar(cartao);
+    const corrigida = depois.transacoes.find((t) => t.id === 'lancada')!;
+    expect(corrigida).toMatchObject({
+      valorCentavos: linha.valorCentavos,
+      idExterno: linha.idExterno,
+      descricao: 'Como a pessoa chama',
+    });
+    // Uma linha só com aquele FITID: a corrigida, sem gêmea ao lado.
+    expect(depois.transacoes.filter((t) => t.idExterno === linha.idExterno)).toEqual([corrigida]);
+    expect(depois.toast!.sub).toContain('1 com o valor corrigido');
+  });
+
+  it('a janela é de cinco dias', () => {
+    expect(situacao(lancada({ ocorridoEm: '2026-08-12' }))).toBe('duplicata');
+    expect(situacao(lancada({ ocorridoEm: '2026-08-11' }))).toBe('nova');
+  });
+
+  it('texto diferente com valor diferente é outra compra', () => {
+    expect(situacao(lancada({ descricaoOriginal: 'Outra coisa' }))).toBe('nova');
+  });
+
+  it('linha que já veio do banco, com FITID, nunca casa pelo texto', () => {
+    expect(situacao(lancada({ idExterno: 'FITID-ANTIGO' }))).toBe('nova');
+  });
+
+  it('entrada não casa com saída do mesmo texto', () => {
+    expect(situacao(lancada({ valorCentavos: -linha.valorCentavos }))).toBe('nova');
+  });
+
+  it('o valor idêntico vem antes: com as duas candidatas, casa a de mesmo valor', () => {
+    const e = lancada();
+    const exata: Transacao = {
+      ...e.transacoes[0],
+      id: 'exata',
+      valorCentavos: linha.valorCentavos,
+      descricaoOriginal: 'Texto qualquer',
+      ocorridoEm: '2026-08-17',
+    };
+    const previa = montarPrevia(
+      cartao,
+      'cartao',
+      {},
+      { ...e, transacoes: [exata, ...e.transacoes] },
+    );
+    const dup = previa.linhas.find((l) => l.bruta.idExterno === linha.idExterno)!;
+    expect(dup).toMatchObject({ situacao: 'duplicata', existente: { id: 'exata' } });
+  });
+});
+
 describe('as duas pontas de uma fatura, em qualquer ordem', () => {
   it('fatura primeiro, conta depois: o boleto casa com a ponta já criada', () => {
     const s = sessao();

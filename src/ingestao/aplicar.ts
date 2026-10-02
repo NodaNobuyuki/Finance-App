@@ -12,6 +12,8 @@ export type ResumoDaImportacao = {
   importadas: number;
   /** Duplicatas confirmadas: não entraram, e a existente ganhou o FITID. */
   ligadas: number;
+  /** Das ligadas, as que estavam com outro valor e ficaram com o do banco. */
+  corrigidas: number;
   transferencias: number;
   /** Das importadas, quantas ficaram sem categoria — o que sobra para a pessoa fazer. */
   semCategoria: number;
@@ -27,7 +29,8 @@ export type ResumoDaImportacao = {
  *
  * Três escritas além de criar linha:
  * - duplicata confirmada passa o FITID à linha existente, para a próxima
- *   importação do mesmo período reconhecê-la sem perguntar de novo;
+ *   importação do mesmo período reconhecê-la sem perguntar de novo, e o valor
+ *   do banco, quando eram diferentes;
  * - transferência cria as duas pontas com o mesmo `transferenciaId`, como a
  *   folha "Transferir" — e a ponta que já existia na outra conta (o boleto
  *   importado antes) vira ponta em vez de ganhar uma gêmea;
@@ -44,6 +47,7 @@ export function aplicarImportacao(
   const resumo: ResumoDaImportacao = {
     importadas: 0,
     ligadas: 0,
+    corrigidas: 0,
     transferencias: 0,
     semCategoria: 0,
     ultimoDia: null,
@@ -68,8 +72,15 @@ export function aplicarImportacao(
     });
 
     if (linha.situacao === 'duplicata' && linha.mesma) {
-      alteradas.set(linha.existente.id, { ...linha.existente, idExterno: bruta.idExterno });
+      // O valor do banco é o que saiu de verdade: a linha da recorrência
+      // variável foi lançada com o do mês passado justamente à espera dele.
+      alteradas.set(linha.existente.id, {
+        ...linha.existente,
+        idExterno: bruta.idExterno,
+        valorCentavos: bruta.valorCentavos,
+      });
       resumo.ligadas += 1;
+      if (linha.existente.valorCentavos !== bruta.valorCentavos) resumo.corrigidas += 1;
       continue;
     }
 
