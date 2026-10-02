@@ -24,7 +24,7 @@ import {
 import { acumuladoDeAportes, Centavos, formatar, percentual, renderPor } from '../dominio/dinheiro';
 import { DefinicaoDesafio, definicoesDesafios, progressoDe } from '../dominio/desafios';
 import { guardadoDaMeta, rotuloDePrazo, totalGuardado as somarGuardado } from '../dominio/metas';
-import { detectarRecorrencias, Recorrencia } from '../dominio/recorrencia';
+import { chaveDeRecorrencia, detectarRecorrencias, Recorrencia } from '../dominio/recorrencia';
 import {
   ehTransferencia,
   semTransferencias,
@@ -302,11 +302,17 @@ export type AtalhoRapido = { categoriaId: string; valorCentavos: Centavos };
  *
  * Olha só para semanas fechadas, então o conjunto de botões fica estável
  * durante a semana inteira.
+ *
+ * Gasto recorrente não entra: aluguel e academia se repetem todo mês, e por
+ * isso ganhariam o primeiro botão — "Aluguel R$ 1.850" a um toque, ao lado do
+ * café. O previsível é trabalho da recorrência, que o lança no vencimento; o
+ * atalho é para o gasto miúdo do dia.
  */
 export function atalhosRapidos(
   e: Pick<Estado, 'categorias' | 'hoje' | 'transacoes'>,
 ): AtalhoRapido[] {
   const inicio = inicioDaSemana(e.hoje);
+  const recorrentes = new Set(detectarRecorrencias(e.transacoes, e.hoje).map((r) => r.chave));
 
   const porCategoria: Record<string, Centavos[]> = {};
   for (const t of e.transacoes) {
@@ -315,6 +321,7 @@ export function atalhosRapidos(
     // Transferência também não vira atalho — guardar dinheiro não é um gasto
     // recorrente para repetir com um toque.
     if (t.valorCentavos >= 0 || t.ocorridoEm >= inicio || ehTransferencia(t)) continue;
+    if (recorrentes.has(chaveDeRecorrencia(t))) continue;
     (porCategoria[t.categoriaId] ??= []).push(Math.abs(t.valorCentavos));
   }
 
@@ -331,12 +338,16 @@ export function atalhosRapidos(
     );
   };
 
+  // Empate se desfaz pelo menor valor, nunca pela ordem do array: a ordem das
+  // transações muda a cada registro, e os botões trocariam de lugar sozinhos.
+  const maisBarata = (a: string, b: string) =>
+    Math.min(...porCategoria[a]) - Math.min(...porCategoria[b]) || (a < b ? -1 : 1);
   const repetidas = Object.keys(porCategoria)
     .filter((k) => porCategoria[k].length >= 2)
-    .sort((a, b) => porCategoria[b].length - porCategoria[a].length);
+    .sort((a, b) => porCategoria[b].length - porCategoria[a].length || maisBarata(a, b));
   const resto = Object.keys(porCategoria)
     .filter((k) => porCategoria[k].length < 2)
-    .sort((a, b) => Math.min(...porCategoria[a]) - Math.min(...porCategoria[b]));
+    .sort(maisBarata);
 
   return [...repetidas, ...resto].slice(0, 4).map((categoriaId) => ({
     categoriaId,
