@@ -36,7 +36,7 @@ import { contaPadraoDeMeta, guardadoDaMeta, metaEscolhida } from '../dominio/met
 import { Semente, semente, vazia } from '../dominio/seed';
 import { EstadoPersistido, hidratar } from '../dados/persistido';
 import { aplicarImportacao } from '../ingestao/aplicar';
-import { contaSugerida, Escolha, montarPrevia } from '../ingestao/previa';
+import { contaSugerida, Escolha, montarPrevia, vincularConta } from '../ingestao/previa';
 import { ExtratoLido } from '../ingestao/tipos';
 import { semanasEmDia } from './derivados';
 import { Conta, Meta, Perfil, ProgressoDesafio, Tela, Transacao } from '../dominio/tipos';
@@ -912,11 +912,15 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       const previa = montarPrevia(extrato, contaId, escolhas, e);
       const seq = e.seq + 1;
       const fechada = { ...e, folha: null, importacao: null };
+      // Lembrado mesmo quando nada entra: a pessoa escolheu a conta do mesmo
+      // jeito, e o próximo extrato daquele banco já deve abrir nela.
+      const contas = vincularConta(e.contas, contaId, extrato);
 
       if (previa.linhas.length === 0) {
         return {
           ...fechada,
           seq,
+          contas,
           toast: avisar(seq, 'Nada novo neste extrato', 'Tudo nele já estava importado.'),
         };
       }
@@ -935,6 +939,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       return {
         ...fechada,
         seq,
+        contas,
         transacoes: ordenar(transacoes),
         // O que acabou de entrar é o que a pessoa quer ver — e as linhas sem
         // categoria se resolvem tocando nelas ali.

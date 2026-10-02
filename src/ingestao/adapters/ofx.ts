@@ -62,12 +62,24 @@ function lerOFX(texto: string): ExtratoLido {
   return {
     tipoDeConta: cartao ? 'cartao' : 'conta',
     banco: cabecalho.get('ORG'),
-    contaExterna: cabecalho.get('ACCTID'),
+    contaExterna: contaExterna(cabecalho),
     inicio: dia(cabecalho.get('DTSTART')) ?? undefined,
     fim: dia(cabecalho.get('DTEND')) ?? undefined,
     transacoes,
     ignoradas,
   };
+}
+
+/**
+ * Instituição e `ACCTID`. O número da conta sozinho pode repetir entre dois
+ * bancos; `FID` e `BANKID` são o código da instituição, e o `ORG` — nome por
+ * extenso, o que mais muda — fica como último recurso.
+ */
+function contaExterna(cabecalho: Map<string, string>): string | undefined {
+  const conta = cabecalho.get('ACCTID');
+  if (!conta) return undefined;
+  const instituicao = cabecalho.get('FID') ?? cabecalho.get('BANKID') ?? cabecalho.get('ORG');
+  return instituicao ? `${instituicao}:${conta}` : conta;
 }
 
 function lerLancamento(

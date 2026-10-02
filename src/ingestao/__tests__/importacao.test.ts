@@ -6,7 +6,7 @@ import { saldoDaConta, saldoTotal, totalEntradas } from '../../dominio/saldo';
 import { Transacao } from '../../dominio/tipos';
 import { Acao, criarReducer, dependenciasDeTeste, Estado, estadoInicial } from '../../estado/store';
 import { adapterOFX } from '../adapters/ofx';
-import { contaSugerida, montarPrevia } from '../previa';
+import { contaSugerida, montarPrevia, vincularConta } from '../previa';
 import { decodificar } from '../texto';
 import { ExtratoLido } from '../tipos';
 
@@ -268,6 +268,70 @@ describe('escolhas da prévia', () => {
   it('conta sugerida: fatura no cartão, extrato na corrente', () => {
     expect(contaSugerida(cartao, estadoInicial.contas)).toBe('cartao');
     expect(contaSugerida(contaComBoleto, estadoInicial.contas)).toBe('corrente');
+  });
+});
+
+describe('a conta lembrada', () => {
+  /** Dois cartões: a sugestão pelo tipo erra um deles todo mês. */
+  const doisCartoes: Estado = {
+    ...estadoInicial,
+    contas: [
+      ...estadoInicial.contas,
+      { ...conta(estadoInicial, 'cartao'), id: 'cartao-2', nome: 'Outro cartão' },
+    ],
+  };
+  const abrir = (e: Estado) =>
+    criarReducer(dependenciasDeTeste())(e, { tipo: 'ABRIR_IMPORTACAO', extrato: cartao });
+
+  it('a próxima importação do mesmo extrato abre na conta escolhida', () => {
+    const s = sessao(doisCartoes);
+    expect(abrir(doisCartoes).importacao!.contaId).toBe('cartao');
+
+    const depois = s.importar(cartao, { tipo: 'IMPORTACAO_CONTA', contaId: 'cartao-2' });
+
+    expect(conta(depois, 'cartao-2').idNoBanco).toBe(cartao.contaExterna);
+    expect(abrir(depois).importacao!.contaId).toBe('cartao-2');
+  });
+
+  it('a conta do banco aponta para uma conta do app só: o vínculo muda de lugar', () => {
+    const s = sessao(doisCartoes);
+    s.importar(cartao, { tipo: 'IMPORTACAO_CONTA', contaId: 'cartao-2' });
+    const depois = s.importar(cartao, { tipo: 'IMPORTACAO_CONTA', contaId: 'cartao' });
+
+    expect(conta(depois, 'cartao').idNoBanco).toBe(cartao.contaExterna);
+    expect('idNoBanco' in conta(depois, 'cartao-2')).toBe(false);
+  });
+
+  it('lembra mesmo quando nada novo entra — o caso de quem importou antes da v10', () => {
+    const s = sessao();
+    const importado = s.importar(cartao);
+    const semVinculo = sessao({
+      ...importado,
+      contas: importado.contas.map(({ idNoBanco: _, ...c }) => c),
+    });
+
+    const depois = semVinculo.importar(cartao);
+
+    expect(depois.toast!.texto).toBe('Nada novo neste extrato');
+    expect(conta(depois, 'cartao').idNoBanco).toBe(cartao.contaExterna);
+  });
+
+  it('conta apagada leva o vínculo junto, e a sugestão volta a ser pelo tipo', () => {
+    const s = sessao(doisCartoes);
+    s.importar(cartao, { tipo: 'IMPORTACAO_CONTA', contaId: 'cartao-2' });
+    const depois = s.fazer({ tipo: 'APAGAR_CONTA', contaId: 'cartao-2' });
+
+    expect(contaSugerida(cartao, depois.contas)).toBe('cartao');
+  });
+
+  it('extrato sem identificação de conta não mexe em nada', () => {
+    const anonimo = { ...cartao, contaExterna: undefined };
+    expect(vincularConta(estadoInicial.contas, 'cartao', anonimo)).toBe(estadoInicial.contas);
+  });
+
+  it('confirmar de novo na mesma conta não troca o array — nada vai ao disco', () => {
+    const vinculadas = vincularConta(estadoInicial.contas, 'cartao', cartao);
+    expect(vincularConta(vinculadas, 'cartao', cartao)).toBe(vinculadas);
   });
 });
 

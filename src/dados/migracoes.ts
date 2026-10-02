@@ -347,6 +347,26 @@ export const migracoes: Migracao[] = [
          )`,
     ],
   },
+  {
+    versao: 10,
+    nome: 'conta-lembra-o-banco',
+    sql: [
+      // A importação sugeria a conta de destino só pelo tipo — fatura para o
+      // primeiro cartão, extrato para a primeira corrente. Com dois cartões, a
+      // pessoa corrigia a escolha todo mês. Agora a conta guarda de qual conta
+      // do banco vêm os extratos dela, e a próxima importação abre nela.
+      //
+      // NULL para todas as contas que já existiam: o vínculo nasce na próxima
+      // confirmação. Deduzir dos lançamentos importados não dá — o FITID não
+      // diz de qual conta do banco veio.
+      //
+      // Sem índice único de propósito: mover o vínculo de uma conta para outra
+      // na mesma gravação passaria por um instante com as duas iguais, e a
+      // escrita seria recusada. Quem mantém um vínculo por conta do banco é
+      // `vincularConta()`.
+      `ALTER TABLE contas ADD COLUMN id_no_banco TEXT`,
+    ],
+  },
 ];
 
 async function versaoAtual(motor: MotorSQL): Promise<number> {

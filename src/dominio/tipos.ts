@@ -50,6 +50,15 @@ export type Conta = {
    */
   saldoInicialCentavos: Centavos;
   cor: CorRef;
+  /**
+   * De qual conta do banco vêm os extratos importados para esta — a
+   * `contaExterna` do adapter. Lembrado na confirmação da importação, para a
+   * próxima abrir já na conta certa em vez de sugerir pelo tipo.
+   *
+   * Uma conta do banco aponta para uma conta do app só: importar o mesmo
+   * extrato para outra conta muda o vínculo de lugar.
+   */
+  idNoBanco?: string;
 };
 
 export type Meta = {

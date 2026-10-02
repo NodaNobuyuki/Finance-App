@@ -265,6 +265,24 @@ describe('aplicar do zero', () => {
     expect(dias.map((d) => d.dia)).toEqual(['2026-03-01', '2026-03-03', '2026-03-04']);
   });
 
+  it('a v10 abre espaço para o vínculo com o banco, vazio para quem já tinha conta', async () => {
+    const motor = criarMotorNode();
+    await ateAVersao(motor, 9);
+    await motor.executar(
+      `INSERT INTO contas (id, nome, tipo, saldo_inicial_centavos, cor, atualizado_em)
+       VALUES ('cartao', 'Cartão', 'cartao', -1000, 'x', 1)`,
+    );
+
+    expect(await aplicarMigracoes(motor)).toBe(VERSAO_ESPERADA);
+
+    // NULL, não um vínculo deduzido: o FITID não diz de qual conta do banco a
+    // linha veio, e a próxima importação confirmada é quem o grava.
+    const [conta] = await motor.consultar<{ saldo_inicial_centavos: number; id_no_banco: null }>(
+      `SELECT saldo_inicial_centavos, id_no_banco FROM contas WHERE id = 'cartao'`,
+    );
+    expect(conta).toEqual({ saldo_inicial_centavos: -1000, id_no_banco: null });
+  });
+
   it('é idempotente — rodar de novo não faz nada', async () => {
     const motor = criarMotorNode();
     await aplicarMigracoes(motor);
