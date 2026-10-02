@@ -709,6 +709,19 @@ function linhaDoLote(e: Estado, dia: DiaISO): LinhaLote {
   );
 }
 
+/**
+ * A conta do rascunho, resolvida contra as contas que existem.
+ *
+ * O id escolhido pode ter ficado pendurado — conta apagada, estado reaberto do
+ * disco. Lançar nele gravaria uma linha fora do saldo de toda conta, então vale
+ * a primeira conta, como `metaEscolhida()` faz com a meta do Simulador.
+ */
+function contaDoRascunho(e: Estado): string {
+  return e.contas.some((c) => c.id === e.rascunho.contaId)
+    ? e.rascunho.contaId
+    : (e.contas[0]?.id ?? '');
+}
+
 function ordenar(transacoes: Transacao[]): Transacao[] {
   return [...transacoes].sort((a, b) => {
     if (a.ocorridoEm !== b.ocorridoEm) return a.ocorridoEm < b.ocorridoEm ? 1 : -1;
@@ -1360,7 +1373,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       if (valor <= 0) return e;
       const seq = e.seq + 1;
       const campos = {
-        contaId: r.contaId,
+        contaId: contaDoRascunho(e),
         categoriaId: r.categoriaId,
         valorCentavos: r.tipo === 'despesa' ? -valor : valor,
         ocorridoEm: r.ocorridoEm,
@@ -1385,7 +1398,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
             ? ordenar(e.transacoes.map((t) => (t.id === anterior.id ? editada : t)))
             : e.transacoes,
           folha: null,
-          rascunho: rascunhoVazio(e.hoje, r.contaId),
+          rascunho: rascunhoVazio(e.hoje, campos.contaId),
           toast: mudou
             ? {
                 id: seq,
@@ -1416,7 +1429,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         seq,
         transacoes: ordenar([tx, ...e.transacoes]),
         folha: null,
-        rascunho: rascunhoVazio(e.hoje, r.contaId),
+        rascunho: rascunhoVazio(e.hoje, campos.contaId),
         toast: toastDeRegistro(e, seq, rotulo, tx.ocorridoEm, {
           tipo: 'DESFAZER',
           transacaoIds: [tx.id],
@@ -1430,7 +1443,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       const seq = e.seq + 1;
       const cat = categoria(e.categorias, a.categoriaId);
       const tx = novaTransacao(d, {
-        contaId: e.rascunho.contaId,
+        contaId: contaDoRascunho(e),
         categoriaId: a.categoriaId,
         valorCentavos: -a.valorCentavos,
         ocorridoEm: e.hoje,
@@ -1491,8 +1504,8 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       // retirar. A conta da meta é sempre a ponta fixa, e é ela que leva o
       // `metaId`: entrada positiva ao guardar, saída negativa ao retirar.
       const par = parDeTransferencia(d, {
-        contaOrigemId: retirar ? meta.contaId : e.rascunho.contaId,
-        contaDestinoId: retirar ? e.rascunho.contaId : meta.contaId,
+        contaOrigemId: retirar ? meta.contaId : contaDoRascunho(e),
+        contaDestinoId: retirar ? contaDoRascunho(e) : meta.contaId,
         valorCentavos: valor,
         ocorridoEm: e.hoje,
         descricao: retirar ? `Retirado de ${meta.nome}` : `Guardado em ${meta.nome}`,

@@ -341,3 +341,47 @@ describe('apagar lançamento', () => {
     );
   });
 });
+
+describe('conta do lançamento', () => {
+  /**
+   * Conta pendurada no rascunho não pode virar linha fora de todo saldo. Era o
+   * que acontecia em todo registro rápido depois de reabrir o app: o rascunho
+   * do boot não tinha conta, e o gasto saía com `contaId` vazio.
+   */
+  const semConta: Estado = {
+    ...estadoInicial,
+    rascunho: { ...estadoInicial.rascunho, contaId: '' },
+  };
+  const existe = (e: Estado, contaId: string) => e.contas.some((c) => c.id === contaId);
+
+  it('registro rápido cai numa conta que existe', () => {
+    const depois = aplicar(semConta, {
+      tipo: 'REGISTRO_RAPIDO',
+      categoriaId: 'mercado',
+      valorCentavos: 100,
+    });
+    const [tx] = novas(semConta, depois);
+    expect(existe(depois, tx.contaId)).toBe(true);
+  });
+
+  it('lançamento pela folha cai numa conta que existe', () => {
+    const depois = aplicar(
+      semConta,
+      { tipo: 'DEFINIR_DIGITOS', digitos: '100' },
+      { tipo: 'SALVAR_TRANSACAO' },
+    );
+    const [tx] = novas(semConta, depois);
+    expect(existe(depois, tx.contaId)).toBe(true);
+    expect(depois.rascunho.contaId).toBe(tx.contaId);
+  });
+
+  it('guardar na meta sai de uma conta que existe', () => {
+    const depois = aplicar(
+      semConta,
+      { tipo: 'ABRIR_MOVIMENTO_META', metaId: 'reserva' },
+      { tipo: 'DEFINIR_DIGITOS', digitos: '100' },
+      { tipo: 'CONFIRMAR_MOVIMENTO_META' },
+    );
+    expect(novas(semConta, depois).every((t) => existe(depois, t.contaId))).toBe(true);
+  });
+});

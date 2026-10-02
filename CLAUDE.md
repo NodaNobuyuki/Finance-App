@@ -211,7 +211,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = formatação + lint + tipos + 543 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = formatação + lint + tipos + 547 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
@@ -239,6 +239,8 @@ Estado (memória, sempre a fonte)
 **Upsert é pela chave primária, nunca `INSERT OR REPLACE`.** O `OR REPLACE` resolve conflito em *qualquer* restrição única apagando a linha que já estava lá: um segundo lançamento com o mesmo FITID fazia o primeiro sumir do disco sem aviso, com a memória ainda mostrando os dois. `ON CONFLICT (id) DO UPDATE` deixa o índice `(conta_id, id_externo)` falhar de verdade, e a remoção roda antes da escrita para que trocar uma linha por outra com o mesmo FITID na mesma gravação não seja conflito. O repositório de memória impõe a mesma unicidade — é a suíte de contrato que segura isso nos dois. **Isto é rede de segurança, não dedupe:** o OFX ainda precisa detectar duplicata antes de chegar ao estado.
 
 **O boot nunca lança; falha é tela, não queda calada.** `abrirBanco()` devolve `pronto` ou `falhou`. Antes, falha de leitura rejeitava a promessa sem ninguém ouvir (app em branco para sempre) e banco que não abria caía sozinho para memória — para quem já tinha dados, isso é o **onboarding de novo**, como se tudo tivesse sumido. Agora `FalhaAoAbrir` diz que nada foi apagado e oferece "Tentar de novo" ou "Usar sem salvar"; este último é escolha explícita, não mexe no disco, e deixa a `FaixaSemSalvar` fixa no topo, porque toast some e quem registra um gasto ali acharia que ele foi salvo.
+
+**O rascunho reaberto aponta para o que existe.** Ele não é gravado, e o do estado vazio não tem conta: até `hidratar()` preenchê-lo, todo registro rápido depois de reabrir o app saía com `contaId` vazio — gravado (não há chave estrangeira), fora do saldo de toda conta. O teste de ciclo não via porque parte da demo, não do vazio que o boot usa; quem trava é `boot.test.ts`. No reducer, `contaDoRascunho()` resolve a conta na hora de lançar, como `metaEscolhida()` — id pendurado é caminho normal, não corrupção. Linha gravada com conta vazia antes da correção se conserta pela edição do lançamento.
 
 **`MotorSQL` existe para o SQL ser testável.** `expo-sqlite` é nativo e não roda no Jest; sem esse seam, migrations só seriam exercitadas no aparelho. A mesma suíte de contrato roda contra memória e contra SQLite de verdade (`node:sqlite`, embutido no Node 24). Sem cobertura sobra só `motorExpo.ts`, que é repasse puro.
 
