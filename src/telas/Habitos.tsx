@@ -8,6 +8,7 @@ import {
   historicoDeSemanas,
   lancamentosDoMesAnterior,
   resumoDoRitual,
+  rotuloDoUltimoBackup,
   semana,
   semanasEmDia,
   transacoesDoMes,
@@ -27,6 +28,7 @@ const CHAVES = [
   'metaSemanal',
   'transacoes',
   'diasSemGasto',
+  'ultimoBackupEm',
 ] as const;
 
 const LEMBRETES = [
@@ -340,6 +342,9 @@ export function Habitos() {
           <Txt tamanho={12} cor={t.inkSoft} entrelinha={1.45} estilo={{ marginTop: -4 }}>
             Tudo fica só neste aparelho. Nada é enviado para nenhum servidor — por isso, guarde um
             backup antes de trocar de celular.
+          </Txt>
+          <Txt tamanho={12} peso={600} cor={t.inkMuted}>
+            {rotuloDoUltimoBackup(estado)}
           </Txt>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             <BotaoDeDados rotulo="Exportar backup" tom="destaque" aoTocar={backup.exportar} />

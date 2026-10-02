@@ -24,6 +24,7 @@ async function montar(inicial: Estado) {
       toast: useSeletor((e) => e.toast),
       transacoes: useSeletor((e) => e.transacoes),
       onboardingConcluido: useSeletor((e) => e.onboardingConcluido),
+      ultimoBackupEm: useSeletor((e) => e.ultimoBackupEm),
     }),
     { wrapper: ({ children }) => <LojaProvider inicial={inicial}>{children}</LojaProvider> },
   );
@@ -38,15 +39,28 @@ describe('exportar', () => {
 
     const [conteudo, nome] = compartilhar.mock.calls[0];
     expect(nome).toBe(`poupa-bloco-${estadoInicial.hoje}.json`);
-    expect(lerBackup(conteudo)).toEqual(recortePersistido(estadoInicial));
+    expect(lerBackup(conteudo)).toEqual({
+      ...recortePersistido(estadoInicial),
+      ultimoBackupEm: expect.any(Number),
+    });
   });
 
-  it('falha vira recado, sem detalhe técnico', async () => {
+  it('marca o último backup com o mesmo instante gravado no arquivo', async () => {
+    const { result } = await montar(estadoInicial);
+    expect(result.current.ultimoBackupEm).toBeNull();
+    await act(() => result.current.backup.exportar());
+
+    const [conteudo] = compartilhar.mock.calls[0];
+    expect(result.current.ultimoBackupEm).toBe(lerBackup(conteudo).ultimoBackupEm);
+  });
+
+  it('falha vira recado, sem detalhe técnico — e não conta como backup', async () => {
     compartilhar.mockRejectedValue(new ArquivoFalhou('exportar', new Error('ENOSPC')));
     const { result } = await montar(estadoInicial);
     await act(() => result.current.backup.exportar());
 
     expect(result.current.toast!.texto).toBe('Não deu para gerar o backup. Tente de novo.');
+    expect(result.current.ultimoBackupEm).toBeNull();
   });
 });
 

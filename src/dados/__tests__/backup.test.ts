@@ -72,12 +72,25 @@ describe('ida e volta', () => {
     // O esquema descarta chave que não conhece. Campo novo no domínio que
     // ninguém pôs em `backup.ts` sumiria em silêncio no primeiro restaurar.
     const dados = completo();
-    expect(lerBackup(gerarBackup(dados, 0))).toEqual(dados);
+    expect(lerBackup(gerarBackup(dados, 0))).toEqual({ ...dados, ultimoBackupEm: 0 });
   });
 
   it('o app vazio também volta', () => {
     const dados = recortePersistido(criarEstadoDemo(AGORA));
-    expect(lerBackup(gerarBackup(dados, 0))).toEqual(dados);
+    expect(lerBackup(gerarBackup(dados, 0))).toEqual({ ...dados, ultimoBackupEm: 0 });
+  });
+
+  it('o último backup passa a ser o próprio arquivo, não o que ele trazia dentro', () => {
+    // Gerado antes de o app saber que foi exportado, o arquivo carrega o
+    // backup ANTERIOR. Tudo o que ele restaura já está guardado nele.
+    const dados = { ...completo(), ultimoBackupEm: 1_000 };
+    const geradoEm = Date.UTC(2026, 9, 2, 15);
+    expect(lerBackup(gerarBackup(dados, geradoEm)).ultimoBackupEm).toBe(geradoEm);
+  });
+
+  it('backup de antes do lembrete, sem o campo, ainda é lido', () => {
+    const texto = adulterado(({ ultimoBackupEm: _, ...resto }) => resto);
+    expect(lerBackup(texto).ultimoBackupEm).toBe(0);
   });
 
   it('o arquivo diz o que é, de qual versão e quando foi feito', () => {

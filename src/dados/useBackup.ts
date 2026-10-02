@@ -19,11 +19,12 @@ export function useBackup(): { exportar: () => Promise<void>; restaurar: () => P
 
   const exportar = useCallback(async () => {
     const e = lerEstado();
+    const agora = Date.now();
     try {
-      await compartilharArquivo(
-        gerarBackup(recortePersistido(e), Date.now()),
-        nomeDoBackup(e.hoje),
-      );
+      await compartilharArquivo(gerarBackup(recortePersistido(e), agora), nomeDoBackup(e.hoje));
+      // A folha de compartilhar não diz se a pessoa salvou ou desistiu: fechar
+      // a folha é o mais perto de "exportado" que o sistema deixa saber.
+      despachar({ tipo: 'BACKUP_EXPORTADO', emMs: agora });
     } catch (erro) {
       despachar({ tipo: 'AVISAR', texto: mensagemParaOUsuario(erro) });
     }

@@ -269,6 +269,15 @@ export type Estado = {
    * acontecer sozinha: ver `semanaEstaFechada` em `derivados.ts`.
    */
   semanaFechada: DiaISO | null;
+  /**
+   * Quando o último backup foi exportado (ms), ou `null` se nunca foi.
+   *
+   * Instante e não dia: o lembrete conta os lançamentos criados depois dele, e
+   * `criadoEm` é instante. Quem escreve é `BACKUP_EXPORTADO`, despachado por
+   * `useBackup` depois da folha de compartilhar — o relógio fica fora do
+   * reducer, como o `geradoEm` do arquivo.
+   */
+  ultimoBackupEm: number | null;
   fechando: boolean;
   fecharPasso: 1 | 2 | 3;
   intencao: string;
@@ -362,6 +371,7 @@ function estadoDe(hoje: DiaISO, s: Semente, onboardingConcluido: boolean): Estad
     lembrete: 'domingo',
 
     semanaFechada: null,
+    ultimoBackupEm: null,
     fechando: false,
     fecharPasso: 1,
     intencao: '',
@@ -517,6 +527,8 @@ export type Acao =
   /** Mescla na escolha que já havia para a linha. */
   | { tipo: 'IMPORTACAO_ESCOLHA'; idExterno: string; escolha: Escolha }
   | { tipo: 'CONFIRMAR_IMPORTACAO' }
+  /** A folha de compartilhar recebeu o backup gerado em `emMs`. */
+  | { tipo: 'BACKUP_EXPORTADO'; emMs: number }
   /** Troca todo o dado do usuário pelo de um backup já validado (`lerBackup`). */
   | { tipo: 'IMPORTAR_BACKUP'; dados: EstadoPersistido }
   | { tipo: 'LIMPAR_TOAST'; id: number };
@@ -2037,6 +2049,9 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       const seq = e.seq + 1;
       return { ...a.estado, seq, toast: avisar(seq, a.texto ?? 'Dados restaurados') };
     }
+
+    case 'BACKUP_EXPORTADO':
+      return { ...e, ultimoBackupEm: a.emMs };
 
     case 'IMPORTAR_BACKUP': {
       const seq = e.seq + 1;

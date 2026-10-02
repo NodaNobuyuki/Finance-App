@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { Barra, corDoNivel, Disco, Hero, Rotulo, Toque, Txt } from '../componentes/basicos';
 import { Icone } from '../componentes/Icone';
 import { ItemTransacao } from '../componentes/ItemTransacao';
+import { useBackup } from '../dados/useBackup';
 import { Vazio } from '../componentes/Vazio';
 import { categoria, icones } from '../dominio/categorias';
 import { rotuloMes } from '../dominio/datas';
@@ -13,6 +14,7 @@ import {
   atalhosRapidos,
   DiaDaSemana,
   insights,
+  lembreteDeBackup,
   orcamento,
   resumoDoMes,
   semana,
@@ -37,11 +39,13 @@ const CHAVES = [
   'metaSemanal',
   'transacoes',
   'diasSemGasto',
+  'ultimoBackupEm',
 ] as const;
 
 export function Inicio() {
   const estado = useRecorte(CHAVES);
   const despachar = useDespachar();
+  const backup = useBackup();
   const { t, paleta } = useTema();
 
   const s = semana(estado);
@@ -53,6 +57,7 @@ export function Inicio() {
   const insight = listaInsights[estado.insightIdx % listaInsights.length];
   const recentes = transacoesDoMes(estado).slice(0, 5);
   const corOrcamento = corDoNivel(orc.nivel, t);
+  const avisoDeBackup = lembreteDeBackup(estado);
 
   /** Um quadradinho da trilha da semana. */
   const celulaDoDia = (d: DiaDaSemana) => {
@@ -543,6 +548,42 @@ export function Inicio() {
             )}
           </View>
         </View>
+
+        {/* Backup: só quando há o que perder. O toque já exporta — o aviso é
+            o próprio caminho, não um recado que manda procurar em Hábitos. */}
+        {avisoDeBackup ? (
+          <Toque aoTocar={backup.exportar} rotuloAcessivel="Fazer backup agora">
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                borderRadius: 18,
+                borderWidth: 1,
+                borderColor: t.line,
+                paddingVertical: 13,
+                paddingHorizontal: 16,
+              }}
+            >
+              <Icone path={icones.baixar} tamanho={18} cor={t.accent} espessura={1.8} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Txt tamanho={12.5} peso={600}>
+                  {avisoDeBackup.nunca
+                    ? 'Nenhum backup ainda'
+                    : `Último backup há ${avisoDeBackup.dias} dias`}
+                </Txt>
+                <Txt tamanho={11.5} cor={t.inkSoft} entrelinha={1.4}>
+                  {avisoDeBackup.pendentes === 1
+                    ? '1 lançamento existe só neste celular.'
+                    : `${avisoDeBackup.pendentes} lançamentos existem só neste celular.`}
+                </Txt>
+              </View>
+              <Txt tamanho={12.5} peso={600} cor={t.accent}>
+                Fazer backup
+              </Txt>
+            </View>
+          </Toque>
+        ) : null}
 
         {/* Últimas transações */}
         <View style={{ gap: 4 }}>

@@ -78,6 +78,7 @@ export const icones = {
   carro:
     'M5 13l1.6-4.6A2 2 0 018.5 7h7a2 2 0 011.9 1.4L19 13v5h-3v-2H8v2H5zM7.6 15.4h.01M16.4 15.4h.01',
   repetir: 'M4 9a5 5 0 015-5h9M18 4l3 3-3 3M20 15a5 5 0 01-5 5H6M6 20l-3-3 3-3',
+  baixar: 'M12 4v11M7 10l5 5 5-5M5 20h14',
 } as const;
 
 /**

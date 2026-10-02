@@ -12,7 +12,12 @@ export type DiaISO = string;
 export const AGORA: DiaISO = '2026-08-05';
 
 export function hojeReal(): DiaISO {
-  const d = new Date();
+  return diaDoInstante(Date.now());
+}
+
+/** O dia, no fuso do aparelho, de um instante em ms — `criadoEm`, por exemplo. */
+export function diaDoInstante(ms: number): DiaISO {
+  const d = new Date(ms);
   return [
     d.getFullYear(),
     String(d.getMonth() + 1).padStart(2, '0'),

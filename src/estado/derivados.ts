@@ -6,8 +6,10 @@ import {
   categoriasPorTipo,
 } from '../dominio/categorias';
 import {
+  diaDoInstante,
   DiaISO,
   diasRitual,
+  diferencaEmDias,
   inicioDaSemana,
   letraDoDia,
   mesDe,
@@ -907,4 +909,52 @@ export function agruparPorDia(transacoes: Transacao[]): GrupoDoDia[] {
 /** Categorias que aparecem no histórico, para os chips de filtro. */
 export function categoriasUsadas(e: Pick<Estado, 'transacoes'>): string[] {
   return [...new Set(e.transacoes.map((t) => t.categoriaId))];
+}
+
+/* ── Backup ───────────────────────────────────────────────────── */
+
+/** Sem backup nenhum, quantos lançamentos só no aparelho já valem o aviso. */
+export const LANCAMENTOS_SEM_BACKUP = 10;
+/** Com backup, quantos dias até ele ficar velho — se algo entrou depois dele. */
+export const DIAS_ENTRE_BACKUPS = 30;
+
+export type LembreteDeBackup = {
+  /** Nunca houve backup. */
+  nunca: boolean;
+  /** Dias desde o último; 0 quando `nunca`. */
+  dias: number;
+  /** Lançamentos criados depois do último backup — os que se perderiam. */
+  pendentes: number;
+};
+
+/**
+ * O app é só local: trocar de celular sem backup é perder o histórico, e a
+ * constância junto. O aviso aparece quando há o que perder, não por calendário.
+ *
+ * Conta `criadoEm`, não `ocorridoEm`: um extrato de três meses importado hoje
+ * é dado novo, ainda fora de qualquer backup. Lançamento editado depois do
+ * backup não conta — o aviso é aproximação, e o que importa é não ficar
+ * calado com histórico inteiro só no aparelho.
+ */
+export function lembreteDeBackup(
+  e: Pick<Estado, 'transacoes' | 'ultimoBackupEm' | 'hoje'>,
+): LembreteDeBackup | null {
+  const desde = e.ultimoBackupEm;
+  const pendentes =
+    desde === null ? e.transacoes.length : e.transacoes.filter((t) => t.criadoEm > desde).length;
+
+  if (desde === null) {
+    return pendentes >= LANCAMENTOS_SEM_BACKUP ? { nunca: true, dias: 0, pendentes } : null;
+  }
+  const dias = diferencaEmDias(diaDoInstante(desde), e.hoje);
+  return pendentes > 0 && dias >= DIAS_ENTRE_BACKUPS ? { nunca: false, dias, pendentes } : null;
+}
+
+/** "Último backup há 12 dias" — o status que Hábitos mostra sempre. */
+export function rotuloDoUltimoBackup(e: Pick<Estado, 'ultimoBackupEm' | 'hoje'>): string {
+  if (e.ultimoBackupEm === null) return 'Nenhum backup feito ainda.';
+  const dias = diferencaEmDias(diaDoInstante(e.ultimoBackupEm), e.hoje);
+  if (dias <= 0) return 'Último backup hoje.';
+  if (dias === 1) return 'Último backup ontem.';
+  return `Último backup há ${dias} dias.`;
 }
