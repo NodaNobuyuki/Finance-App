@@ -153,6 +153,28 @@ describe('fechar e reabrir', () => {
     );
   });
 
+  it('restaurar um backup substitui o que estava no disco', async () => {
+    // Diff por id contra um estado inteiro novo: o que não está no backup tem
+    // de SAIR do banco, senão reabrir o app traria de volta a mistura dos dois.
+    const motor = criarMotorNode();
+    const demo = recortePersistido(criarEstadoDemo(AGORA));
+    const dados = {
+      ...demo,
+      perfil: { nome: 'Outra pessoa' },
+      transacoes: demo.transacoes.slice(0, 3),
+      metas: [],
+      diasSemGasto: [],
+    };
+    await sessao(motor, [{ tipo: 'IMPORTAR_BACKUP', dados }]);
+    const depois = await sessao(motor);
+
+    const ids = (ts: { id: string }[]) => ts.map((t) => t.id).sort();
+    expect(depois.perfil.nome).toBe('Outra pessoa');
+    expect(ids(depois.transacoes)).toEqual(ids(dados.transacoes));
+    expect(depois.metas).toHaveLength(0);
+    expect(depois.diasSemGasto).toHaveLength(0);
+  });
+
   it('a semana fechada continua fechada — e sabe qual era', async () => {
     const motor = criarMotorNode();
     await sessao(motor, [

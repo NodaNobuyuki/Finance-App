@@ -34,6 +34,7 @@ import {
 import { GerarId, idsSequenciais, uuidV7 } from '../dominio/ids';
 import { contaPadraoDeMeta, guardadoDaMeta, metaEscolhida } from '../dominio/metas';
 import { Semente, semente, vazia } from '../dominio/seed';
+import { EstadoPersistido, hidratar } from '../dados/persistido';
 import { semanasEmDia } from './derivados';
 import { Conta, Meta, Perfil, ProgressoDesafio, Tela, Transacao } from '../dominio/tipos';
 import { CorRef, token } from '../tema/paletas';
@@ -486,7 +487,9 @@ export type Acao =
   | { tipo: 'ONBOARDING_CONCLUIR' }
   | { tipo: 'CARREGAR_DEMO' }
   | { tipo: 'APAGAR_DADOS' }
-  | { tipo: 'RESTAURAR'; estado: Estado }
+  | { tipo: 'RESTAURAR'; estado: Estado; texto?: string }
+  /** Troca todo o dado do usuário pelo de um backup já validado (`lerBackup`). */
+  | { tipo: 'IMPORTAR_BACKUP'; dados: EstadoPersistido }
   | { tipo: 'LIMPAR_TOAST'; id: number };
 
 /* ────────────────────────────────────────────────────────────────
@@ -1914,7 +1917,44 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
 
     case 'RESTAURAR': {
       const seq = e.seq + 1;
-      return { ...a.estado, seq, toast: avisar(seq, 'Dados restaurados') };
+      return { ...a.estado, seq, toast: avisar(seq, a.texto ?? 'Dados restaurados') };
+    }
+
+    case 'IMPORTAR_BACKUP': {
+      const seq = e.seq + 1;
+      // Quem restaura no primeiro uso já tem nome, conta e meta: refazer o
+      // cadastro por cima seria pedir o que o arquivo acabou de dizer.
+      const restaurado = hidratar(
+        criarEstadoVazio(e.hoje),
+        { ...a.dados, onboardingConcluido: true },
+        e.hoje,
+      );
+      const n = a.dados.transacoes.length;
+      return {
+        ...restaurado,
+        seq,
+        toast: {
+          id: seq,
+          texto: 'Backup restaurado',
+          sub: `${n === 1 ? '1 lançamento' : `${n} lançamentos`} em ${
+            a.dados.contas.length === 1 ? '1 conta' : `${a.dados.contas.length} contas`
+          }.`,
+          // Do onboarding não há para onde desfazer: o estado de antes nunca foi
+          // gravado, e voltar a ele deixaria o disco com o backup e a tela no
+          // primeiro uso — reabrir o app mostraria outra coisa.
+          acao: e.onboardingConcluido
+            ? {
+                rotulo: 'Desfazer',
+                acao: {
+                  tipo: 'RESTAURAR',
+                  estado: { ...e, folha: null },
+                  texto: 'Backup desfeito',
+                },
+              }
+            : undefined,
+          duracaoMs: 6000,
+        },
+      };
     }
 
     case 'LIMPAR_TOAST':
@@ -1987,6 +2027,15 @@ function useContextoDaLoja(): Loja {
   const loja = useContext(ContextoDaLoja);
   if (!loja) throw new Error('A loja precisa estar dentro de <LojaProvider>');
   return loja;
+}
+
+/**
+ * Lê o estado na hora, sem assinar nada — para tratador de evento que precisa
+ * do estado inteiro uma vez (exportar o backup), não para render. Componente
+ * que lê estado para desenhar usa `useRecorte`: este não o acorda nunca.
+ */
+export function useLerEstado(): () => Estado {
+  return useContextoDaLoja().obter;
 }
 
 /** O despacho. Estável: nunca provoca render por si. */

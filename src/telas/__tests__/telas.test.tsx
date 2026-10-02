@@ -208,6 +208,17 @@ describe('app vazio', () => {
     expect(julho.getByText('Julho 2026')).toBeTruthy();
   });
 
+  it('o backup está ao alcance: exportar em Hábitos, restaurar no primeiro uso', async () => {
+    // Num app só local, o arquivo é o que separa trocar de celular de perder
+    // o histórico — e quem chega num celular novo começa pelo onboarding.
+    const habitos = await montar(<Habitos />, estadoInicial);
+    expect(habitos.getByText('Exportar backup')).toBeTruthy();
+    expect(habitos.getByText('Restaurar backup')).toBeTruthy();
+
+    const primeiroUso = await montar(<Onboarding />, estadoVazio);
+    expect(primeiroUso.getByText('Restaurar backup')).toBeTruthy();
+  });
+
   it('Metas vazio explica para que serve uma meta', async () => {
     const tela = await montar(<Metas />, estadoVazio);
     expect(tela.getByText('Nenhuma meta ainda')).toBeTruthy();

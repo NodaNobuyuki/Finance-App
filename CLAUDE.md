@@ -211,7 +211,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = formatação + lint + tipos + 547 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = formatação + lint + tipos + 574 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
@@ -458,7 +458,20 @@ Até aqui o único conserto era o "Desfazer" do toast, que some em segundos: val
 
 **A data são atalhos dos últimos 7 dias**, não calendário — o mesmo raciocínio do prazo da meta. Uma semana é o que o ritual fecha; o que ficou mais para trás em branco é trabalho do Lote. Ao editar uma linha mais antiga, o dia dela entra na fileira para continuar selecionado. Dia futuro é recusado no reducer: seria previsão, e contaria como constância de uma semana que não aconteceu. A data não gruda: o próximo `ABRIR_NOVA` volta para hoje.
 
+### Backup é o domínio num arquivo
+
+App só local sem backup é histórico inteiro perdido ao trocar de celular — e a constância, derivada dele, junto. "Exportar backup" em Hábitos gera um JSON e o entrega à folha de compartilhar do sistema (Arquivos, iCloud, e-mail); "Restaurar backup" está em Hábitos e no **primeiro uso**, porque quem chega num celular novo começa pelo onboarding.
+
+**O formato é `EstadoPersistido`, não o esquema do SQLite.** O banco muda por migration; um backup feito hoje precisa continuar legível depois da v20. O que versiona o arquivo é `VERSAO_BACKUP`, e backup de versão mais nova é recusado com recado — ler pela metade restauraria dado faltando sem ninguém ver.
+
+**`lerBackup()` é fronteira de entrada: Zod**, como a regra manda — foi a dependência que entrou com ele, e serve aos adapters de OFX também. O esquema é tipado contra o domínio sem cast, então campo obrigatório novo em `Transacao` que ninguém pôs em `backup.ts` não compila; campo opcional esquecido é pego pelo teste de ida e volta, porque o Zod descarta chave desconhecida. Além do esquema, recusa o que só estouraria no banco: id repetido, FITID repetido na mesma conta e lançamento de conta ausente. Categoria e meta ausentes **não** são erro — são caminhos normais do app.
+
+**Três camadas, como a persistência.** `backup.ts` é puro e testado; `arquivoBackup.ts` é repasse nativo sem regra (como `motorExpo.ts`) e embrulha falha em `ArquivoFalhou`; `useBackup` é a cola, e mora fora do reducer porque relógio e arquivo são mundo externo. Só o backup já validado entra como `IMPORTAR_BACKUP`. `useLerEstado()` existe para isso: lê o estado na hora sem assinar — não é o `useLoja` de volta, porque não provoca render nenhum.
+
+**Restaurar troca todo o dado do usuário, com undo** — exceto no primeiro uso. Ali o estado de antes nunca foi gravado, e desfazer deixaria o disco com o backup e a tela no onboarding.
+
 **Pendências abertas:**
+- Sem lembrete de backup: o app não sabe quando foi o último. Guardar a data exige migration — vale quando houver o que lembrar
 - Sem retentativa ativa de gravação: o reenvio pega carona na próxima mudança. Um outbox resolve, se virar problema
 - Nenhuma tela lê do banco sob demanda — o estado inteiro é carregado no boot. Aguenta bem os primeiros anos; a saída é paginar por período no repositório
 

@@ -4,6 +4,7 @@ import { BotaoPrincipal, Hero, Rotulo, Toque, Txt } from '../componentes/basicos
 import { Teclado } from '../componentes/Teclado';
 import { deDigitos, empilharDigitos, formatar, removerDigito } from '../dominio/dinheiro';
 import { Conta } from '../dominio/tipos';
+import { useBackup } from '../dados/useBackup';
 import { useRecorte, useDespachar } from '../estado/store';
 import { sans } from '../tema/fontes';
 import { useTema } from '../tema/TemaContext';
@@ -30,6 +31,7 @@ const TIPOS: { id: Conta['tipo']; nome: string }[] = [
 export function Onboarding() {
   const estado = useRecorte(CHAVES);
   const despachar = useDespachar();
+  const backup = useBackup();
   const { t } = useTema();
 
   const o = estado.onboarding;
@@ -242,7 +244,7 @@ export function Onboarding() {
           }
         />
 
-        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 18 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 18 }}>
           {o.passo > 1 ? (
             <Toque
               aoTocar={() => despachar({ tipo: 'ONBOARDING_PASSO', passo: o.passo === 3 ? 2 : 1 })}
@@ -253,6 +255,14 @@ export function Onboarding() {
               </Txt>
             </Toque>
           ) : null}
+
+          {/* Celular novo: o histórico volta do arquivo em vez de recomeçar do
+              zero — a constância inteira é derivada dele. */}
+          <Toque aoTocar={backup.restaurar} rotuloAcessivel="Restaurar um backup">
+            <Txt tamanho={12.5} peso={600} cor={t.accent}>
+              Restaurar backup
+            </Txt>
+          </Toque>
 
           {/* Escape para quem só quer ver o app funcionando antes de investir
               tempo digitando o próprio dinheiro. */}
