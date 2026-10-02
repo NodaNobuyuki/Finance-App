@@ -2,19 +2,20 @@ import { act, renderHook } from '@testing-library/react-native';
 import React from 'react';
 import { ArquivoFalhou } from '../../dominio/erros';
 import { estadoInicial, estadoVazio, LojaProvider, useSeletor, Estado } from '../../estado/store';
-import { compartilharBackup, escolherBackup } from '../arquivoBackup';
+import { compartilharArquivo, escolherArquivo } from '../arquivos';
 import { gerarBackup, lerBackup } from '../backup';
 import { recortePersistido } from '../persistido';
 import { useBackup } from '../useBackup';
 
 // A ponta nativa não roda no Jest; o que se testa aqui é a cola entre ela,
 // o formato e a loja — o que vira ação, o que vira toast.
-jest.mock('../arquivoBackup', () => ({
-  compartilharBackup: jest.fn(),
-  escolherBackup: jest.fn(),
+jest.mock('../arquivos', () => ({
+  compartilharArquivo: jest.fn(),
+  escolherArquivo: jest.fn(),
 }));
-const compartilhar = jest.mocked(compartilharBackup);
-const escolher = jest.mocked(escolherBackup);
+const compartilhar = jest.mocked(compartilharArquivo);
+const escolher = jest.mocked(escolherArquivo);
+const bytes = (texto: string) => new TextEncoder().encode(texto);
 
 async function montar(inicial: Estado) {
   return renderHook(
@@ -51,7 +52,7 @@ describe('exportar', () => {
 
 describe('restaurar', () => {
   it('backup válido do primeiro uso entra direto no app', async () => {
-    escolher.mockResolvedValue(gerarBackup(recortePersistido(estadoInicial), 0));
+    escolher.mockResolvedValue(bytes(gerarBackup(recortePersistido(estadoInicial), 0)));
     const { result } = await montar(estadoVazio);
     await act(() => result.current.backup.restaurar());
 
@@ -70,7 +71,7 @@ describe('restaurar', () => {
   });
 
   it('arquivo que não é backup vira recado e não mexe em nada', async () => {
-    escolher.mockResolvedValue('{"qualquer": "coisa"}');
+    escolher.mockResolvedValue(bytes('{"qualquer": "coisa"}'));
     const { result } = await montar(estadoInicial);
     const antes = result.current.transacoes;
     await act(() => result.current.backup.restaurar());

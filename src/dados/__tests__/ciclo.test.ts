@@ -1,5 +1,9 @@
 /** @jest-environment node */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { AGORA, inicioDaSemana, somarDias } from '../../dominio/datas';
+import { adapterOFX } from '../../ingestao/adapters/ofx';
+import { decodificar } from '../../ingestao/texto';
 import { guardadoDaMeta } from '../../dominio/metas';
 import { saldoTotal } from '../../dominio/saldo';
 import { Acao, criarEstadoDemo, criarReducer, dependenciasDeTeste } from '../../estado/store';
@@ -173,6 +177,29 @@ describe('fechar e reabrir', () => {
     expect(ids(depois.transacoes)).toEqual(ids(dados.transacoes));
     expect(depois.metas).toHaveLength(0);
     expect(depois.diasSemGasto).toHaveLength(0);
+  });
+
+  it('extrato importado atravessa o fechar e reabrir — e não entra de novo', async () => {
+    // O FITID é o que segura a segunda importação. Se ele não sobrevivesse ao
+    // disco, reabrir o app e importar o mesmo arquivo dobraria tudo.
+    const motor = criarMotorNode();
+    const bytes = new Uint8Array(
+      readFileSync(join(__dirname, '../../ingestao/__tests__/fixtures/nubank-cartao.ofx')),
+    );
+    const extrato = adapterOFX.ler(decodificar(bytes));
+    const importar: Acao[] = [
+      { tipo: 'ABRIR_IMPORTACAO', extrato },
+      { tipo: 'CONFIRMAR_IMPORTACAO' },
+    ];
+
+    const importado = await sessao(motor, importar);
+    const reaberto = await sessao(motor);
+    expect(reaberto.transacoes).toHaveLength(importado.transacoes.length);
+    expect(reaberto.transacoes.filter((t) => t.origem === 'ofx')).toHaveLength(18);
+
+    const deNovo = await sessao(motor, importar);
+    expect(deNovo.transacoes).toHaveLength(importado.transacoes.length);
+    expect(deNovo.toast!.texto).toBe('Nada novo neste extrato');
   });
 
   it('a semana fechada continua fechada — e sabe qual era', async () => {

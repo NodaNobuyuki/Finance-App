@@ -4,15 +4,15 @@ import * as Sharing from 'expo-sharing';
 import { ArquivoFalhou } from '../dominio/erros';
 
 /**
- * A ponta nativa do backup: gravar o arquivo e entregá-lo à folha de
- * compartilhar, e abrir um que a pessoa escolher.
+ * A ponta nativa dos arquivos: gravar um e entregá-lo à folha de compartilhar,
+ * e abrir o que a pessoa escolher — backup ou extrato de banco.
  *
- * Repasse puro, como `motorExpo.ts` — nada aqui decide coisa alguma. Gerar e
- * validar o conteúdo é `backup.ts`, que roda no Jest; isto não roda, e por
- * isso não pode ter regra.
+ * Repasse puro, como `motorExpo.ts` — nada aqui decide coisa alguma. Gerar,
+ * decodificar e validar o conteúdo é de `backup.ts` e de `ingestao/`, que
+ * rodam no Jest; isto não roda, e por isso não pode ter regra.
  */
 
-export async function compartilharBackup(conteudo: string, nome: string): Promise<void> {
+export async function compartilharArquivo(conteudo: string, nome: string): Promise<void> {
   try {
     if (!(await Sharing.isAvailableAsync())) throw new Error('compartilhar indisponível');
     // No cache: o arquivo só precisa existir até a folha de compartilhar
@@ -31,17 +31,22 @@ export async function compartilharBackup(conteudo: string, nome: string): Promis
   }
 }
 
-/** O texto do arquivo escolhido, ou `null` se a pessoa desistiu no seletor. */
-export async function escolherBackup(): Promise<string | null> {
+/**
+ * Os BYTES do arquivo escolhido, ou `null` se a pessoa desistiu no seletor.
+ *
+ * Bytes e não texto: extrato de banco chega em cp1252 ou UTF-8 e o cabeçalho
+ * mente sobre qual — quem decide é `decodificar()`, olhando o conteúdo.
+ */
+export async function escolherArquivo(): Promise<Uint8Array | null> {
   try {
     // Qualquer tipo: arquivo salvo por outro app pode perder a extensão, e o
-    // que decide se é backup é o conteúdo, validado em `lerBackup`.
+    // que decide se serve é o conteúdo, validado depois.
     const escolha = await DocumentPicker.getDocumentAsync({
       type: '*/*',
       copyToCacheDirectory: true,
     });
     if (escolha.canceled) return null;
-    return await new File(escolha.assets[0].uri).text();
+    return await new File(escolha.assets[0].uri).bytes();
   } catch (erro) {
     throw new ArquivoFalhou('abrir', erro);
   }

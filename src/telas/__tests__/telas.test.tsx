@@ -29,6 +29,11 @@ import { CadastroCategoria } from '../folhas/CadastroCategoria';
 import { CadastroConta } from '../folhas/CadastroConta';
 import { CadastroMeta } from '../folhas/CadastroMeta';
 import { DetalheTransferencia } from '../folhas/DetalheTransferencia';
+import { ImportarExtrato } from '../folhas/ImportarExtrato';
+import { adapterOFX } from '../../ingestao/adapters/ofx';
+import { decodificar } from '../../ingestao/texto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { MovimentoMeta } from '../folhas/MovimentoMeta';
 import { NovaTransacao } from '../folhas/NovaTransacao';
 import { Ritual } from '../folhas/Ritual';
@@ -217,6 +222,30 @@ describe('app vazio', () => {
 
     const primeiroUso = await montar(<Onboarding />, estadoVazio);
     expect(primeiroUso.getByText('Restaurar backup')).toBeTruthy();
+  });
+
+  it('a prévia de importação mostra o extrato, a conta e as transferências', async () => {
+    const bytes = new Uint8Array(
+      readFileSync(join(__dirname, '../../ingestao/__tests__/fixtures/nubank-cartao.ofx')),
+    );
+    const extrato = adapterOFX.ler(decodificar(bytes));
+    const aberto = criarReducer(dependenciasDeTeste())(estadoInicial, {
+      tipo: 'ABRIR_IMPORTACAO',
+      extrato,
+    });
+    const tela = await montar(<ImportarExtrato />, aberto);
+
+    expect(tela.getByText('Importar extrato')).toBeTruthy();
+    expect(tela.getByText('Fatura de cartão · NU PAGAMENTOS S.A.')).toBeTruthy();
+    expect(tela.getByText('Importar 16 lançamentos')).toBeTruthy();
+    // A lista é virtualizada: o segundo pagamento (linha 14) nem é desenhado
+    // de saída. Basta o primeiro, que está no começo da fatura.
+    expect(tela.getAllByText('Não é transferência').length).toBeGreaterThan(0);
+  });
+
+  it('o Extrato oferece importar', async () => {
+    const tela = await montar(<Extrato />, estadoInicial);
+    expect(tela.getByText('Importar')).toBeTruthy();
   });
 
   it('Metas vazio explica para que serve uma meta', async () => {

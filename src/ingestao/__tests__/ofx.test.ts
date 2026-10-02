@@ -61,6 +61,24 @@ describe('fatura de cartão do Nubank', () => {
     expect(textos).toContain('Shopee *Lojaroupa - Parcela 6/12');
   });
 
+  it('o pagamento da fatura vem marcado como transferência, e só ele', () => {
+    // Não é receita: é o dinheiro da conta quitando o cartão.
+    const marcadas = extrato.transacoes.filter((t) => t.natureza === 'transferencia');
+    expect(marcadas.map((t) => t.descricaoOriginal)).toEqual([
+      'Pagamento recebido',
+      'Pagamento recebido',
+    ]);
+  });
+
+  it('estorno não é pagamento', () => {
+    const texto = decodificar(bytes('nubank-cartao.ofx')).replace(
+      '<MEMO>Pagamento recebido</MEMO>',
+      '<MEMO>Estorno de pagamento</MEMO>',
+    );
+    const marcadas = adapterOFX.ler(texto).transacoes.filter((t) => t.natureza);
+    expect(marcadas).toHaveLength(1);
+  });
+
   it('todo lançamento tem FITID próprio', () => {
     const ids = extrato.transacoes.map((t) => t.idExterno);
     expect(new Set(ids).size).toBe(ids.length);
@@ -74,6 +92,19 @@ describe('conta corrente do Nubank', () => {
     expect(extrato.tipoDeConta).toBe('conta');
     expect(extrato.contaExterna).toBe('000000000-0');
     expect(extrato.transacoes.map((t) => t.valorCentavos)).toEqual([123456, -123456]);
+  });
+
+  it('Pix para outra pessoa não é marcado como transferência entre contas', () => {
+    expect(extrato.transacoes.some((t) => t.natureza)).toBe(false);
+  });
+
+  it('o boleto da fatura saindo da conta é marcado', () => {
+    const texto = decodificar(bytes('nubank-conta.ofx')).replace(
+      /<MEMO>Transferência enviada pelo Pix[^<]*/,
+      '<MEMO>Pagamento de fatura',
+    );
+    const [, boleto] = adapterOFX.ler(texto).transacoes;
+    expect(boleto.natureza).toBe('transferencia');
   });
 
   it('lê UTF-8 com acento e o • da máscara de CPF', () => {

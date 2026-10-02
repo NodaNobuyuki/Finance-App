@@ -18,6 +18,14 @@ export type TransacaoBruta = {
   /** O texto do banco, intacto. Preservar sempre: é a prova de onde veio. */
   descricaoOriginal: string;
   origem: Origem;
+  /**
+   * Pista do adapter de que a linha é uma ponta de transferência entre contas
+   * da própria pessoa — o pagamento da fatura, visto do cartão ou da conta.
+   *
+   * É pista, não decisão: a prévia mostra e a pessoa confirma. Mas é o adapter
+   * que sabe ler o texto do banco, então é ele quem a dá.
+   */
+  natureza?: 'transferencia';
 };
 
 /**

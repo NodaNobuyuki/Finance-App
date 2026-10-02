@@ -35,6 +35,9 @@ import { GerarId, idsSequenciais, uuidV7 } from '../dominio/ids';
 import { contaPadraoDeMeta, guardadoDaMeta, metaEscolhida } from '../dominio/metas';
 import { Semente, semente, vazia } from '../dominio/seed';
 import { EstadoPersistido, hidratar } from '../dados/persistido';
+import { aplicarImportacao } from '../ingestao/aplicar';
+import { contaSugerida, Escolha, montarPrevia } from '../ingestao/previa';
+import { ExtratoLido } from '../ingestao/tipos';
 import { semanasEmDia } from './derivados';
 import { Conta, Meta, Perfil, ProgressoDesafio, Tela, Transacao } from '../dominio/tipos';
 import { CorRef, token } from '../tema/paletas';
@@ -94,7 +97,23 @@ export type Folha =
    * mudar uma ponta sozinha quebraria o par, e o que dá para fazer com ele
    * inteiro é apagar.
    */
-  | { tipo: 'detalheTransferencia'; transferenciaId: string };
+  | { tipo: 'detalheTransferencia'; transferenciaId: string }
+  /** Prévia de um extrato lido — os dados moram em `Estado.importacao`. */
+  | { tipo: 'importacao' };
+
+/**
+ * Um extrato esperando confirmação.
+ *
+ * Guarda só a entrada e as escolhas da pessoa; a prévia é derivada por
+ * `montarPrevia()`. Estado de sessão, como os rascunhos: fechar o app no meio
+ * descarta, e reabrir o arquivo é um toque.
+ */
+export type Importacao = {
+  extrato: ExtratoLido;
+  contaId: string;
+  /** Por `idExterno` da linha. */
+  escolhas: Record<string, Escolha>;
+};
 
 /**
  * Rascunho de cadastro de conta e de meta.
@@ -280,6 +299,8 @@ export type Estado = {
    */
   simMetaId: string | null;
 
+  importacao: Importacao | null;
+
   toast: Toast | null;
   /** Contador para ids determinísticos — nada de `Date.now()` dentro do reducer. */
   seq: number;
@@ -360,6 +381,8 @@ function estadoDe(hoje: DiaISO, s: Semente, onboardingConcluido: boolean): Estad
     simDigitos: '',
     simTaxaId: 'cdi',
     simMetaId: null,
+
+    importacao: null,
 
     toast: null,
     seq: 0,
@@ -488,6 +511,12 @@ export type Acao =
   | { tipo: 'CARREGAR_DEMO' }
   | { tipo: 'APAGAR_DADOS' }
   | { tipo: 'RESTAURAR'; estado: Estado; texto?: string }
+  /** Extrato já lido pelo adapter: abre a prévia. */
+  | { tipo: 'ABRIR_IMPORTACAO'; extrato: ExtratoLido }
+  | { tipo: 'IMPORTACAO_CONTA'; contaId: string }
+  /** Mescla na escolha que já havia para a linha. */
+  | { tipo: 'IMPORTACAO_ESCOLHA'; idExterno: string; escolha: Escolha }
+  | { tipo: 'CONFIRMAR_IMPORTACAO' }
   /** Troca todo o dado do usuário pelo de um backup já validado (`lerBackup`). */
   | { tipo: 'IMPORTAR_BACKUP'; dados: EstadoPersistido }
   | { tipo: 'LIMPAR_TOAST'; id: number };
@@ -757,6 +786,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         ...e,
         tela: a.tela,
         folha: null,
+        importacao: null,
         fechando: a.tela === 'home' ? false : e.fechando,
         // Entrar no Extrato sempre começa no mês corrente. Reabrir a tela em
         // março porque foi lá que a pessoa parou meses atrás é desorientador.
@@ -843,7 +873,90 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       return { ...e, folha: { tipo: 'ritual' }, ritualPrimeira: false };
 
     case 'FECHAR_FOLHA':
-      return { ...e, folha: null };
+      // Extrato descartado sai da memória junto com a folha.
+      return { ...e, folha: null, importacao: null };
+
+    case 'ABRIR_IMPORTACAO':
+      return {
+        ...e,
+        folha: { tipo: 'importacao' },
+        importacao: {
+          extrato: a.extrato,
+          contaId: contaSugerida(a.extrato, e.contas),
+          escolhas: {},
+        },
+      };
+
+    case 'IMPORTACAO_CONTA':
+      return e.importacao && e.contas.some((c) => c.id === a.contaId)
+        ? { ...e, importacao: { ...e.importacao, contaId: a.contaId } }
+        : e;
+
+    case 'IMPORTACAO_ESCOLHA':
+      return e.importacao
+        ? {
+            ...e,
+            importacao: {
+              ...e.importacao,
+              escolhas: {
+                ...e.importacao.escolhas,
+                [a.idExterno]: { ...e.importacao.escolhas[a.idExterno], ...a.escolha },
+              },
+            },
+          }
+        : e;
+
+    case 'CONFIRMAR_IMPORTACAO': {
+      if (!e.importacao) return e;
+      const { extrato, contaId, escolhas } = e.importacao;
+      const previa = montarPrevia(extrato, contaId, escolhas, e);
+      const seq = e.seq + 1;
+      const fechada = { ...e, folha: null, importacao: null };
+
+      if (previa.linhas.length === 0) {
+        return {
+          ...fechada,
+          seq,
+          toast: avisar(seq, 'Nada novo neste extrato', 'Tudo nele já estava importado.'),
+        };
+      }
+
+      const { transacoes, resumo } = aplicarImportacao(previa, contaId, e, d);
+      const partes = [
+        resumo.transferencias > 0
+          ? `${resumo.transferencias} ${resumo.transferencias === 1 ? 'transferência' : 'transferências'}`
+          : '',
+        resumo.ligadas > 0
+          ? `${resumo.ligadas} ${resumo.ligadas === 1 ? 'já existia' : 'já existiam'}`
+          : '',
+        resumo.semCategoria > 0 ? `${resumo.semCategoria} sem categoria` : '',
+      ].filter(Boolean);
+
+      return {
+        ...fechada,
+        seq,
+        transacoes: ordenar(transacoes),
+        // O que acabou de entrar é o que a pessoa quer ver — e as linhas sem
+        // categoria se resolvem tocando nelas ali.
+        tela: 'extrato',
+        mesVisivel: primeiroDoMes(resumo.ultimoDia ?? e.hoje),
+        filtroConta: 'todas',
+        filtroCategoria: 'todas',
+        toast: {
+          id: seq,
+          texto:
+            resumo.importadas === 1
+              ? '1 lançamento importado'
+              : `${resumo.importadas} lançamentos importados`,
+          sub: partes.length > 0 ? `${partes.join(' · ')}.` : undefined,
+          acao: {
+            rotulo: 'Desfazer',
+            acao: { tipo: 'RESTAURAR', estado: fechada, texto: 'Importação desfeita' },
+          },
+          duracaoMs: 6000,
+        },
+      };
+    }
 
     case 'ABRIR_CONTA': {
       const existente = e.contas.find((c) => c.id === a.contaId);

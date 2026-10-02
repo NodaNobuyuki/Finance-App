@@ -54,7 +54,7 @@ function lerOFX(texto: string): ExtratoLido {
   // metade.
   for (const pedaco of texto.split(/<STMTTRN>/i).slice(1)) {
     const fim = pedaco.search(/<\/STMTTRN>/i);
-    const linha = fim < 0 ? null : lerLancamento(folhas(pedaco.slice(0, fim)), repeticoes);
+    const linha = fim < 0 ? null : lerLancamento(folhas(pedaco.slice(0, fim)), repeticoes, cartao);
     if (linha) transacoes.push(linha);
     else ignoradas += 1;
   }
@@ -73,6 +73,7 @@ function lerOFX(texto: string): ExtratoLido {
 function lerLancamento(
   campos: Map<string, string>,
   repeticoes: Map<string, number>,
+  cartao: boolean,
 ): TransacaoBruta | null {
   const valorCentavos = centavos(campos.get('TRNAMT'));
   const ocorridoEm = dia(campos.get('DTPOSTED') ?? campos.get('DTUSER'));
@@ -89,7 +90,36 @@ function lerLancamento(
     ocorridoEm,
     descricaoOriginal,
     origem: 'ofx',
+    ...(pagamentoDeFatura(campos.get('TRNTYPE'), valorCentavos, descricaoOriginal, cartao)
+      ? { natureza: 'transferencia' as const }
+      : {}),
   };
+}
+
+/**
+ * O pagamento da fatura não é receita nem despesa: é dinheiro saindo da conta
+ * e quitando o cartão. Lido como linha comum, o gasto contaria duas vezes — nas
+ * compras do cartão e no boleto da conta.
+ *
+ * Na fatura, é entrada marcada como pagamento (`PAYMENT`, ou "pagamento" no
+ * texto, que é como o Nubank escreve). Estorno também entra positivo na fatura
+ * e é o caso que não pode cair aqui: é dinheiro voltando, não vindo da conta.
+ * Na conta, é saída que diz "fatura".
+ */
+function pagamentoDeFatura(
+  tipo: string | undefined,
+  valor: Centavos,
+  descricao: string,
+  cartao: boolean,
+): boolean {
+  if (cartao) {
+    return (
+      valor > 0 &&
+      !/estorno/i.test(descricao) &&
+      (tipo?.toUpperCase() === 'PAYMENT' || /\bpagamento\b/i.test(descricao))
+    );
+  }
+  return valor < 0 && /\bfatura\b/i.test(descricao);
 }
 
 /**

@@ -136,7 +136,7 @@ interface RawTransaction {
 ### Ordem de implementação
 
 1. Manual rápido — ✅ pronto
-2. OFX/CSV + share sheet do Android — exige development build (EAS)
+2. OFX/CSV + share sheet do Android — **OFX pelo seletor de arquivo ✅ pronto** (roda no Expo Go, iPhone incluso); CSV e receber o arquivo pelo share sheet ainda faltam, e o share sheet exige development build (EAS)
 3. Notificações Android
 4. Recorrência inferida (elimina ingestão do que é previsível)
 5. E-mail via OAuth (cobre iOS)
@@ -216,7 +216,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = formatação + lint + tipos + 611 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = formatação + lint + tipos + 643 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
@@ -471,11 +471,26 @@ App só local sem backup é histórico inteiro perdido ao trocar de celular — 
 
 **`lerBackup()` é fronteira de entrada: Zod**, como a regra manda — foi a dependência que entrou com ele, e serve aos adapters de OFX também. O esquema é tipado contra o domínio sem cast, então campo obrigatório novo em `Transacao` que ninguém pôs em `backup.ts` não compila; campo opcional esquecido é pego pelo teste de ida e volta, porque o Zod descarta chave desconhecida. Além do esquema, recusa o que só estouraria no banco: id repetido, FITID repetido na mesma conta e lançamento de conta ausente. Categoria e meta ausentes **não** são erro — são caminhos normais do app.
 
-**Três camadas, como a persistência.** `backup.ts` é puro e testado; `arquivoBackup.ts` é repasse nativo sem regra (como `motorExpo.ts`) e embrulha falha em `ArquivoFalhou`; `useBackup` é a cola, e mora fora do reducer porque relógio e arquivo são mundo externo. Só o backup já validado entra como `IMPORTAR_BACKUP`. `useLerEstado()` existe para isso: lê o estado na hora sem assinar — não é o `useLoja` de volta, porque não provoca render nenhum.
+**Três camadas, como a persistência.** `backup.ts` é puro e testado; `dados/arquivos.ts` é repasse nativo sem regra (como `motorExpo.ts`), devolve **bytes** — o OFX precisa decidir o encoding — e embrulha falha em `ArquivoFalhou`; `useBackup` é a cola, e mora fora do reducer porque relógio e arquivo são mundo externo. Só o backup já validado entra como `IMPORTAR_BACKUP`. `useLerEstado()` existe para isso: lê o estado na hora sem assinar — não é o `useLoja` de volta, porque não provoca render nenhum.
 
 **Restaurar troca todo o dado do usuário, com undo** — exceto no primeiro uso. Ali o estado de antes nunca foi gravado, e desfazer deixaria o disco com o backup e a tela no onboarding.
 
+### Importar extrato: a prévia é derivada, e nada se resolve calado
+
+`Extrato → Importar` escolhe um OFX, `useImportarExtrato` decodifica e passa pelo adapter, e só o extrato lido entra no estado (`Estado.importacao`, sessão, não persistido). **A prévia é `montarPrevia()`, derivada a cada render** de extrato + conta de destino + escolhas da pessoa — trocar a conta refaz a detecção sozinha. `CONFIRMAR_IMPORTACAO` chama `aplicarImportacao()`, puro e com id e relógio injetados como o reducer, e abre o Extrato no mês do que entrou, com undo.
+
+Quatro situações por linha:
+
+- **Já importada:** FITID que já está naquela conta (ou repetido no próprio arquivo). Não aparece; só conta. É o que impede importar o mesmo arquivo duas vezes — e sobrevive a reabrir o app, travado em `ciclo.test.ts`.
+- **Possível duplicata:** lançamento na mesma conta, mesmo valor, ±2 dias e **sem FITID** — linha com FITID é outro registro do banco, e duas compras iguais no mesmo dia são duas compras. O padrão é "é a mesma": a linha não entra e **o FITID passa à existente**, para a próxima importação do período não perguntar de novo. "São diferentes" importa. Nunca automático sem mostrar — é a regra do dedupe.
+- **Transferência:** pista do adapter (`natureza`), que a pessoa liga e desliga. Cria as duas pontas como a folha Transferir; se a outra conta já tem o lançamento oposto (±3 dias, sem `transferenciaId`), **ele vira a outra ponta** em vez de ganhar gêmea. A ponta criada nasce sem FITID — e é por isso que, quando o extrato da outra conta chegar, o boleto cai em "possível duplicata" dela. As duas ordens (fatura antes ou conta antes) terminam no mesmo par, com uma linha por lado.
+- **Nova:** com a categoria que a pessoa deu da última vez ao mesmo texto do banco e mesmo sinal (`categoriasAprendidas`); sem histórico, **sem categoria**. Chutar "Compras" esconderia o que falta decidir, e o desafio "categorizados" já conta essas linhas. O toast diz quantas ficaram assim.
+
+O toast conta **linhas do arquivo**, não linhas criadas: a pessoa reconhece "16 lançamentos" do extrato que baixou, e a ponta criada na outra conta aparece como "2 transferências".
+
 **Pendências abertas:**
+- A categoria aprendida casa texto exato: "Parcela 1/2" e "Parcela 2/2" não se reconhecem. Normalizar isso é saber o formato do banco — mora no adapter, quando doer
+- O app não lembra qual conta do banco (`ACCTID`) foi para qual conta do app; a sugestão é por tipo. Lembrar exige persistir o vínculo
 - Sem lembrete de backup: o app não sabe quando foi o último. Guardar a data exige migration — vale quando houver o que lembrar
 - Sem retentativa ativa de gravação: o reenvio pega carona na próxima mudança. Um outbox resolve, se virar problema
 - Nenhuma tela lê do banco sob demanda — o estado inteiro é carregado no boot. Aguenta bem os primeiros anos; a saída é paginar por período no repositório

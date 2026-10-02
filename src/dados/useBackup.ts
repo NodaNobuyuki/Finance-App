@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
 import { mensagemParaOUsuario } from '../dominio/erros';
 import { useDespachar, useLerEstado } from '../estado/store';
-import { compartilharBackup, escolherBackup } from './arquivoBackup';
+import { decodificar } from '../ingestao/texto';
+import { compartilharArquivo, escolherArquivo } from './arquivos';
 import { gerarBackup, lerBackup, nomeDoBackup } from './backup';
 import { recortePersistido } from './persistido';
 
@@ -19,7 +20,10 @@ export function useBackup(): { exportar: () => Promise<void>; restaurar: () => P
   const exportar = useCallback(async () => {
     const e = lerEstado();
     try {
-      await compartilharBackup(gerarBackup(recortePersistido(e), Date.now()), nomeDoBackup(e.hoje));
+      await compartilharArquivo(
+        gerarBackup(recortePersistido(e), Date.now()),
+        nomeDoBackup(e.hoje),
+      );
     } catch (erro) {
       despachar({ tipo: 'AVISAR', texto: mensagemParaOUsuario(erro) });
     }
@@ -27,9 +31,9 @@ export function useBackup(): { exportar: () => Promise<void>; restaurar: () => P
 
   const restaurar = useCallback(async () => {
     try {
-      const texto = await escolherBackup();
-      if (texto === null) return;
-      despachar({ tipo: 'IMPORTAR_BACKUP', dados: lerBackup(texto) });
+      const bytes = await escolherArquivo();
+      if (bytes === null) return;
+      despachar({ tipo: 'IMPORTAR_BACKUP', dados: lerBackup(decodificar(bytes)) });
     } catch (erro) {
       despachar({ tipo: 'AVISAR', texto: mensagemParaOUsuario(erro) });
     }
