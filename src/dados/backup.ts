@@ -110,6 +110,9 @@ const dados = z.object({
   ritualPrimeira: z.boolean(),
   lembrete: z.string(),
   semanaFechada: dia.nullable(),
+  // Ausente nos backups anteriores ao lembrete. O valor do arquivo nem chega a
+  // valer: `lerBackup()` o troca pelo `geradoEm`.
+  ultimoBackupEm: z.number().int().nullable().default(null),
   intencao: z.string(),
   mostrarSaldo: z.boolean(),
 });
@@ -152,6 +155,10 @@ export function nomeDoBackup(hoje: string): string {
  * reducer e só apareceriam no banco, como linha recusada que some ao fechar
  * o app. Categoria e meta ausentes NÃO são erro: categoria órfã e entrada de
  * meta apagada são caminhos normais do app.
+ *
+ * O último backup passa a ser o próprio arquivo: tudo o que ele restaura já
+ * está guardado nele. O campo gravado dentro dizia o backup ANTERIOR a este —
+ * o arquivo é gerado antes de o app saber que ele foi exportado.
  */
 export function lerBackup(texto: string): EstadoPersistido {
   let bruto: unknown;
@@ -203,5 +210,6 @@ export function lerBackup(texto: string): EstadoPersistido {
     throw new BackupInvalido('O backup tem lançamentos de uma conta que não está nele.');
   }
 
-  return d;
+  const geradoEm = Date.parse(cabecalho.data.geradoEm);
+  return Number.isFinite(geradoEm) ? { ...d, ultimoBackupEm: geradoEm } : d;
 }

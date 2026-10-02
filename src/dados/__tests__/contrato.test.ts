@@ -179,6 +179,14 @@ describe.each(implementacoes)('repositório: %s', (_nome, criar) => {
     expect(Object.keys(lido!.progressoDesafios[0]).sort()).toEqual(['aceito', 'id', 'progresso']);
   });
 
+  it('o instante do último backup volta como número, e a ausência como null', async () => {
+    await repo.salvar(null, { ...base(), ultimoBackupEm: 1_759_420_800_123 });
+    expect((await repo.carregar())!.ultimoBackupEm).toBe(1_759_420_800_123);
+
+    await repo.salvar(null, { ...base(), ultimoBackupEm: null });
+    expect((await repo.carregar())!.ultimoBackupEm).toBeNull();
+  });
+
   it('a conta lembra de qual conta do banco vêm os extratos', async () => {
     const estado = base();
     const contas = estado.contas.map((c, i) => (i === 0 ? { ...c, idNoBanco: '260:abc' } : c));
