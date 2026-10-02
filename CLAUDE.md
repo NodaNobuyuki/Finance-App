@@ -199,7 +199,7 @@ Tudo que entra na tela usa a mesma frase — surge com uma leve subida — e só
 
 ## Estado atual
 
-**App Expo rodando** (`src/`), portado do protótipo `design/Poupa Hábitos.dc.html`. 9 telas — Início, Extrato, Metas, Categorias, Hábitos, Simulador, Lote, Resumo, Fechar semana — mais 8 folhas: Nova transação, Movimento de meta (guardar/retirar), Transferência, Ritual, Recategorizar e os cadastros de conta, meta e categoria. 13 paletas, teclado numérico próprio, toast com undo.
+**App Expo rodando** (`src/`), portado do protótipo `design/Poupa Hábitos.dc.html`. 9 telas — Início, Extrato, Metas, Categorias, Hábitos, Simulador, Lote, Resumo, Fechar semana — mais 8 folhas: Nova transação (que também edita), Movimento de meta (guardar/retirar), Transferência, Detalhe de transferência, Ritual e os cadastros de conta, meta e categoria. 13 paletas, teclado numérico próprio, toast com undo.
 
 ```
 src/dominio/    dinheiro (centavos), saldo derivado, guardado das metas,
@@ -211,7 +211,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = formatação + lint + tipos + 516 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = formatação + lint + tipos + 543 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
@@ -316,7 +316,7 @@ O motivo é persistência: **o que não está no `Estado` não tem como ser grav
 
 **Renomear não troca o id.** Ele é a chave que os lançamentos apontam; id derivado do nome faria "Mercado" → "Compras" órfãar o histórico inteiro.
 
-**Apagar categoria mantém os lançamentos** — oposto de apagar conta. O gasto aconteceu e o dinheiro saiu, seja qual for o rótulo: some o rótulo, não o dinheiro. As linhas caem em "Sem categoria" e `Recategorizar` é o caminho de volta, que antes não existia.
+**Apagar categoria mantém os lançamentos** — oposto de apagar conta. O gasto aconteceu e o dinheiro saiu, seja qual for o rótulo: some o rótulo, não o dinheiro. As linhas caem em "Sem categoria" e editar o lançamento é o caminho de volta — ver "Lançamento se corrige".
 
 **A última categoria de um tipo não é apagável**, e `transferencia` nunca é: sem nenhuma despesa não há o que escolher ao lançar, e sem `transferencia` o aporte não teria como marcar as linhas que cria.
 
@@ -443,6 +443,18 @@ Onde a interface mudou: a Home mostra "Definir orçamento" em vez de barra vazia
 ### `Contexto` acabou
 
 Os dois placeholders viraram conta sobre o que existe, e o tipo sumiu junto com a chave no banco (migration v8). `lancamentosDoMesAnterior()` conta as transações do mês passado, sem transferência — um aporte lançaria duas linhas de uma vez. `economizado()` soma só os desafios aceitos, partindo de zero em vez dos R$ 180 que a demo inventava.
+
+### Lançamento se corrige
+
+Até aqui o único conserto era o "Desfazer" do toast, que some em segundos: valor errado virava dado permanente, e tocar na linha do Extrato só trocava a categoria. Com OFX chegando, linha a corrigir vai ser rotina.
+
+**Editar é a folha de lançamento com `rascunho.id` preenchido** — a convenção dos cadastros. `ABRIR_LANCAMENTO` decide o que abre, não a tela: transferência vai para `DetalheTransferencia`, o resto para `NovaTransacao` preenchida. A folha `Recategorizar` sumiu — trocar a categoria virou um campo da edição. Editar preserva id, `origem`, `descricaoOriginal`, `idExterno` e `criadoEm`: corrigir o valor de uma linha importada não a torna manual, e o dedupe ainda precisa do FITID. Descrição que o app preencheu com o nome da categoria volta vazia ao abrir, senão recategorizar deixaria a linha com o nome antigo.
+
+**Apagar usa undo, e transferência vai com o par.** Uma ponta sozinha seria dinheiro saindo sem chegar a lugar nenhum. Apagar o depósito de uma meta da qual já se retirou é recusado no toast — o guardado ficaria negativo, a mesma regra de "retirar mais do que está lá". Transferência não se edita: mexer numa ponta quebra o par, então o caminho é apagar e refazer, e o detalhe diz isso.
+
+**O desfazer é `REPOR_TRANSACOES`**, que substitui por id as versões exatas guardadas no toast. Serve aos dois casos e, ao contrário de `RESTAURAR`, não joga fora o que mais tenha acontecido no estado nesse meio-tempo.
+
+**A data são atalhos dos últimos 7 dias**, não calendário — o mesmo raciocínio do prazo da meta. Uma semana é o que o ritual fecha; o que ficou mais para trás em branco é trabalho do Lote. Ao editar uma linha mais antiga, o dia dela entra na fileira para continuar selecionado. Dia futuro é recusado no reducer: seria previsão, e contaria como constância de uma semana que não aconteceu. A data não gruda: o próximo `ABRIR_NOVA` volta para hoje.
 
 **Pendências abertas:**
 - Sem retentativa ativa de gravação: o reenvio pega carona na próxima mudança. Um outbox resolve, se virar problema

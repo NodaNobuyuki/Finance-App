@@ -302,7 +302,7 @@ export function Extrato() {
       )}
       renderItem={({ item, index, section }) => (
         <View style={{ paddingHorizontal: 18 }}>
-          <ItemTransacao tx={item} separador={index < section.data.length - 1} recategorizavel />
+          <ItemTransacao tx={item} separador={index < section.data.length - 1} editavel />
         </View>
       )}
     />

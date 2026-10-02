@@ -4,7 +4,10 @@ import { ICONE_ORFA } from '../../dominio/categorias';
 import { hojeReal, inicioDaSemana } from '../../dominio/datas';
 import { Tela } from '../../dominio/tipos';
 import {
+  Acao,
   criarEstadoDemo,
+  criarReducer,
+  dependenciasDeTeste,
   Estado,
   estadoInicial,
   estadoVazio,
@@ -24,8 +27,8 @@ import { Resumo } from '../Resumo';
 import { Simulador } from '../Simulador';
 import { CadastroCategoria } from '../folhas/CadastroCategoria';
 import { CadastroConta } from '../folhas/CadastroConta';
-import { Recategorizar } from '../folhas/Recategorizar';
 import { CadastroMeta } from '../folhas/CadastroMeta';
+import { DetalheTransferencia } from '../folhas/DetalheTransferencia';
 import { MovimentoMeta } from '../folhas/MovimentoMeta';
 import { NovaTransacao } from '../folhas/NovaTransacao';
 import { Ritual } from '../folhas/Ritual';
@@ -130,15 +133,53 @@ describe('app vazio', () => {
     expect(comFiltro.getByText('Nenhuma transação com esses filtros')).toBeTruthy();
   });
 
-  it('a folha de recategorizar oferece as categorias do tipo do lançamento', async () => {
-    // O tipo vem do SINAL, não da categoria atual: linha órfã não tem tipo
-    // confiável, e o sinal é o dado que não mente.
-    const despesa = estadoInicial.transacoes.find((t) => t.valorCentavos < 0)!;
-    const tela = await montar(<Recategorizar transacaoId={despesa.id} />, estadoInicial);
+  it('editar um lançamento abre a mesma folha, preenchida e com apagar', async () => {
+    const despesa = estadoInicial.transacoes.find(
+      (t) => t.valorCentavos < 0 && t.transferenciaId === undefined,
+    )!;
+    const aberto = criarReducer(dependenciasDeTeste())(estadoInicial, {
+      tipo: 'ABRIR_LANCAMENTO',
+      transacaoId: despesa.id,
+    });
+    const tela = await montar(<NovaTransacao />, aberto);
 
-    expect(tela.getByText('Mudar categoria')).toBeTruthy();
+    expect(tela.getByText('Editar lançamento')).toBeTruthy();
+    expect(tela.getByText('Salvar alterações')).toBeTruthy();
+    expect(tela.getByText('Apagar lançamento')).toBeTruthy();
+    // O tipo vem do SINAL: despesa oferece só categorias de despesa.
     expect(tela.getByText('Mercado')).toBeTruthy();
     expect(tela.queryByText('Salário')).toBeNull();
+    // Corrigir um gasto antigo não é hora de simular se valia a pena.
+    expect(tela.queryByText('Vale a pena? Simular')).toBeNull();
+  });
+
+  it('o lançamento novo oferece atalhos de data, sem apagar', async () => {
+    const tela = await montar(<NovaTransacao />, estadoInicial);
+
+    expect(tela.getByText('Hoje')).toBeTruthy();
+    expect(tela.getByText('Ontem')).toBeTruthy();
+    expect(tela.queryByText('Apagar lançamento')).toBeNull();
+  });
+
+  it('o detalhe de uma transferência mostra as duas pontas e deixa apagar', async () => {
+    const guardar: Acao[] = [
+      { tipo: 'ABRIR_MOVIMENTO_META', metaId: 'reserva' },
+      { tipo: 'DEFINIR_DIGITOS', digitos: '10000' },
+      { tipo: 'CONFIRMAR_MOVIMENTO_META' },
+    ];
+    const guardado = guardar.reduce(criarReducer(dependenciasDeTeste()), {
+      ...estadoInicial,
+      rascunho: { ...estadoInicial.rascunho, contaId: 'corrente' },
+    });
+    const ponta = guardado.transacoes.find((t) => t.transferenciaId !== undefined)!;
+    const tela = await montar(
+      <DetalheTransferencia transferenciaId={ponta.transferenciaId!} />,
+      guardado,
+    );
+
+    expect(tela.getByText('R$ 100,00')).toBeTruthy();
+    expect(tela.getByText('De Conta corrente para Poupança')).toBeTruthy();
+    expect(tela.getByText('Apagar movimento')).toBeTruthy();
   });
 
   it('o Extrato desenha só o começo de um mês cheio, não o mês inteiro', async () => {

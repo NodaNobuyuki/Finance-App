@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { AGORA, inicioDaSemana } from '../../dominio/datas';
+import { AGORA, inicioDaSemana, somarDias } from '../../dominio/datas';
 import { guardadoDaMeta } from '../../dominio/metas';
 import { saldoTotal } from '../../dominio/saldo';
 import { Acao, criarEstadoDemo, criarReducer, dependenciasDeTeste } from '../../estado/store';
@@ -99,6 +99,58 @@ describe('fechar e reabrir', () => {
     expect(new Set(par.map((t) => t.transferenciaId)).size).toBe(1);
     expect(par.reduce((a, t) => a + t.valorCentavos, 0)).toBe(0);
     expect(par.filter((t) => t.metaId === 'reserva')).toHaveLength(1);
+  });
+
+  it('o lançamento corrigido volta corrigido', async () => {
+    // Editar é UPDATE de uma linha que já está no disco — caminho que lançar
+    // um gasto novo nunca exercita.
+    const motor = criarMotorNode();
+    const alvo = criarEstadoDemo(AGORA).transacoes.find((t) => t.categoriaId === 'mercado')!;
+    const ontem = somarDias(AGORA, -1);
+    await sessao(motor, [
+      { tipo: 'ABRIR_LANCAMENTO', transacaoId: alvo.id },
+      { tipo: 'DEFINIR_DIGITOS', digitos: '4321' },
+      { tipo: 'RASCUNHO_DATA', dia: ontem },
+      { tipo: 'RASCUNHO_CATEGORIA', categoriaId: 'lazer' },
+      { tipo: 'SALVAR_TRANSACAO' },
+    ]);
+    const depois = await sessao(motor);
+
+    expect(depois.transacoes.find((t) => t.id === alvo.id)).toMatchObject({
+      valorCentavos: -4321,
+      ocorridoEm: ontem,
+      categoriaId: 'lazer',
+      criadoEm: alvo.criadoEm,
+    });
+  });
+
+  it('o lançamento apagado não volta', async () => {
+    const motor = criarMotorNode();
+    const inicial = criarEstadoDemo(AGORA);
+    const alvo = inicial.transacoes[0];
+    await sessao(motor, [{ tipo: 'APAGAR_TRANSACAO', transacaoId: alvo.id }]);
+    const depois = await sessao(motor);
+
+    expect(depois.transacoes.some((t) => t.id === alvo.id)).toBe(false);
+    expect(depois.transacoes).toHaveLength(inicial.transacoes.length - 1);
+  });
+
+  it('apagar um aporte tira as duas pontas do disco', async () => {
+    const motor = criarMotorNode();
+    const inicial = criarEstadoDemo(AGORA);
+    const guardado = await sessao(motor, [
+      { tipo: 'ABRIR_MOVIMENTO_META', metaId: 'reserva' },
+      { tipo: 'DEFINIR_DIGITOS', digitos: '25000' },
+      { tipo: 'CONFIRMAR_MOVIMENTO_META' },
+    ]);
+    const ponta = guardado.transacoes.find((t) => t.transferenciaId !== undefined)!;
+    await sessao(motor, [{ tipo: 'APAGAR_TRANSACAO', transacaoId: ponta.id }]);
+    const depois = await sessao(motor);
+
+    expect(depois.transacoes.some((t) => t.transferenciaId !== undefined)).toBe(false);
+    expect(saldoTotal(depois.contas, depois.transacoes)).toBe(
+      saldoTotal(inicial.contas, inicial.transacoes),
+    );
   });
 
   it('a semana fechada continua fechada — e sabe qual era', async () => {
