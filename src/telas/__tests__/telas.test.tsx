@@ -133,8 +133,8 @@ describe('app vazio', () => {
     const semNada = await montar(<Extrato />, estadoVazio);
     expect(semNada.getByText('Seu extrato começa aqui')).toBeTruthy();
 
-    const mesVazio = await montar(<Extrato />, { ...estadoInicial, mesVisivel: '2026-06-01' });
-    expect(mesVazio.getByText('Nada em Junho 2026')).toBeTruthy();
+    const mesVazio = await montar(<Extrato />, { ...estadoInicial, mesVisivel: '2026-05-01' });
+    expect(mesVazio.getByText('Nada em Maio 2026')).toBeTruthy();
 
     const comFiltro = await montar(<Extrato />, { ...estadoInicial, filtroCategoria: 'presente' });
     expect(comFiltro.getByText('Nenhuma transação com esses filtros')).toBeTruthy();

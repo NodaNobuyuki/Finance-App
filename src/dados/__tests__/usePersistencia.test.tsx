@@ -2,7 +2,7 @@ import { act, render } from '@testing-library/react-native';
 import React from 'react';
 import { Text } from 'react-native';
 import { GravacaoRecusada, mensagemParaOUsuario } from '../../dominio/erros';
-import { Acao, LojaProvider, useDespachar, useSeletor } from '../../estado/store';
+import { Acao, estadoInicial, LojaProvider, useDespachar, useSeletor } from '../../estado/store';
 import { EstadoPersistido } from '../persistido';
 import { RepositorioLocal } from '../repositorio';
 import { criarRepositorioMemoria } from '../repositorioMemoria';
@@ -159,7 +159,7 @@ describe('usePersistencia', () => {
 
     expect(avisos).toHaveLength(1);
     // A transação continua no estado — o usuário não perde o que registrou.
-    expect(tela.getByText('15')).toBeTruthy();
+    expect(tela.getByText(String(estadoInicial.transacoes.length + 1))).toBeTruthy();
   });
 
   it('depois de falhar, a próxima gravação reenvia o que se perdeu', async () => {
@@ -201,7 +201,7 @@ describe('usePersistencia', () => {
   it('sem repositório, o app funciona e não tenta gravar', async () => {
     const { agir, tela } = await montar(null);
     await agir({ tipo: 'REGISTRO_RAPIDO', categoriaId: 'mercado', valorCentavos: 1000 });
-    expect(tela.getByText('15')).toBeTruthy();
+    expect(tela.getByText(String(estadoInicial.transacoes.length + 1))).toBeTruthy();
   });
 
   it('o que chega ao repositório é o recorte, sem estado de sessão', async () => {
