@@ -40,7 +40,12 @@ export type ExtratoLido = {
   tipoDeConta: 'cartao' | 'conta';
   /** Nome da instituição como o arquivo diz (`<ORG>`). */
   banco?: string;
-  /** Identificador da conta no banco (`<ACCTID>`). Nunca exibido inteiro. */
+  /**
+   * Identidade da conta no banco, estável entre exportações: é ela que o app
+   * lembra para abrir a próxima importação na conta certa. O adapter decide do
+   * que ela é feita — número de conta sozinho repete entre bancos. O app só
+   * compara igualdade, e nunca a exibe.
+   */
   contaExterna?: string;
   inicio?: DiaISO;
   fim?: DiaISO;

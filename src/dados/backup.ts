@@ -71,6 +71,7 @@ const conta = z.object({
   tipo: z.enum(['carteira', 'corrente', 'cartao', 'poupanca']),
   saldoInicialCentavos: centavos,
   cor: corRef,
+  idNoBanco: z.string().optional(),
 });
 
 const meta = z.object({

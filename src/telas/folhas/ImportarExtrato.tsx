@@ -6,7 +6,7 @@ import { rotuloDataCurta } from '../../dominio/datas';
 import { comSinal } from '../../dominio/dinheiro';
 import { Conta } from '../../dominio/tipos';
 import { useDespachar, useRecorte } from '../../estado/store';
-import { Escolha, LinhaDaPrevia, montarPrevia } from '../../ingestao/previa';
+import { contaLembrada, Escolha, LinhaDaPrevia, montarPrevia } from '../../ingestao/previa';
 import { useTema } from '../../tema/TemaContext';
 import { Folha } from './Folha';
 import { Pilulas } from './PilulasDeConta';
@@ -42,6 +42,7 @@ export function ImportarExtrato() {
   if (!importacao || !previa) return null;
 
   const { extrato } = importacao;
+  const lembrada = contaLembrada(extrato, contas)?.id === importacao.contaId;
   const periodo =
     extrato.inicio && extrato.fim
       ? `${rotuloDataCurta(extrato.inicio)} a ${rotuloDataCurta(extrato.fim)}`
@@ -76,6 +77,11 @@ export function ImportarExtrato() {
         selecionado={importacao.contaId}
         aoEscolher={(contaId) => despachar({ tipo: 'IMPORTACAO_CONTA', contaId })}
       />
+      {lembrada ? (
+        <Txt tamanho={11.5} cor={t.inkSoft} alinhamento="center" estilo={{ marginTop: -10 }}>
+          A mesma conta da última importação deste extrato.
+        </Txt>
+      ) : null}
 
       <Txt tamanho={12} peso={600} cor={t.inkMuted} alinhamento="center">
         {resumo.join(' · ')}

@@ -32,6 +32,8 @@ type LinhaConta = {
   tipo: string;
   saldo_inicial_centavos: number;
   cor: string;
+  /** NULL quando nenhum extrato foi importado para a conta — ver migration v10. */
+  id_no_banco: string | null;
 };
 
 type LinhaTransacao = {
@@ -87,13 +89,14 @@ type Tabela<T extends { id: string }, L> = {
 
 const TABELA_CONTAS: Tabela<Conta, LinhaConta> = {
   nome: 'contas',
-  colunas: ['id', 'nome', 'tipo', 'saldo_inicial_centavos', 'cor', 'atualizado_em'],
+  colunas: ['id', 'nome', 'tipo', 'saldo_inicial_centavos', 'cor', 'id_no_banco', 'atualizado_em'],
   paraLinha: (c, agoraMs) => [
     c.id,
     c.nome,
     c.tipo,
     c.saldoInicialCentavos,
     corParaTexto(c.cor),
+    c.idNoBanco ?? null,
     agoraMs,
   ],
   daLinha: (l) => ({
@@ -102,6 +105,7 @@ const TABELA_CONTAS: Tabela<Conta, LinhaConta> = {
     tipo: l.tipo as Conta['tipo'],
     saldoInicialCentavos: l.saldo_inicial_centavos,
     cor: corDeTexto(l.cor),
+    ...(l.id_no_banco === null ? {} : { idNoBanco: l.id_no_banco }),
   }),
 };
 

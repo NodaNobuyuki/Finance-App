@@ -26,7 +26,10 @@ function aplicar(estado: Estado, ...acoes: Acao[]): Estado {
   return acoes.reduce(criarReducer(dependenciasDeTeste()), estado);
 }
 
-/** A demo com o que ela não tem: linha importada e um par de transferência. */
+/**
+ * A demo com o que ela não tem: linha importada, um par de transferência e uma
+ * conta que lembra de qual conta do banco vêm os extratos dela.
+ */
 function completo(): EstadoPersistido {
   const guardado = aplicar(
     { ...estadoInicial, rascunho: { ...estadoInicial.rascunho, contaId: 'corrente' } },
@@ -41,7 +44,11 @@ function completo(): EstadoPersistido {
     idExterno: 'FITID-1',
     descricaoOriginal: 'PAG*PADARIA SAO JOAO',
   };
-  return recortePersistido({ ...guardado, transacoes: [importada, ...guardado.transacoes] });
+  return recortePersistido({
+    ...guardado,
+    transacoes: [importada, ...guardado.transacoes],
+    contas: guardado.contas.map((c) => (c.id === 'cartao' ? { ...c, idNoBanco: '260:abc' } : c)),
+  });
 }
 
 /** Gera um backup, mexe no conteúdo e devolve o texto. */
