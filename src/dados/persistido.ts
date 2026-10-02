@@ -1,4 +1,4 @@
-import { categoriasIniciais } from '../dominio/categorias';
+import { categoriaPadrao, categoriasIniciais } from '../dominio/categorias';
 import { DiaISO } from '../dominio/datas';
 import { Estado } from '../estado/store';
 
@@ -76,18 +76,28 @@ export function recortePersistido(e: Estado): EstadoPersistido {
  * esperando para aparecer no aparelho de alguém.
  */
 export function hidratar(vazio: Estado, salvo: EstadoPersistido, hoje: DiaISO): Estado {
+  // Sem categoria nenhuma não dá para lançar. Só acontece em banco anterior à
+  // v6, que criou a tabela sem preenchê-la: o catálogo de fábrica vive em
+  // código em vez de repetido dentro de uma migration que nunca mais pode ser
+  // editada. Apagar a última categoria de um tipo é proibido no reducer, então
+  // "vazio" não tem outro significado possível.
+  const categorias = salvo.categorias.length > 0 ? salvo.categorias : categoriasIniciais();
   return {
     ...vazio,
     ...salvo,
     // `hoje` vem do relógio, nunca do disco — reabrir no dia gravado colocaria
     // o próximo lançamento na data errada.
     hoje,
-    // Sem categoria nenhuma não dá para lançar. Só acontece em banco anterior à
-    // v6, que criou a tabela sem preenchê-la: o catálogo de fábrica vive em
-    // código em vez de repetido dentro de uma migration que nunca mais pode ser
-    // editada. Apagar a última categoria de um tipo é proibido no reducer,
-    // então "vazio" não tem outro significado possível.
-    categorias: salvo.categorias.length > 0 ? salvo.categorias : categoriasIniciais(),
+    categorias,
+    // O rascunho não é gravado, e o do estado vazio não tem conta: sem isto o
+    // primeiro registro rápido depois de reabrir o app saía com `contaId`
+    // vazio — gravado, fora do saldo de toda conta, dinheiro sumindo do
+    // patrimônio sem nada explicando.
+    rascunho: {
+      ...vazio.rascunho,
+      contaId: salvo.contas[0]?.id ?? '',
+      categoriaId: categoriaPadrao(categorias, 'despesa'),
+    },
   };
 }
 

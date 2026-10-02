@@ -24,6 +24,7 @@ import {
 } from '../dominio/datas';
 import {
   Centavos,
+  comSinal,
   deDigitos,
   deTextoLivre,
   empilharDigitos,
@@ -33,6 +34,10 @@ import {
 import { GerarId, idsSequenciais, uuidV7 } from '../dominio/ids';
 import { contaPadraoDeMeta, guardadoDaMeta, metaEscolhida } from '../dominio/metas';
 import { Semente, semente, vazia } from '../dominio/seed';
+import { EstadoPersistido, hidratar } from '../dados/persistido';
+import { aplicarImportacao } from '../ingestao/aplicar';
+import { contaSugerida, Escolha, montarPrevia } from '../ingestao/previa';
+import { ExtratoLido } from '../ingestao/tipos';
 import { semanasEmDia } from './derivados';
 import { Conta, Meta, Perfil, ProgressoDesafio, Tela, Transacao } from '../dominio/tipos';
 import { CorRef, token } from '../tema/paletas';
@@ -42,11 +47,22 @@ import { CorRef, token } from '../tema/paletas';
    ──────────────────────────────────────────────────────────────── */
 
 export type Rascunho = {
+  /**
+   * Lançamento em edição, ou `null` para um novo — a mesma convenção dos
+   * cadastros de conta e de meta. A folha é uma só: corrigir um gasto é
+   * lançá-lo de novo com os campos já preenchidos.
+   */
+  id: string | null;
   tipo: 'despesa' | 'receita';
   digitos: string;
   categoriaId: string;
   contaId: string;
   descricao: string;
+  /**
+   * Dia do lançamento. Era sempre `hoje`, e o café de ontem só entrava pelo
+   * Lote — e só se o dia ainda estivesse em aberto.
+   */
+  ocorridoEm: DiaISO;
 };
 
 export type LinhaLote = {
@@ -76,7 +92,28 @@ export type Folha =
   | { tipo: 'conta' }
   | { tipo: 'meta' }
   | { tipo: 'categoria' }
-  | { tipo: 'recategorizar'; transacaoId: string };
+  /**
+   * As duas pontas de um movimento entre contas. Não abre a folha de edição:
+   * mudar uma ponta sozinha quebraria o par, e o que dá para fazer com ele
+   * inteiro é apagar.
+   */
+  | { tipo: 'detalheTransferencia'; transferenciaId: string }
+  /** Prévia de um extrato lido — os dados moram em `Estado.importacao`. */
+  | { tipo: 'importacao' };
+
+/**
+ * Um extrato esperando confirmação.
+ *
+ * Guarda só a entrada e as escolhas da pessoa; a prévia é derivada por
+ * `montarPrevia()`. Estado de sessão, como os rascunhos: fechar o app no meio
+ * descarta, e reabrir o arquivo é um toque.
+ */
+export type Importacao = {
+  extrato: ExtratoLido;
+  contaId: string;
+  /** Por `idExterno` da linha. */
+  escolhas: Record<string, Escolha>;
+};
 
 /**
  * Rascunho de cadastro de conta e de meta.
@@ -262,6 +299,8 @@ export type Estado = {
    */
   simMetaId: string | null;
 
+  importacao: Importacao | null;
+
   toast: Toast | null;
   /** Contador para ids determinísticos — nada de `Date.now()` dentro do reducer. */
   seq: number;
@@ -272,14 +311,20 @@ export type Estado = {
  * `'mercado'` e `'cartao'`, ids da semente da demo, que instalação de verdade
  * não tem. Quem resolve o padrão é quem monta o estado ou abre a folha, contra
  * o que a pessoa realmente possui.
+ *
+ * É função porque a data padrão é o dia corrente, que só o estado conhece.
  */
-const RASCUNHO_VAZIO: Rascunho = {
-  tipo: 'despesa',
-  digitos: '',
-  categoriaId: '',
-  contaId: '',
-  descricao: '',
-};
+function rascunhoVazio(hoje: DiaISO, contaId = ''): Rascunho {
+  return {
+    id: null,
+    tipo: 'despesa',
+    digitos: '',
+    categoriaId: '',
+    contaId,
+    descricao: '',
+    ocorridoEm: hoje,
+  };
+}
 
 /**
  * Estado de partida a partir de uma semente, ancorado num dia.
@@ -326,9 +371,8 @@ function estadoDe(hoje: DiaISO, s: Semente, onboardingConcluido: boolean): Estad
 
     folha: null,
     rascunho: {
-      ...RASCUNHO_VAZIO,
+      ...rascunhoVazio(hoje, s.contas[0]?.id ?? ''),
       categoriaId: categoriaPadrao(s.categorias, 'despesa'),
-      contaId: s.contas[0]?.id ?? '',
     },
     transferenciaDestinoId: '',
     cadastroConta: CADASTRO_CONTA_VAZIO,
@@ -337,6 +381,8 @@ function estadoDe(hoje: DiaISO, s: Semente, onboardingConcluido: boolean): Estad
     simDigitos: '',
     simTaxaId: 'cdi',
     simMetaId: null,
+
+    importacao: null,
 
     toast: null,
     seq: 0,
@@ -405,15 +451,25 @@ export type Acao =
   | { tipo: 'CADASTRO_CATEGORIA_LIMITE'; digitos: string }
   | { tipo: 'SALVAR_CATEGORIA' }
   | { tipo: 'APAGAR_CATEGORIA'; categoriaId: string }
-  /** Trocar a categoria de um lançamento já feito. */
-  | { tipo: 'ABRIR_RECATEGORIZAR'; transacaoId: string }
-  | { tipo: 'RECATEGORIZAR'; transacaoId: string; categoriaId: string }
+  /**
+   * Tocar num lançamento já feito. O reducer decide o que abre: transferência
+   * vai para o detalhe do par, o resto para a folha de edição.
+   */
+  | { tipo: 'ABRIR_LANCAMENTO'; transacaoId: string }
+  /** Leva junto a outra ponta, quando é transferência. */
+  | { tipo: 'APAGAR_TRANSACAO'; transacaoId: string }
+  /**
+   * Põe de volta versões exatas de lançamentos — o desfazer de editar e de
+   * apagar. Substitui por id, então serve aos dois.
+   */
+  | { tipo: 'REPOR_TRANSACOES'; transacoes: Transacao[]; texto: string }
   | { tipo: 'SALVAR_META' }
   | { tipo: 'APAGAR_META'; metaId: string }
   | { tipo: 'RASCUNHO_TIPO'; valor: 'despesa' | 'receita' }
   | { tipo: 'RASCUNHO_CATEGORIA'; categoriaId: string }
   | { tipo: 'RASCUNHO_CONTA'; contaId: string }
   | { tipo: 'RASCUNHO_DESCRICAO'; texto: string }
+  | { tipo: 'RASCUNHO_DATA'; dia: DiaISO }
   | { tipo: 'DIGITO'; valor: string }
   | { tipo: 'APAGAR_DIGITO' }
   | { tipo: 'DEFINIR_DIGITOS'; digitos: string }
@@ -454,7 +510,15 @@ export type Acao =
   | { tipo: 'ONBOARDING_CONCLUIR' }
   | { tipo: 'CARREGAR_DEMO' }
   | { tipo: 'APAGAR_DADOS' }
-  | { tipo: 'RESTAURAR'; estado: Estado }
+  | { tipo: 'RESTAURAR'; estado: Estado; texto?: string }
+  /** Extrato já lido pelo adapter: abre a prévia. */
+  | { tipo: 'ABRIR_IMPORTACAO'; extrato: ExtratoLido }
+  | { tipo: 'IMPORTACAO_CONTA'; contaId: string }
+  /** Mescla na escolha que já havia para a linha. */
+  | { tipo: 'IMPORTACAO_ESCOLHA'; idExterno: string; escolha: Escolha }
+  | { tipo: 'CONFIRMAR_IMPORTACAO' }
+  /** Troca todo o dado do usuário pelo de um backup já validado (`lerBackup`). */
+  | { tipo: 'IMPORTAR_BACKUP'; dados: EstadoPersistido }
   | { tipo: 'LIMPAR_TOAST'; id: number };
 
 /* ────────────────────────────────────────────────────────────────
@@ -677,6 +741,19 @@ function linhaDoLote(e: Estado, dia: DiaISO): LinhaLote {
   );
 }
 
+/**
+ * A conta do rascunho, resolvida contra as contas que existem.
+ *
+ * O id escolhido pode ter ficado pendurado — conta apagada, estado reaberto do
+ * disco. Lançar nele gravaria uma linha fora do saldo de toda conta, então vale
+ * a primeira conta, como `metaEscolhida()` faz com a meta do Simulador.
+ */
+function contaDoRascunho(e: Estado): string {
+  return e.contas.some((c) => c.id === e.rascunho.contaId)
+    ? e.rascunho.contaId
+    : (e.contas[0]?.id ?? '');
+}
+
 function ordenar(transacoes: Transacao[]): Transacao[] {
   return [...transacoes].sort((a, b) => {
     if (a.ocorridoEm !== b.ocorridoEm) return a.ocorridoEm < b.ocorridoEm ? 1 : -1;
@@ -709,6 +786,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         ...e,
         tela: a.tela,
         folha: null,
+        importacao: null,
         fechando: a.tela === 'home' ? false : e.fechando,
         // Entrar no Extrato sempre começa no mês corrente. Reabrir a tela em
         // março porque foi lá que a pessoa parou meses atrás é desorientador.
@@ -750,10 +828,9 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         ...e,
         folha: { tipo: 'nova' },
         rascunho: {
-          ...RASCUNHO_VAZIO,
+          ...rascunhoVazio(e.hoje, e.rascunho.contaId),
           tipo,
           categoriaId: a.categoriaId ?? categoriaPadrao(e.categorias, tipo),
-          contaId: e.rascunho.contaId,
         },
       };
     }
@@ -796,7 +873,90 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       return { ...e, folha: { tipo: 'ritual' }, ritualPrimeira: false };
 
     case 'FECHAR_FOLHA':
-      return { ...e, folha: null };
+      // Extrato descartado sai da memória junto com a folha.
+      return { ...e, folha: null, importacao: null };
+
+    case 'ABRIR_IMPORTACAO':
+      return {
+        ...e,
+        folha: { tipo: 'importacao' },
+        importacao: {
+          extrato: a.extrato,
+          contaId: contaSugerida(a.extrato, e.contas),
+          escolhas: {},
+        },
+      };
+
+    case 'IMPORTACAO_CONTA':
+      return e.importacao && e.contas.some((c) => c.id === a.contaId)
+        ? { ...e, importacao: { ...e.importacao, contaId: a.contaId } }
+        : e;
+
+    case 'IMPORTACAO_ESCOLHA':
+      return e.importacao
+        ? {
+            ...e,
+            importacao: {
+              ...e.importacao,
+              escolhas: {
+                ...e.importacao.escolhas,
+                [a.idExterno]: { ...e.importacao.escolhas[a.idExterno], ...a.escolha },
+              },
+            },
+          }
+        : e;
+
+    case 'CONFIRMAR_IMPORTACAO': {
+      if (!e.importacao) return e;
+      const { extrato, contaId, escolhas } = e.importacao;
+      const previa = montarPrevia(extrato, contaId, escolhas, e);
+      const seq = e.seq + 1;
+      const fechada = { ...e, folha: null, importacao: null };
+
+      if (previa.linhas.length === 0) {
+        return {
+          ...fechada,
+          seq,
+          toast: avisar(seq, 'Nada novo neste extrato', 'Tudo nele já estava importado.'),
+        };
+      }
+
+      const { transacoes, resumo } = aplicarImportacao(previa, contaId, e, d);
+      const partes = [
+        resumo.transferencias > 0
+          ? `${resumo.transferencias} ${resumo.transferencias === 1 ? 'transferência' : 'transferências'}`
+          : '',
+        resumo.ligadas > 0
+          ? `${resumo.ligadas} ${resumo.ligadas === 1 ? 'já existia' : 'já existiam'}`
+          : '',
+        resumo.semCategoria > 0 ? `${resumo.semCategoria} sem categoria` : '',
+      ].filter(Boolean);
+
+      return {
+        ...fechada,
+        seq,
+        transacoes: ordenar(transacoes),
+        // O que acabou de entrar é o que a pessoa quer ver — e as linhas sem
+        // categoria se resolvem tocando nelas ali.
+        tela: 'extrato',
+        mesVisivel: primeiroDoMes(resumo.ultimoDia ?? e.hoje),
+        filtroConta: 'todas',
+        filtroCategoria: 'todas',
+        toast: {
+          id: seq,
+          texto:
+            resumo.importadas === 1
+              ? '1 lançamento importado'
+              : `${resumo.importadas} lançamentos importados`,
+          sub: partes.length > 0 ? `${partes.join(' · ')}.` : undefined,
+          acao: {
+            rotulo: 'Desfazer',
+            acao: { tipo: 'RESTAURAR', estado: fechada, texto: 'Importação desfeita' },
+          },
+          duracaoMs: 6000,
+        },
+      };
+    }
 
     case 'ABRIR_CONTA': {
       const existente = e.contas.find((c) => c.id === a.contaId);
@@ -1085,31 +1245,100 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       };
     }
 
-    case 'ABRIR_RECATEGORIZAR':
-      return { ...e, folha: { tipo: 'recategorizar', transacaoId: a.transacaoId } };
-
-    case 'RECATEGORIZAR': {
+    case 'ABRIR_LANCAMENTO': {
       const tx = e.transacoes.find((t) => t.id === a.transacaoId);
       if (!tx) return e;
 
+      if (tx.transferenciaId !== undefined) {
+        return {
+          ...e,
+          folha: { tipo: 'detalheTransferencia', transferenciaId: tx.transferenciaId },
+        };
+      }
+
+      // A descrição que o próprio app preencheu com o nome da categoria volta
+      // vazia: senão trocar "Mercado" por "Lazer" deixaria a linha chamada
+      // "Mercado" para sempre. Salvar sem descrição a deriva de novo.
+      const automatica = tx.descricao === categoria(e.categorias, tx.categoriaId).nome;
+      return {
+        ...e,
+        folha: { tipo: 'nova' },
+        rascunho: {
+          id: tx.id,
+          // O tipo vem do SINAL, não da categoria: uma linha órfã não tem tipo
+          // confiável, e o sinal é o dado que não mente.
+          tipo: tx.valorCentavos < 0 ? 'despesa' : 'receita',
+          digitos: String(Math.abs(tx.valorCentavos)),
+          categoriaId: tx.categoriaId,
+          contaId: tx.contaId,
+          descricao: automatica ? '' : tx.descricao,
+          ocorridoEm: tx.ocorridoEm,
+        },
+      };
+    }
+
+    case 'APAGAR_TRANSACAO': {
+      const tx = e.transacoes.find((t) => t.id === a.transacaoId);
+      if (!tx) return e;
+
+      // Uma ponta de transferência sozinha seria dinheiro saindo de uma conta
+      // sem chegar a lugar nenhum: o par vai inteiro ou não vai.
+      const alvo =
+        tx.transferenciaId === undefined
+          ? [tx]
+          : e.transacoes.filter((t) => t.transferenciaId === tx.transferenciaId);
+      const ids = new Set(alvo.map((t) => t.id));
+      const restantes = e.transacoes.filter((t) => !ids.has(t.id));
       const seq = e.seq + 1;
-      const anterior = tx.categoriaId;
+
+      // Apagar o depósito de uma meta da qual já se retirou deixaria o guardado
+      // negativo — a mesma regra que impede retirar mais do que está lá.
+      for (const t of alvo) {
+        const meta = t.metaId ? e.metas.find((m) => m.id === t.metaId) : undefined;
+        const guardado = meta ? guardadoDaMeta(meta, restantes) : 0;
+        if (meta && guardado < 0) {
+          return {
+            ...e,
+            seq,
+            toast: avisar(
+              seq,
+              `${meta.nome} ficaria devendo ${formatar(-guardado)}`,
+              'Parte deste valor já foi retirada. Apague a retirada antes.',
+            ),
+          };
+        }
+      }
+
+      const transferencia = tx.transferenciaId !== undefined;
       return {
         ...e,
         seq,
-        transacoes: e.transacoes.map((t) =>
-          t.id === tx.id ? { ...t, categoriaId: a.categoriaId } : t,
-        ),
+        transacoes: restantes,
         folha: null,
+        rascunho: e.rascunho.id === tx.id ? rascunhoVazio(e.hoje, e.rascunho.contaId) : e.rascunho,
         toast: {
           id: seq,
-          texto: `Movido para ${categoria(e.categorias, a.categoriaId).nome}`,
+          texto: transferencia ? 'Movimento apagado' : 'Lançamento apagado',
+          sub: transferencia
+            ? 'As duas pontas saíram do extrato.'
+            : `${tx.descricao} · ${comSinal(tx.valorCentavos)}`,
           acao: {
             rotulo: 'Desfazer',
-            acao: { tipo: 'RECATEGORIZAR', transacaoId: tx.id, categoriaId: anterior },
+            acao: { tipo: 'REPOR_TRANSACOES', transacoes: alvo, texto: 'Lançamento de volta' },
           },
           duracaoMs: 6000,
         },
+      };
+    }
+
+    case 'REPOR_TRANSACOES': {
+      const ids = new Set(a.transacoes.map((t) => t.id));
+      const seq = e.seq + 1;
+      return {
+        ...e,
+        seq,
+        transacoes: ordenar([...a.transacoes, ...e.transacoes.filter((t) => !ids.has(t.id))]),
+        toast: avisar(seq, a.texto),
       };
     }
 
@@ -1237,6 +1466,11 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
     case 'RASCUNHO_DESCRICAO':
       return { ...e, rascunho: { ...e.rascunho, descricao: a.texto } };
 
+    case 'RASCUNHO_DATA':
+      // Dia futuro não é registro, é previsão — e contaria como constância de
+      // uma semana que ainda não aconteceu.
+      return a.dia > e.hoje ? e : { ...e, rascunho: { ...e.rascunho, ocorridoEm: a.dia } };
+
     case 'DIGITO':
       return {
         ...e,
@@ -1250,24 +1484,68 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       return { ...e, rascunho: { ...e.rascunho, digitos: a.digitos } };
 
     case 'SALVAR_TRANSACAO': {
-      const valor = deDigitos(e.rascunho.digitos);
+      const r = e.rascunho;
+      const valor = deDigitos(r.digitos);
       if (valor <= 0) return e;
       const seq = e.seq + 1;
-      const tx = novaTransacao(d, {
-        contaId: e.rascunho.contaId,
-        categoriaId: e.rascunho.categoriaId,
-        valorCentavos: e.rascunho.tipo === 'despesa' ? -valor : valor,
-        ocorridoEm: e.hoje,
-        descricao:
-          e.rascunho.descricao.trim() || categoria(e.categorias, e.rascunho.categoriaId).nome,
-      });
-      const rotulo = `${e.rascunho.tipo === 'despesa' ? 'Despesa' : 'Receita'} de ${formatar(valor)} registrada`;
+      const campos = {
+        contaId: contaDoRascunho(e),
+        categoriaId: r.categoriaId,
+        valorCentavos: r.tipo === 'despesa' ? -valor : valor,
+        ocorridoEm: r.ocorridoEm,
+        descricao: r.descricao.trim() || categoria(e.categorias, r.categoriaId).nome,
+      };
+
+      if (r.id !== null) {
+        const anterior = e.transacoes.find((t) => t.id === r.id);
+        // Transferência não passa por aqui: editar uma ponta quebraria o par.
+        if (!anterior || anterior.transferenciaId !== undefined) return e;
+
+        // Id, origem, texto original e FITID ficam: corrigir o valor de uma
+        // linha importada não a torna manual, e o dedupe ainda precisa dela.
+        const editada: Transacao = { ...anterior, ...campos };
+        const mudou = (Object.keys(campos) as (keyof typeof campos)[]).some(
+          (k) => editada[k] !== anterior[k],
+        );
+        return {
+          ...e,
+          seq: mudou ? seq : e.seq,
+          transacoes: mudou
+            ? ordenar(e.transacoes.map((t) => (t.id === anterior.id ? editada : t)))
+            : e.transacoes,
+          folha: null,
+          rascunho: rascunhoVazio(e.hoje, campos.contaId),
+          toast: mudou
+            ? {
+                id: seq,
+                texto: 'Lançamento atualizado',
+                sub: `${editada.descricao} · ${comSinal(editada.valorCentavos)}`,
+                acao: {
+                  rotulo: 'Desfazer',
+                  acao: {
+                    tipo: 'REPOR_TRANSACOES',
+                    transacoes: [anterior],
+                    texto: 'Alteração desfeita',
+                  },
+                },
+                duracaoMs: 6000,
+              }
+            : e.toast,
+        };
+      }
+
+      const tx = novaTransacao(d, campos);
+      // Lançamento retroativo diz o dia no toast: é a confirmação de que a data
+      // escolhida pegou, e não foi parar em hoje.
+      const quando =
+        tx.ocorridoEm === e.hoje ? '' : ` · ${rotuloCurto(tx.ocorridoEm, e.hoje).toLowerCase()}`;
+      const rotulo = `${r.tipo === 'despesa' ? 'Despesa' : 'Receita'} de ${formatar(valor)} registrada${quando}`;
       return {
         ...e,
         seq,
         transacoes: ordenar([tx, ...e.transacoes]),
         folha: null,
-        rascunho: { ...RASCUNHO_VAZIO, contaId: e.rascunho.contaId },
+        rascunho: rascunhoVazio(e.hoje, campos.contaId),
         toast: toastDeRegistro(e, seq, rotulo, tx.ocorridoEm, {
           tipo: 'DESFAZER',
           transacaoIds: [tx.id],
@@ -1281,7 +1559,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       const seq = e.seq + 1;
       const cat = categoria(e.categorias, a.categoriaId);
       const tx = novaTransacao(d, {
-        contaId: e.rascunho.contaId,
+        contaId: contaDoRascunho(e),
         categoriaId: a.categoriaId,
         valorCentavos: -a.valorCentavos,
         ocorridoEm: e.hoje,
@@ -1342,8 +1620,8 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       // retirar. A conta da meta é sempre a ponta fixa, e é ela que leva o
       // `metaId`: entrada positiva ao guardar, saída negativa ao retirar.
       const par = parDeTransferencia(d, {
-        contaOrigemId: retirar ? meta.contaId : e.rascunho.contaId,
-        contaDestinoId: retirar ? e.rascunho.contaId : meta.contaId,
+        contaOrigemId: retirar ? meta.contaId : contaDoRascunho(e),
+        contaDestinoId: retirar ? contaDoRascunho(e) : meta.contaId,
         valorCentavos: valor,
         ocorridoEm: e.hoje,
         descricao: retirar ? `Retirado de ${meta.nome}` : `Guardado em ${meta.nome}`,
@@ -1422,12 +1700,11 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       switch (definicao.medida) {
         // Medida derivada não avança no toque: o toque leva aonde o progresso
         // de verdade acontece.
+        // É o mesmo caminho do botão de lançar: abria a folha com o rascunho
+        // zerado à mão, sem categoria escolhida, e salvar dali criava uma linha
+        // "Sem categoria".
         case 'registros':
-          return {
-            ...e,
-            folha: { tipo: 'nova' },
-            rascunho: { ...RASCUNHO_VAZIO, contaId: e.rascunho.contaId },
-          };
+          return aplicarAcao(d, e, { tipo: 'ABRIR_NOVA' });
         case 'categorizados':
           return aplicarAcao(d, e, { tipo: 'IR_PARA', tela: 'extrato' });
         case 'manual': {
@@ -1716,7 +1993,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         metas,
         onboardingConcluido: true,
         onboarding: ONBOARDING_VAZIO,
-        rascunho: { ...RASCUNHO_VAZIO, contaId: conta.id },
+        rascunho: rascunhoVazio(e.hoje, conta.id),
         tela: 'home',
         toast: avisar(seq, `Tudo pronto, ${nome.split(' ')[0]}`, 'Registre seu primeiro gasto.'),
       };
@@ -1753,7 +2030,44 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
 
     case 'RESTAURAR': {
       const seq = e.seq + 1;
-      return { ...a.estado, seq, toast: avisar(seq, 'Dados restaurados') };
+      return { ...a.estado, seq, toast: avisar(seq, a.texto ?? 'Dados restaurados') };
+    }
+
+    case 'IMPORTAR_BACKUP': {
+      const seq = e.seq + 1;
+      // Quem restaura no primeiro uso já tem nome, conta e meta: refazer o
+      // cadastro por cima seria pedir o que o arquivo acabou de dizer.
+      const restaurado = hidratar(
+        criarEstadoVazio(e.hoje),
+        { ...a.dados, onboardingConcluido: true },
+        e.hoje,
+      );
+      const n = a.dados.transacoes.length;
+      return {
+        ...restaurado,
+        seq,
+        toast: {
+          id: seq,
+          texto: 'Backup restaurado',
+          sub: `${n === 1 ? '1 lançamento' : `${n} lançamentos`} em ${
+            a.dados.contas.length === 1 ? '1 conta' : `${a.dados.contas.length} contas`
+          }.`,
+          // Do onboarding não há para onde desfazer: o estado de antes nunca foi
+          // gravado, e voltar a ele deixaria o disco com o backup e a tela no
+          // primeiro uso — reabrir o app mostraria outra coisa.
+          acao: e.onboardingConcluido
+            ? {
+                rotulo: 'Desfazer',
+                acao: {
+                  tipo: 'RESTAURAR',
+                  estado: { ...e, folha: null },
+                  texto: 'Backup desfeito',
+                },
+              }
+            : undefined,
+          duracaoMs: 6000,
+        },
+      };
     }
 
     case 'LIMPAR_TOAST':
@@ -1826,6 +2140,15 @@ function useContextoDaLoja(): Loja {
   const loja = useContext(ContextoDaLoja);
   if (!loja) throw new Error('A loja precisa estar dentro de <LojaProvider>');
   return loja;
+}
+
+/**
+ * Lê o estado na hora, sem assinar nada — para tratador de evento que precisa
+ * do estado inteiro uma vez (exportar o backup), não para render. Componente
+ * que lê estado para desenhar usa `useRecorte`: este não o acorda nunca.
+ */
+export function useLerEstado(): () => Estado {
+  return useContextoDaLoja().obter;
 }
 
 /** O despacho. Estável: nunca provoca render por si. */

@@ -4,18 +4,40 @@ import { BotaoPrincipal, Rotulo, Toque, Txt } from '../../componentes/basicos';
 import { Icone } from '../../componentes/Icone';
 import { Teclado } from '../../componentes/Teclado';
 import { categoriasPorTipo, icones } from '../../dominio/categorias';
+import { DiaISO, rotuloAtalhoDeDia, rotuloDataCurta, somarDias } from '../../dominio/datas';
 import { deDigitos, formatar } from '../../dominio/dinheiro';
 import { useRecorte, useDespachar } from '../../estado/store';
 import { sans } from '../../tema/fontes';
 import { comAlfa, resolverCor } from '../../tema/paletas';
 import { useTema } from '../../tema/TemaContext';
+import { BotaoApagar } from './Campo';
 import { Folha } from './Folha';
 
 /** O que esta tela lê do estado — e só isto a acorda. */
-const CHAVES = ['rascunho', 'contas', 'categorias'] as const;
+const CHAVES = ['rascunho', 'contas', 'categorias', 'hoje'] as const;
 
 /**
- * Nova transação.
+ * Quantos dias para trás os atalhos de data alcançam. Uma semana é o que o
+ * ritual fecha; o que ficou mais para trás em branco é trabalho do Lote.
+ */
+const DIAS_DE_ATALHO = 7;
+
+/**
+ * Os dias oferecidos como atalho, do mais recente para o mais antigo.
+ *
+ * Atalho e não calendário, pelo mesmo motivo do prazo da meta: a pergunta é
+ * "quando foi, hoje ou uns dias atrás", e um date picker seria dependência
+ * nativa nova para responder pior. Ao editar uma linha mais antiga que isso, o
+ * dia dela entra na lista — senão a data atual nem apareceria selecionada.
+ */
+function diasDeAtalho(hoje: DiaISO, atual: DiaISO): DiaISO[] {
+  const dias = Array.from({ length: DIAS_DE_ATALHO }, (_, i) => somarDias(hoje, -i));
+  return dias.includes(atual) ? dias : [...dias, atual];
+}
+
+/**
+ * Nova transação — e a edição de uma já feita, que é a mesma folha com os
+ * campos preenchidos (`rascunho.id`).
  *
  * Caminho crítico do produto: nenhuma chamada de rede acontece aqui. O
  * lançamento é escrito no estado local e confirmado na hora; sync é depois.
@@ -26,6 +48,7 @@ export function NovaTransacao() {
   const { t, paleta } = useTema();
 
   const r = estado.rascunho;
+  const editando = r.id !== null;
   const valor = deDigitos(r.digitos);
   const despesa = r.tipo === 'despesa';
   const corValor = valor === 0 ? t.inkFaint : despesa ? t.down : t.up;
@@ -50,7 +73,10 @@ export function NovaTransacao() {
   );
 
   return (
-    <Folha titulo="Nova transação" aoFechar={() => despachar({ tipo: 'FECHAR_FOLHA' })}>
+    <Folha
+      titulo={editando ? 'Editar lançamento' : 'Nova transação'}
+      aoFechar={() => despachar({ tipo: 'FECHAR_FOLHA' })}
+    >
       <View style={{ paddingHorizontal: 16, paddingBottom: 12, gap: 14 }}>
         <View
           style={{
@@ -75,8 +101,9 @@ export function NovaTransacao() {
             {formatar(valor)}
           </Txt>
 
-          {/* O laço de custo de oportunidade: sai do gasto direto para a simulação */}
-          {despesa && valor > 0 ? (
+          {/* O laço de custo de oportunidade: sai do gasto direto para a simulação.
+              Só ao lançar — corrigir um gasto antigo não é mais hora de decidir. */}
+          {despesa && valor > 0 && !editando ? (
             <Toque
               aoTocar={() => despachar({ tipo: 'SIMULAR_DO_RASCUNHO' })}
               estilo={{ marginTop: 6 }}
@@ -206,52 +233,72 @@ export function NovaTransacao() {
           </ScrollView>
         </View>
 
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <View style={{ gap: 8 }}>
-            <Rotulo>Data</Rotulo>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 8,
+        <View style={{ gap: 8 }}>
+          <Rotulo>Data</Rotulo>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 7 }}
+          >
+            {diasDeAtalho(estado.hoje, r.ocorridoEm).map((dia, i) => {
+              const ativo = r.ocorridoEm === dia;
+              const rotulo =
+                i < DIAS_DE_ATALHO ? rotuloAtalhoDeDia(dia, estado.hoje) : rotuloDataCurta(dia);
+              return (
+                <Toque
+                  key={dia}
+                  aoTocar={() => despachar({ tipo: 'RASCUNHO_DATA', dia })}
+                  rotuloAcessivel={`Data: ${rotulo}`}
+                >
+                  <View
+                    style={{
+                      borderRadius: 999,
+                      paddingVertical: 8,
+                      paddingHorizontal: 13,
+                      borderWidth: 1,
+                      borderColor: ativo ? t.accent : t.line,
+                      backgroundColor: ativo ? t.accent : t.surface,
+                    }}
+                  >
+                    <Txt tamanho={12.5} peso={600} cor={ativo ? t.onAccent : t.inkMuted}>
+                      {rotulo}
+                    </Txt>
+                  </View>
+                </Toque>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        <View style={{ gap: 8 }}>
+          <Rotulo>Descrição (opcional)</Rotulo>
+          <TextInput
+            value={r.descricao}
+            onChangeText={(texto) => despachar({ tipo: 'RASCUNHO_DESCRICAO', texto })}
+            placeholder="Ex.: mercado da semana"
+            placeholderTextColor={t.inkFaint}
+            style={[
+              sans(400),
+              {
                 backgroundColor: t.surface,
                 borderWidth: 1,
                 borderColor: t.lineInput,
                 borderRadius: 12,
                 paddingVertical: 11,
                 paddingHorizontal: 13,
-              }}
-            >
-              <Icone path={icones.calendario} tamanho={15} cor={t.inkSoft} />
-              <Txt tamanho={13} peso={600}>
-                Hoje
-              </Txt>
-            </View>
-          </View>
-
-          <View style={{ flex: 1, gap: 8 }}>
-            <Rotulo>Descrição (opcional)</Rotulo>
-            <TextInput
-              value={r.descricao}
-              onChangeText={(texto) => despachar({ tipo: 'RASCUNHO_DESCRICAO', texto })}
-              placeholder="Ex.: mercado da semana"
-              placeholderTextColor={t.inkFaint}
-              style={[
-                sans(400),
-                {
-                  backgroundColor: t.surface,
-                  borderWidth: 1,
-                  borderColor: t.lineInput,
-                  borderRadius: 12,
-                  paddingVertical: 11,
-                  paddingHorizontal: 13,
-                  fontSize: 13,
-                  color: t.ink,
-                },
-              ]}
-            />
-          </View>
+                fontSize: 13,
+                color: t.ink,
+              },
+            ]}
+          />
         </View>
+
+        {editando ? (
+          <BotaoApagar
+            rotulo="Apagar lançamento"
+            aoTocar={() => despachar({ tipo: 'APAGAR_TRANSACAO', transacaoId: r.id! })}
+          />
+        ) : null}
       </ScrollView>
 
       <View
@@ -270,7 +317,15 @@ export function NovaTransacao() {
           aoApagar={() => despachar({ tipo: 'APAGAR_DIGITO' })}
         />
         <BotaoPrincipal
-          rotulo={valor === 0 ? 'Informe um valor' : despesa ? 'Salvar despesa' : 'Salvar receita'}
+          rotulo={
+            valor === 0
+              ? 'Informe um valor'
+              : editando
+                ? 'Salvar alterações'
+                : despesa
+                  ? 'Salvar despesa'
+                  : 'Salvar receita'
+          }
           fundo={valor === 0 ? t.lineInput : despesa ? t.down : t.up}
           desabilitado={valor === 0}
           aoTocar={() => despachar({ tipo: 'SALVAR_TRANSACAO' })}

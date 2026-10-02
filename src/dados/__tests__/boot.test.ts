@@ -57,6 +57,21 @@ describe('abrirBanco', () => {
     expect(boot.inicial.transacoes).toHaveLength(demo.transacoes.length);
   });
 
+  it('o rascunho reaberto aponta para conta e categoria que existem', async () => {
+    // O rascunho não vai para o disco, e o do estado vazio não tem conta: o
+    // primeiro registro rápido depois de reabrir saía com `contaId` vazio,
+    // gravado e fora do saldo de toda conta.
+    const repo = criarRepositorioMemoria();
+    await repo.salvar(null, recortePersistido(criarEstadoDemo(AGORA)));
+
+    const boot = await abrirBanco(async () => repo, AGORA);
+    if (boot.tipo !== 'pronto') throw new Error('boot falhou');
+    const { rascunho, contas, categorias } = boot.inicial;
+
+    expect(contas.some((c) => c.id === rascunho.contaId)).toBe(true);
+    expect(categorias.some((c) => c.id === rascunho.categoriaId)).toBe(true);
+  });
+
   it('leitura que falha vira `falhou`, não promessa rejeitada', async () => {
     const erro = new LeituraFalhou('o estado salvo');
     const { repo, fechado } = repositorioQue({

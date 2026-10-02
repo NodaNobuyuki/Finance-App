@@ -92,6 +92,19 @@ export class EscritaFalhou extends ErroDeInfra {
 }
 
 /**
+ * Gerar, compartilhar ou abrir um arquivo falhou — o sistema negou, o disco
+ * encheu, o arquivo sumiu entre o seletor e a leitura.
+ */
+export class ArquivoFalhou extends ErroDeInfra {
+  constructor(
+    readonly operacao: 'exportar' | 'abrir',
+    causa?: unknown,
+  ) {
+    super('arquivo-falhou', `Falha ao ${operacao} o arquivo de backup.`, causa);
+  }
+}
+
+/**
  * O banco recusou linhas por restrição do esquema; o resto foi gravado.
  *
  * É a exceção à regra do `ErroDeInfra`: repetir NÃO conserta, porque a mesma
@@ -117,6 +130,11 @@ export function mensagemParaOUsuario(erro: unknown): string {
     return erro.recusadas.length === 1
       ? 'Uma alteração não pôde ser salva e some ao fechar o app.'
       : `${erro.recusadas.length} alterações não puderam ser salvas e somem ao fechar o app.`;
+  }
+  if (erro instanceof ArquivoFalhou) {
+    return erro.operacao === 'exportar'
+      ? 'Não deu para gerar o backup. Tente de novo.'
+      : 'Não deu para abrir o arquivo. Tente de novo.';
   }
   if (erro instanceof ErroDeInfra) return 'Não deu para salvar agora. Vamos tentar de novo.';
   return 'Algo deu errado.';

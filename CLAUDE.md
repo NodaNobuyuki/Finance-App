@@ -118,10 +118,15 @@ interface RawTransaction {
 
 **OFX**
 - OFX 1.x é SGML, não XML — tags sem fechamento. Parser XML padrão quebra.
-- Encoding costuma ser `cp1252`/`ISO-8859-1`, não UTF-8. Ler como UTF-8 corrompe acentuação.
+- Encoding varia, e **o cabeçalho mente**: banco antigo manda `cp1252`, o extrato de conta do Nubank é UTF-8, e a fatura do mesmo Nubank declara `CHARSET:1252` sendo ASCII puro. `ingestao/texto.ts` decide pelos bytes — UTF-8 válido é UTF-8, o resto é cp1252 —, decodificando em JS porque o `TextDecoder` não é garantido no Hermes.
+- Folha pode vir com ou sem fechamento (`<MEMO>x</MEMO>` no Nubank, `<MEMO>x` no formato clássico); agregado (`<STMTTRN>`) sempre fecha. O adapter lê por tag de abertura, e o fixture derivado `sgml-cp1252-sem-fechamento.ofx` tem de dar o mesmo extrato que o original UTF-8.
+- Fixture `.ofx` é `binary` no `.gitattributes`: o `eol=lf` do repositório apagaria o CRLF que o teste existe para exercitar.
 - Cartão de crédito usa `CREDITCARDMSGSRSV1`; conta usa `BANKMSGSRSV1`. Caminhos distintos.
 - Data no formato `YYYYMMDDHHMMSS[-3:BRT]`.
-- Alguns bancos invertem a convenção de sinal em fatura de cartão.
+- Alguns bancos invertem a convenção de sinal em fatura de cartão. O Nubank não: compra negativa, `Pagamento recebido` positivo.
+- Valor sem float: `centavos()` lê `-19.90`, `-19,90` e `1.234,56`, e recusa o ambíguo (`0.123`, `12.345.6`) em vez de chutar — a linha é pulada e contada.
+- Sem FITID, o id é hash de data, valor, texto e ordem de aparição: estável entre exportações sobrepostas, e dois cafés iguais no mesmo dia não colidem.
+- `Pagamento recebido` na fatura e o pagamento saindo da conta são as **duas pontas de uma transferência**, não receita e despesa. Importados como linhas comuns, contariam o gasto duas vezes (compras no cartão + boleto da fatura).
 
 **Notificações Android**
 - `NotificationListenerService` é permissão sensível na Play Store. Exige justificativa na publicação e tela de consentimento explícita.
@@ -131,7 +136,7 @@ interface RawTransaction {
 ### Ordem de implementação
 
 1. Manual rápido — ✅ pronto
-2. OFX/CSV + share sheet do Android — exige development build (EAS)
+2. OFX/CSV + share sheet do Android — **OFX pelo seletor de arquivo ✅ pronto** (roda no Expo Go, iPhone incluso); CSV e receber o arquivo pelo share sheet ainda faltam, e o share sheet exige development build (EAS)
 3. Notificações Android
 4. Recorrência inferida (elimina ingestão do que é previsível)
 5. E-mail via OAuth (cobre iOS)
@@ -199,7 +204,7 @@ Tudo que entra na tela usa a mesma frase — surge com uma leve subida — e só
 
 ## Estado atual
 
-**App Expo rodando** (`src/`), portado do protótipo `design/Poupa Hábitos.dc.html`. 9 telas — Início, Extrato, Metas, Categorias, Hábitos, Simulador, Lote, Resumo, Fechar semana — mais 8 folhas: Nova transação, Movimento de meta (guardar/retirar), Transferência, Ritual, Recategorizar e os cadastros de conta, meta e categoria. 13 paletas, teclado numérico próprio, toast com undo.
+**App Expo rodando** (`src/`), portado do protótipo `design/Poupa Hábitos.dc.html`. 9 telas — Início, Extrato, Metas, Categorias, Hábitos, Simulador, Lote, Resumo, Fechar semana — mais 8 folhas: Nova transação (que também edita), Movimento de meta (guardar/retirar), Transferência, Detalhe de transferência, Ritual e os cadastros de conta, meta e categoria. 13 paletas, teclado numérico próprio, toast com undo.
 
 ```
 src/dominio/    dinheiro (centavos), saldo derivado, guardado das metas,
@@ -211,7 +216,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = formatação + lint + tipos + 516 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = formatação + lint + tipos + 643 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
@@ -239,6 +244,8 @@ Estado (memória, sempre a fonte)
 **Upsert é pela chave primária, nunca `INSERT OR REPLACE`.** O `OR REPLACE` resolve conflito em *qualquer* restrição única apagando a linha que já estava lá: um segundo lançamento com o mesmo FITID fazia o primeiro sumir do disco sem aviso, com a memória ainda mostrando os dois. `ON CONFLICT (id) DO UPDATE` deixa o índice `(conta_id, id_externo)` falhar de verdade, e a remoção roda antes da escrita para que trocar uma linha por outra com o mesmo FITID na mesma gravação não seja conflito. O repositório de memória impõe a mesma unicidade — é a suíte de contrato que segura isso nos dois. **Isto é rede de segurança, não dedupe:** o OFX ainda precisa detectar duplicata antes de chegar ao estado.
 
 **O boot nunca lança; falha é tela, não queda calada.** `abrirBanco()` devolve `pronto` ou `falhou`. Antes, falha de leitura rejeitava a promessa sem ninguém ouvir (app em branco para sempre) e banco que não abria caía sozinho para memória — para quem já tinha dados, isso é o **onboarding de novo**, como se tudo tivesse sumido. Agora `FalhaAoAbrir` diz que nada foi apagado e oferece "Tentar de novo" ou "Usar sem salvar"; este último é escolha explícita, não mexe no disco, e deixa a `FaixaSemSalvar` fixa no topo, porque toast some e quem registra um gasto ali acharia que ele foi salvo.
+
+**O rascunho reaberto aponta para o que existe.** Ele não é gravado, e o do estado vazio não tem conta: até `hidratar()` preenchê-lo, todo registro rápido depois de reabrir o app saía com `contaId` vazio — gravado (não há chave estrangeira), fora do saldo de toda conta. O teste de ciclo não via porque parte da demo, não do vazio que o boot usa; quem trava é `boot.test.ts`. No reducer, `contaDoRascunho()` resolve a conta na hora de lançar, como `metaEscolhida()` — id pendurado é caminho normal, não corrupção. Linha gravada com conta vazia antes da correção se conserta pela edição do lançamento.
 
 **`MotorSQL` existe para o SQL ser testável.** `expo-sqlite` é nativo e não roda no Jest; sem esse seam, migrations só seriam exercitadas no aparelho. A mesma suíte de contrato roda contra memória e contra SQLite de verdade (`node:sqlite`, embutido no Node 24). Sem cobertura sobra só `motorExpo.ts`, que é repasse puro.
 
@@ -316,7 +323,7 @@ O motivo é persistência: **o que não está no `Estado` não tem como ser grav
 
 **Renomear não troca o id.** Ele é a chave que os lançamentos apontam; id derivado do nome faria "Mercado" → "Compras" órfãar o histórico inteiro.
 
-**Apagar categoria mantém os lançamentos** — oposto de apagar conta. O gasto aconteceu e o dinheiro saiu, seja qual for o rótulo: some o rótulo, não o dinheiro. As linhas caem em "Sem categoria" e `Recategorizar` é o caminho de volta, que antes não existia.
+**Apagar categoria mantém os lançamentos** — oposto de apagar conta. O gasto aconteceu e o dinheiro saiu, seja qual for o rótulo: some o rótulo, não o dinheiro. As linhas caem em "Sem categoria" e editar o lançamento é o caminho de volta — ver "Lançamento se corrige".
 
 **A última categoria de um tipo não é apagável**, e `transferencia` nunca é: sem nenhuma despesa não há o que escolher ao lançar, e sem `transferencia` o aporte não teria como marcar as linhas que cria.
 
@@ -444,7 +451,47 @@ Onde a interface mudou: a Home mostra "Definir orçamento" em vez de barra vazia
 
 Os dois placeholders viraram conta sobre o que existe, e o tipo sumiu junto com a chave no banco (migration v8). `lancamentosDoMesAnterior()` conta as transações do mês passado, sem transferência — um aporte lançaria duas linhas de uma vez. `economizado()` soma só os desafios aceitos, partindo de zero em vez dos R$ 180 que a demo inventava.
 
+### Lançamento se corrige
+
+Até aqui o único conserto era o "Desfazer" do toast, que some em segundos: valor errado virava dado permanente, e tocar na linha do Extrato só trocava a categoria. Com OFX chegando, linha a corrigir vai ser rotina.
+
+**Editar é a folha de lançamento com `rascunho.id` preenchido** — a convenção dos cadastros. `ABRIR_LANCAMENTO` decide o que abre, não a tela: transferência vai para `DetalheTransferencia`, o resto para `NovaTransacao` preenchida. A folha `Recategorizar` sumiu — trocar a categoria virou um campo da edição. Editar preserva id, `origem`, `descricaoOriginal`, `idExterno` e `criadoEm`: corrigir o valor de uma linha importada não a torna manual, e o dedupe ainda precisa do FITID. Descrição que o app preencheu com o nome da categoria volta vazia ao abrir, senão recategorizar deixaria a linha com o nome antigo.
+
+**Apagar usa undo, e transferência vai com o par.** Uma ponta sozinha seria dinheiro saindo sem chegar a lugar nenhum. Apagar o depósito de uma meta da qual já se retirou é recusado no toast — o guardado ficaria negativo, a mesma regra de "retirar mais do que está lá". Transferência não se edita: mexer numa ponta quebra o par, então o caminho é apagar e refazer, e o detalhe diz isso.
+
+**O desfazer é `REPOR_TRANSACOES`**, que substitui por id as versões exatas guardadas no toast. Serve aos dois casos e, ao contrário de `RESTAURAR`, não joga fora o que mais tenha acontecido no estado nesse meio-tempo.
+
+**A data são atalhos dos últimos 7 dias**, não calendário — o mesmo raciocínio do prazo da meta. Uma semana é o que o ritual fecha; o que ficou mais para trás em branco é trabalho do Lote. Ao editar uma linha mais antiga, o dia dela entra na fileira para continuar selecionado. Dia futuro é recusado no reducer: seria previsão, e contaria como constância de uma semana que não aconteceu. A data não gruda: o próximo `ABRIR_NOVA` volta para hoje.
+
+### Backup é o domínio num arquivo
+
+App só local sem backup é histórico inteiro perdido ao trocar de celular — e a constância, derivada dele, junto. "Exportar backup" em Hábitos gera um JSON e o entrega à folha de compartilhar do sistema (Arquivos, iCloud, e-mail); "Restaurar backup" está em Hábitos e no **primeiro uso**, porque quem chega num celular novo começa pelo onboarding.
+
+**O formato é `EstadoPersistido`, não o esquema do SQLite.** O banco muda por migration; um backup feito hoje precisa continuar legível depois da v20. O que versiona o arquivo é `VERSAO_BACKUP`, e backup de versão mais nova é recusado com recado — ler pela metade restauraria dado faltando sem ninguém ver.
+
+**`lerBackup()` é fronteira de entrada: Zod**, como a regra manda — foi a dependência que entrou com ele, e serve aos adapters de OFX também. O esquema é tipado contra o domínio sem cast, então campo obrigatório novo em `Transacao` que ninguém pôs em `backup.ts` não compila; campo opcional esquecido é pego pelo teste de ida e volta, porque o Zod descarta chave desconhecida. Além do esquema, recusa o que só estouraria no banco: id repetido, FITID repetido na mesma conta e lançamento de conta ausente. Categoria e meta ausentes **não** são erro — são caminhos normais do app.
+
+**Três camadas, como a persistência.** `backup.ts` é puro e testado; `dados/arquivos.ts` é repasse nativo sem regra (como `motorExpo.ts`), devolve **bytes** — o OFX precisa decidir o encoding — e embrulha falha em `ArquivoFalhou`; `useBackup` é a cola, e mora fora do reducer porque relógio e arquivo são mundo externo. Só o backup já validado entra como `IMPORTAR_BACKUP`. `useLerEstado()` existe para isso: lê o estado na hora sem assinar — não é o `useLoja` de volta, porque não provoca render nenhum.
+
+**Restaurar troca todo o dado do usuário, com undo** — exceto no primeiro uso. Ali o estado de antes nunca foi gravado, e desfazer deixaria o disco com o backup e a tela no onboarding.
+
+### Importar extrato: a prévia é derivada, e nada se resolve calado
+
+`Extrato → Importar` escolhe um OFX, `useImportarExtrato` decodifica e passa pelo adapter, e só o extrato lido entra no estado (`Estado.importacao`, sessão, não persistido). **A prévia é `montarPrevia()`, derivada a cada render** de extrato + conta de destino + escolhas da pessoa — trocar a conta refaz a detecção sozinha. `CONFIRMAR_IMPORTACAO` chama `aplicarImportacao()`, puro e com id e relógio injetados como o reducer, e abre o Extrato no mês do que entrou, com undo.
+
+Quatro situações por linha:
+
+- **Já importada:** FITID que já está naquela conta (ou repetido no próprio arquivo). Não aparece; só conta. É o que impede importar o mesmo arquivo duas vezes — e sobrevive a reabrir o app, travado em `ciclo.test.ts`.
+- **Possível duplicata:** lançamento na mesma conta, mesmo valor, ±2 dias e **sem FITID** — linha com FITID é outro registro do banco, e duas compras iguais no mesmo dia são duas compras. O padrão é "é a mesma": a linha não entra e **o FITID passa à existente**, para a próxima importação do período não perguntar de novo. "São diferentes" importa. Nunca automático sem mostrar — é a regra do dedupe.
+- **Transferência:** pista do adapter (`natureza`), que a pessoa liga e desliga. Cria as duas pontas como a folha Transferir; se a outra conta já tem o lançamento oposto (±3 dias, sem `transferenciaId`), **ele vira a outra ponta** em vez de ganhar gêmea. A ponta criada nasce sem FITID — e é por isso que, quando o extrato da outra conta chegar, o boleto cai em "possível duplicata" dela. As duas ordens (fatura antes ou conta antes) terminam no mesmo par, com uma linha por lado.
+- **Nova:** com a categoria que a pessoa deu da última vez ao mesmo texto do banco e mesmo sinal (`categoriasAprendidas`); sem histórico, **sem categoria**. Chutar "Compras" esconderia o que falta decidir, e o desafio "categorizados" já conta essas linhas. O toast diz quantas ficaram assim.
+
+O toast conta **linhas do arquivo**, não linhas criadas: a pessoa reconhece "16 lançamentos" do extrato que baixou, e a ponta criada na outra conta aparece como "2 transferências".
+
 **Pendências abertas:**
+- A categoria aprendida casa texto exato: "Parcela 1/2" e "Parcela 2/2" não se reconhecem. Normalizar isso é saber o formato do banco — mora no adapter, quando doer
+- O app não lembra qual conta do banco (`ACCTID`) foi para qual conta do app; a sugestão é por tipo. Lembrar exige persistir o vínculo
+- Sem lembrete de backup: o app não sabe quando foi o último. Guardar a data exige migration — vale quando houver o que lembrar
 - Sem retentativa ativa de gravação: o reenvio pega carona na próxima mudança. Um outbox resolve, se virar problema
 - Nenhuma tela lê do banco sob demanda — o estado inteiro é carregado no boot. Aguenta bem os primeiros anos; a saída é paginar por período no repositório
 

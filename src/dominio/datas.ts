@@ -115,6 +115,16 @@ export function rotuloCurto(dia: DiaISO, hoje: DiaISO = AGORA): string {
   return rotuloDia(dia, hoje).split(' · ')[0];
 }
 
+/**
+ * Rótulo de pílula para os dias recentes: `"Hoje"`, `"Ontem"`, `"Seg 3"`.
+ * Curto porque a fileira de atalhos da folha de lançamento precisa caber.
+ */
+export function rotuloAtalhoDeDia(dia: DiaISO, hoje: DiaISO = AGORA): string {
+  if (dia === hoje) return 'Hoje';
+  if (dia === somarDias(hoje, -1)) return 'Ontem';
+  return `${nomeDoDia(dia).slice(0, 3)} ${partes(dia).data}`;
+}
+
 /** `"Agosto de 2026"`. */
 export function rotuloMes(dia: DiaISO): string {
   const { ano, mes } = partes(dia);
