@@ -138,7 +138,7 @@ interface RawTransaction {
 1. Manual rápido — ✅ pronto
 2. OFX/CSV + share sheet do Android — **OFX pelo seletor de arquivo ✅ pronto** (roda no Expo Go, iPhone incluso); CSV e receber o arquivo pelo share sheet ainda faltam, e o share sheet exige development build (EAS)
 3. Notificações Android
-4. Recorrência inferida (elimina ingestão do que é previsível) — **despesa mensal ✅ pronta**; receita (salário) ainda não
+4. Recorrência inferida (elimina ingestão do que é previsível) — **despesa mensal ✅ pronta**; **entrada (salário) ✅ pronta**, a serviço do pague-se primeiro
 5. E-mail via OAuth (cobre iOS)
 6. Open Finance via agregador — só quando houver receita, é custo recorrente por usuário
 
@@ -216,7 +216,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = formatação + lint + tipos + 721 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = formatação + lint + tipos + 747 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
@@ -514,8 +514,22 @@ Quando o OFX daquele mês chega, o lançamento feito pela recorrência não tem 
 O custo é o loop do produto: a tela Recorrentes mostra o comprometido do mês, o do ano e quanto viraria em 5 anos guardado todo mês no CDI (`acumuladoDeAportes`, arredondando mês a mês, centavo inteiro).
 
 **Pendências da recorrência:**
-- Só despesa. Salário é o mais previsível de todos, mas o loop é sobre gasto; entra quando houver o que fazer com ele
+- Salário quinzenal (adiantamento + saldo com o mesmo texto) quebra a corrida de 25–35 dias e não é detectado
 - Vencimento pelo dia da última ocorrência: a do dia 31 que caiu em 28/02 passa a vencer dia 28 dali em diante
+
+### Pague-se primeiro: o salário caiu, guarde antes de gastar
+
+Entrada recorrente existia só como pendência — "entra quando houver o que fazer com ele". O que fazer é o loop no momento de maior efeito: quando o salário confirmado cai, a Home abre com o convite de guardar uma fatia **antes do primeiro gasto**.
+
+`detectarRecorrencias(transacoes, hoje, sentido)` — `'despesa'` é o padrão e é tudo o que comprometido, atalho e "Venceu" leem; `'entrada'` só vem quando pedida. **A chave da entrada leva o prefixo `entrada:`**: o mesmo texto entrando e saindo todo mês (o Pix de quem divide o aluguel) são duas recorrências, e confirmar uma não pode confirmar a outra. A entrada fica fora de `mensalCentavos` — abater o salário do comprometido esconderia o custo.
+
+`pagueSePrimeiroAgora()` é derivado, como tudo: entrada confirmada que caiu há até `DIAS_PARA_SE_PAGAR` (10) dias vira `guardar`; confirmada que venceu sem lançamento vira `lancar` — para quem registra à mão, sem o salário no app não há de onde guardar, e o toast do lançamento já anuncia a fatia. Passados os 10 dias o convite some: o dinheiro já tomou rumo, e "primeiro" seria mentira.
+
+**O que é gravado é `Estado.pagueSePrimeiro`** (preferência, sem migration): percentual, meta e `resolvidas` — por chave, o dia da ocorrência que a pessoa já resolveu, guardando ou com "Agora não". É decisão sobre **aquela** ocorrência, não contador: o salário seguinte tem outro dia e volta a perguntar. Derivar "já guardou" das transferências seria frágil — qualquer R$ 20 guardado no Simulador apagaria o convite.
+
+`PAGAR_PRIMEIRO` e `PULAR_PAGAR_PRIMEIRO` só levam a chave; valor, meta e conta o reducer deriva de novo (a lição do `SIM_GUARDAR`). Guardar é `parDeTransferencia` da conta onde o salário caiu para a da meta, e o desfazer é `REABRIR_PAGAR_PRIMEIRO`, que tira o par **e** reabre a ocorrência — `DESFAZER` sozinho devolveria o dinheiro e deixaria o convite sumido. Sem meta, o botão vira "Criar uma meta", e o reducer avisa em vez de sair calado.
+
+O valor é `fatiaEmReais()`: inteiro, arredondado ao real — "guarde R$ 523", não "R$ 523,42". **O percentual troca no próprio cartão** (5, 10, 15, 20%), porque "este mês só 5%" é melhor que "agora não" e esconder a escolha numa tela de ajustes empurra para o não; a meta de destino mora em Recorrentes, que é escolha de uma vez. O reducer aceita de 1 a 50%.
 
 ### O Extrato rola sozinho
 

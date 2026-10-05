@@ -20,6 +20,7 @@ export type EstadoPersistido = Pick<
   | 'progressoDesafios'
   | 'diasSemGasto'
   | 'decisoesDeRecorrencia'
+  | 'pagueSePrimeiro'
   | 'onboardingConcluido'
   | 'metaSemanal'
   | 'ritualDiaFechamento'
@@ -40,6 +41,7 @@ export const CHAVES_PERSISTIDAS = [
   'progressoDesafios',
   'diasSemGasto',
   'decisoesDeRecorrencia',
+  'pagueSePrimeiro',
   'onboardingConcluido',
   'metaSemanal',
   'ritualDiaFechamento',
@@ -61,6 +63,7 @@ export function recortePersistido(e: Estado): EstadoPersistido {
     progressoDesafios: e.progressoDesafios,
     diasSemGasto: e.diasSemGasto,
     decisoesDeRecorrencia: e.decisoesDeRecorrencia,
+    pagueSePrimeiro: e.pagueSePrimeiro,
     onboardingConcluido: e.onboardingConcluido,
     metaSemanal: e.metaSemanal,
     ritualDiaFechamento: e.ritualDiaFechamento,

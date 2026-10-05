@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 import React from 'react';
 import { ICONE_ORFA } from '../../dominio/categorias';
 import { hojeReal, inicioDaSemana } from '../../dominio/datas';
@@ -261,6 +261,28 @@ describe('app vazio', () => {
     const home = await montar(<Inicio />, confirmada);
     expect(home.getByText('Venceu')).toBeTruthy();
     expect(home.getByLabelText('Lançar Streamingbr')).toBeTruthy();
+  });
+
+  it('o salário confirmado convida a guardar antes de gastar, e o toque resolve', async () => {
+    // A demo tem três meses de "Salário do mês", o último quatro dias antes de hoje.
+    const sugerida = await montar(<Recorrentes />, estadoInicial);
+    expect(sugerida.getByText('Entradas que se repetem')).toBeTruthy();
+    const homeSemDecisao = await montar(<Inicio />, estadoInicial);
+    expect(homeSemDecisao.queryByText('Pague-se primeiro')).toBeNull();
+
+    const confirmada: Estado = {
+      ...estadoInicial,
+      decisoesDeRecorrencia: [{ id: 'entrada:salário do mês', decisao: 'confirmada' }],
+    };
+    const ajustes = await montar(<Recorrentes />, confirmada);
+    expect(ajustes.getByText('Pague-se primeiro')).toBeTruthy();
+    expect(ajustes.getByText('QUANTO GUARDAR')).toBeTruthy();
+
+    const home = await montar(<Inicio />, confirmada);
+    expect(home.getByText('Pague-se primeiro')).toBeTruthy();
+    await fireEvent.press(home.getByLabelText('Guardar 15%'));
+    await fireEvent.press(home.getByLabelText('Guardar R$ 1.020,00'));
+    expect(home.queryByText('Pague-se primeiro')).toBeNull();
   });
 
   it('a Home avisa do backup só quando há o que perder', async () => {

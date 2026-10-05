@@ -1,6 +1,6 @@
 import { mesmoDiaNoMesSeguinte } from '../datas';
 import { acumuladoDeAportes } from '../dinheiro';
-import { DIAS_ATE_SUMIR, detectarRecorrencias } from '../recorrencia';
+import { DIAS_ATE_SUMIR, detectarRecorrencias, todasAsRecorrencias } from '../recorrencia';
 import { Transacao } from '../tipos';
 
 /**
@@ -196,5 +196,67 @@ describe('custo de oportunidade de um gasto mensal', () => {
 
   it('nada guardado não rende nada', () => {
     expect(acumuladoDeAportes(0, 88, 60)).toBe(0);
+  });
+});
+
+describe('entrada que se repete', () => {
+  it('o salário é detectado quando pedido, com valor positivo e a chave marcada', () => {
+    const [r] = detectarRecorrencias(
+      [tx('2026-08-05', 680000, 'Salário'), tx('2026-09-05', 680000, 'Salário')],
+      HOJE,
+      'entrada',
+    );
+    expect(r).toMatchObject({
+      chave: 'entrada:salário',
+      sentido: 'entrada',
+      valorCentavos: 680000,
+      proxima: '2026-10-05',
+    });
+  });
+
+  it('o salário que varia um pouco ainda é o salário', () => {
+    const [r] = detectarRecorrencias(
+      [tx('2026-08-05', 680000, 'Salário'), tx('2026-09-04', 712000, 'Salário')],
+      HOJE,
+      'entrada',
+    );
+    expect(r).toMatchObject({ valorFixo: false, valorCentavos: 712000 });
+  });
+
+  it('gasto não entra na lista de entradas', () => {
+    const lista = detectarRecorrencias(
+      [tx('2026-08-15', -4490, 'Streamingbr'), tx('2026-09-15', -4490, 'Streamingbr')],
+      HOJE,
+      'entrada',
+    );
+    expect(lista).toEqual([]);
+  });
+
+  it('o mesmo texto entrando e saindo todo mês são duas recorrências, com chaves distintas', () => {
+    const lista = todasAsRecorrencias(
+      [
+        tx('2026-08-10', 90000, 'Pix Ana'),
+        tx('2026-09-10', 90000, 'Pix Ana'),
+        tx('2026-08-12', -180000, 'Pix Ana'),
+        tx('2026-09-12', -180000, 'Pix Ana'),
+      ],
+      HOJE,
+    );
+    expect(lista.map((r) => [r.chave, r.sentido])).toEqual([
+      ['pix ana', 'despesa'],
+      ['entrada:pix ana', 'entrada'],
+    ]);
+  });
+
+  it('o aporte que volta da meta não é entrada recorrente', () => {
+    const lista = detectarRecorrencias(
+      [
+        tx('2026-08-06', 50000, 'Reserva', { transferenciaId: 'p1' }),
+        tx('2026-09-06', 50000, 'Reserva', { transferenciaId: 'p2' }),
+      ],
+      HOJE,
+      'entrada',
+    );
+    expect(lista).toEqual([]);
   });
 });

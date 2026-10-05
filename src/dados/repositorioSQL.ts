@@ -251,6 +251,7 @@ type Preferencias = Pick<
   | 'lembrete'
   | 'semanaFechada'
   | 'ultimoBackupEm'
+  | 'pagueSePrimeiro'
   | 'intencao'
   | 'mostrarSaldo'
 >;
@@ -265,6 +266,7 @@ function preferenciasDe(e: EstadoPersistido): Preferencias {
     lembrete: e.lembrete,
     semanaFechada: e.semanaFechada,
     ultimoBackupEm: e.ultimoBackupEm,
+    pagueSePrimeiro: e.pagueSePrimeiro,
     intencao: e.intencao,
     mostrarSaldo: e.mostrarSaldo,
   };

@@ -21,9 +21,21 @@ import {
   somarDias,
   somarMeses,
 } from '../dominio/datas';
-import { acumuladoDeAportes, Centavos, formatar, percentual, renderPor } from '../dominio/dinheiro';
+import {
+  acumuladoDeAportes,
+  Centavos,
+  fatiaEmReais,
+  formatar,
+  percentual,
+  renderPor,
+} from '../dominio/dinheiro';
 import { DefinicaoDesafio, definicoesDesafios, progressoDe } from '../dominio/desafios';
-import { guardadoDaMeta, rotuloDePrazo, totalGuardado as somarGuardado } from '../dominio/metas';
+import {
+  guardadoDaMeta,
+  metaEscolhida,
+  rotuloDePrazo,
+  totalGuardado as somarGuardado,
+} from '../dominio/metas';
 import { chaveDeRecorrencia, detectarRecorrencias, Recorrencia } from '../dominio/recorrencia';
 import {
   ehTransferencia,
@@ -33,7 +45,7 @@ import {
   totalSaidas,
 } from '../dominio/saldo';
 import { taxa } from '../dominio/taxas';
-import { Transacao } from '../dominio/tipos';
+import { Meta, Transacao } from '../dominio/tipos';
 import { CorRef } from '../tema/paletas';
 import type { Estado } from './store';
 
@@ -436,6 +448,84 @@ export function insights(e: Pick<Estado, 'categorias' | 'hoje' | 'transacoes'>):
   });
 
   return lista;
+}
+
+/* ── Pague-se primeiro ───────────────────────────────────────── */
+
+/**
+ * Quanto tempo depois de a entrada cair o convite ainda faz sentido. Passados
+ * dez dias o dinheiro já tomou rumo, e guardar "primeiro" seria mentira.
+ */
+export const DIAS_PARA_SE_PAGAR = 10;
+
+export type PagueSePrimeiroAgora =
+  /**
+   * A entrada confirmada venceu e não há lançamento dela. Para quem lança à
+   * mão é o passo que falta: sem o salário no app, não há de onde guardar.
+   */
+  | { situacao: 'lancar'; entrada: Recorrencia }
+  | {
+      situacao: 'guardar';
+      entrada: Recorrencia;
+      percentual: number;
+      valorCentavos: Centavos;
+      /** `null` sem meta nenhuma: o convite vira "criar uma meta". */
+      meta: Meta | null;
+      /** Onde a entrada caiu — é de lá que a fatia sai. */
+      contaOrigemId: string;
+    };
+
+/**
+ * O convite da Home quando o salário cai: guardar uma fatia antes de gastar.
+ *
+ * Tudo derivado — a entrada sai do histórico, o valor do percentual escolhido,
+ * a meta de `metaEscolhida()`. A única coisa gravada é a ocorrência que a
+ * pessoa já resolveu, e é ela que faz o convite sumir até o mês seguinte.
+ *
+ * Guardar vem antes de lançar: com dois salários, o que já caiu é o que tem
+ * dinheiro para mover agora.
+ */
+export function pagueSePrimeiroAgora(
+  e: Pick<
+    Estado,
+    'transacoes' | 'hoje' | 'decisoesDeRecorrencia' | 'metas' | 'contas' | 'pagueSePrimeiro'
+  >,
+): PagueSePrimeiroAgora | null {
+  const confirmadas = new Set(
+    e.decisoesDeRecorrencia.filter((d) => d.decisao === 'confirmada').map((d) => d.id),
+  );
+  const entradas = detectarRecorrencias(e.transacoes, e.hoje, 'entrada').filter((r) =>
+    confirmadas.has(r.chave),
+  );
+  const { percentual: pct, resolvidas } = e.pagueSePrimeiro;
+
+  const caiu = entradas
+    .filter((r) => diferencaEmDias(r.ultima, e.hoje) <= DIAS_PARA_SE_PAGAR)
+    .filter((r) => {
+      const resolvida: DiaISO | undefined = resolvidas[r.chave];
+      return resolvida === undefined || resolvida < r.ultima;
+    })
+    .sort((a, b) => (a.ultima > b.ultima ? -1 : a.ultima < b.ultima ? 1 : 0));
+  for (const entrada of caiu) {
+    const valorCentavos = fatiaEmReais(entrada.valorCentavos, pct);
+    if (valorCentavos <= 0) continue;
+    return {
+      situacao: 'guardar',
+      entrada,
+      percentual: pct,
+      valorCentavos,
+      meta: metaEscolhida(e.metas, e.pagueSePrimeiro.metaId) ?? null,
+      contaOrigemId: e.contas.some((c) => c.id === entrada.contaId)
+        ? entrada.contaId
+        : (e.contas[0]?.id ?? ''),
+    };
+  }
+
+  // `detectarRecorrencias` já vem ordenada pelo vencimento.
+  const venceu = entradas.find(
+    (r) => r.proxima <= e.hoje && diferencaEmDias(r.proxima, e.hoje) <= DIAS_PARA_SE_PAGAR,
+  );
+  return venceu ? { situacao: 'lancar', entrada: venceu } : null;
 }
 
 /* ── Card de ação da Home ────────────────────────────────────── */
@@ -994,6 +1084,13 @@ export type Recorrencias = {
   mensalCentavos: Centavos;
   anualCentavos: Centavos;
   investidoCentavos: Centavos;
+  /**
+   * Entradas que se repetem — o salário. Ficam fora de todos os totais acima:
+   * o comprometido é o que sai, e abater o salário dele esconderia o custo.
+   * Elas existem para o "pague-se primeiro".
+   */
+  entradasConfirmadas: Recorrencia[];
+  entradasSugeridas: Recorrencia[];
 };
 
 /**
@@ -1022,6 +1119,7 @@ export function recorrencias(
 
   const confirmadas = vistas.filter((r) => decisao.get(r.chave) === 'confirmada');
   const soma = (f: (r: RecorrenciaVista) => Centavos) => confirmadas.reduce((a, r) => a + f(r), 0);
+  const entradas = detectarRecorrencias(e.transacoes, e.hoje, 'entrada');
   return {
     confirmadas,
     sugeridas: vistas.filter((r) => !decisao.has(r.chave)),
@@ -1029,6 +1127,8 @@ export function recorrencias(
     mensalCentavos: soma((r) => -r.valorCentavos),
     anualCentavos: soma((r) => r.anualCentavos),
     investidoCentavos: soma((r) => r.investidoCentavos),
+    entradasConfirmadas: entradas.filter((r) => decisao.get(r.chave) === 'confirmada'),
+    entradasSugeridas: entradas.filter((r) => !decisao.has(r.chave)),
   };
 }
 
