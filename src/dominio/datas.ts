@@ -193,6 +193,19 @@ export function somarMeses(dia: DiaISO, n: number): DiaISO {
   return `${novoAno}-${String(novoMes + 1).padStart(2, '0')}-01`;
 }
 
+/**
+ * O mesmo dia no mês seguinte, encostando no último dia quando ele não existe:
+ * a assinatura do dia 31 de janeiro vence em 28 de fevereiro, não em março.
+ */
+export function mesmoDiaNoMesSeguinte(dia: DiaISO): DiaISO {
+  const seguinte = somarMeses(dia, 1);
+  const { ano, mes } = partes(seguinte);
+  // Dia 0 do mês depois do seguinte é o último dia do seguinte.
+  const ultimoDia = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+  const data = Math.min(partes(dia).data, ultimoDia);
+  return `${seguinte.slice(0, 8)}${String(data).padStart(2, '0')}`;
+}
+
 export function nomeDoMes(dia: DiaISO): string {
   return MESES[partes(dia).mes - 1];
 }

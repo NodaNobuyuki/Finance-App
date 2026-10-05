@@ -104,6 +104,11 @@ const dados = z.object({
     z.object({ id, aceito: z.boolean(), progresso: z.number().int().nonnegative() }),
   ),
   diasSemGasto: z.array(dia),
+  // Ausente nos backups anteriores à recorrência: sem decisão, tudo volta a
+  // ser sugestão — nada se perde que a pessoa tenha dito.
+  decisoesDeRecorrencia: z
+    .array(z.object({ id, decisao: z.enum(['confirmada', 'ignorada']) }))
+    .default([]),
   onboardingConcluido: z.boolean(),
   metaSemanal: z.number().int().min(1).max(7),
   ritualDiaFechamento: z.enum(diasRitual.map((d) => d.id) as [DiaRitualId, ...DiaRitualId[]]),
@@ -189,7 +194,8 @@ export function lerBackup(texto: string): EstadoPersistido {
     repetido(d.transacoes.map((t) => t.id)) ||
     repetido(d.contas.map((c) => c.id)) ||
     repetido(d.metas.map((m) => m.id)) ||
-    repetido(d.categorias.map((c) => c.id))
+    repetido(d.categorias.map((c) => c.id)) ||
+    repetido(d.decisoesDeRecorrencia.map((r) => r.id))
   ) {
     throw new BackupInvalido('O backup tem registros repetidos.');
   }

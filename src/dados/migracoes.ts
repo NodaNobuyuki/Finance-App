@@ -367,6 +367,26 @@ export const migracoes: Migracao[] = [
       `ALTER TABLE contas ADD COLUMN id_no_banco TEXT`,
     ],
   },
+  {
+    versao: 11,
+    nome: 'decisoes-de-recorrencia',
+    sql: [
+      // A recorrência é DERIVADA do histórico — não há tabela de regras, e nem
+      // poderia: uma regra gravada envelheceria no primeiro extrato antigo
+      // importado ou no primeiro lançamento apagado, como envelheceu o contador
+      // de semanas da v3. O que é da pessoa é só a decisão sobre cada uma:
+      // "é recorrente, me avise" ou "não é, pare de sugerir".
+      //
+      // O `id` é a chave da recorrência — o texto do banco normalizado. Não é
+      // UUID porque a recorrência não tem id próprio: é o texto que a identifica
+      // de um mês para o outro.
+      `CREATE TABLE decisoes_recorrencia (
+         id TEXT PRIMARY KEY NOT NULL,
+         decisao TEXT NOT NULL,
+         atualizado_em INTEGER NOT NULL
+       )`,
+    ],
+  },
 ];
 
 async function versaoAtual(motor: MotorSQL): Promise<number> {

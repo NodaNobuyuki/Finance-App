@@ -127,4 +127,5 @@ export type Tela =
   | 'simulador'
   | 'lote'
   | 'resumo'
-  | 'fechar';
+  | 'fechar'
+  | 'recorrentes';

@@ -48,6 +48,7 @@ function completo(): EstadoPersistido {
     ...guardado,
     transacoes: [importada, ...guardado.transacoes],
     contas: guardado.contas.map((c) => (c.id === 'cartao' ? { ...c, idNoBanco: '260:abc' } : c)),
+    decisoesDeRecorrencia: [{ id: 'streamingbr', decisao: 'confirmada' }],
   });
 }
 
@@ -86,6 +87,11 @@ describe('ida e volta', () => {
     const dados = { ...completo(), ultimoBackupEm: 1_000 };
     const geradoEm = Date.UTC(2026, 9, 2, 15);
     expect(lerBackup(gerarBackup(dados, geradoEm)).ultimoBackupEm).toBe(geradoEm);
+  });
+
+  it('backup de antes da recorrência ainda é lido, com tudo voltando a ser sugestão', () => {
+    const texto = adulterado(({ decisoesDeRecorrencia: _, ...resto }) => resto);
+    expect(lerBackup(texto).decisoesDeRecorrencia).toEqual([]);
   });
 
   it('backup de antes do lembrete, sem o campo, ainda é lido', () => {
