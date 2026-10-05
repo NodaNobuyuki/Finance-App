@@ -25,6 +25,7 @@ export type EstadoPersistido = Pick<
   | 'ritualPrimeira'
   | 'lembrete'
   | 'semanaFechada'
+  | 'ultimoBackupEm'
   | 'intencao'
   | 'mostrarSaldo'
 >;
@@ -43,6 +44,7 @@ export const CHAVES_PERSISTIDAS = [
   'ritualPrimeira',
   'lembrete',
   'semanaFechada',
+  'ultimoBackupEm',
   'intencao',
   'mostrarSaldo',
 ] as const satisfies readonly (keyof EstadoPersistido)[];
@@ -62,6 +64,7 @@ export function recortePersistido(e: Estado): EstadoPersistido {
     ritualPrimeira: e.ritualPrimeira,
     lembrete: e.lembrete,
     semanaFechada: e.semanaFechada,
+    ultimoBackupEm: e.ultimoBackupEm,
     intencao: e.intencao,
     mostrarSaldo: e.mostrarSaldo,
   };

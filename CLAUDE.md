@@ -216,7 +216,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = formatação + lint + tipos + 652 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = formatação + lint + tipos + 669 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
@@ -475,6 +475,8 @@ App só local sem backup é histórico inteiro perdido ao trocar de celular — 
 
 **Restaurar troca todo o dado do usuário, com undo** — exceto no primeiro uso. Ali o estado de antes nunca foi gravado, e desfazer deixaria o disco com o backup e a tela no onboarding.
 
+**O lembrete avisa quando há o que perder, não por calendário.** `Estado.ultimoBackupEm` (ms, em `preferencias` — sem migration) é escrito por `BACKUP_EXPORTADO`, despachado por `useBackup` quando a folha de compartilhar fecha; o sistema não diz se a pessoa salvou ou desistiu, e isso é o mais perto que dá. `lembreteDeBackup()` conta os lançamentos com `criadoEm` depois dele: sem backup nenhum, avisa a partir de 10; com backup, quando ele passou de 30 dias **e** algo entrou depois — backup velho sem nada novo não insiste. É `criadoEm`, não `ocorridoEm`, porque um extrato de três meses importado hoje é dado fora de qualquer backup. O aviso mora na Home e o toque já exporta; Hábitos mostra sempre o status. Restaurar faz do próprio arquivo o último backup: `lerBackup()` troca o campo pelo `geradoEm`, já que o valor gravado dentro dizia o backup anterior a ele.
+
 ### Importar extrato: a prévia é derivada, e nada se resolve calado
 
 `Extrato → Importar` escolhe um OFX, `useImportarExtrato` decodifica e passa pelo adapter, e só o extrato lido entra no estado (`Estado.importacao`, sessão, não persistido). **A prévia é `montarPrevia()`, derivada a cada render** de extrato + conta de destino + escolhas da pessoa — trocar a conta refaz a detecção sozinha. `CONFIRMAR_IMPORTACAO` chama `aplicarImportacao()`, puro e com id e relógio injetados como o reducer, e abre o Extrato no mês do que entrou, com undo.
@@ -492,7 +494,6 @@ O toast conta **linhas do arquivo**, não linhas criadas: a pessoa reconhece "16
 
 **Pendências abertas:**
 - A categoria aprendida casa texto exato: "Parcela 1/2" e "Parcela 2/2" não se reconhecem. Normalizar isso é saber o formato do banco — mora no adapter, quando doer
-- Sem lembrete de backup: o app não sabe quando foi o último. A data cabe em `preferencias`, que é chave-valor — não precisa de migration
 - Sem retentativa ativa de gravação: o reenvio pega carona na próxima mudança. Um outbox resolve, se virar problema
 - Nenhuma tela lê do banco sob demanda — o estado inteiro é carregado no boot. Aguenta bem os primeiros anos; a saída é paginar por período no repositório
 

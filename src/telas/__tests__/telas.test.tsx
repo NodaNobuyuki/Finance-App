@@ -224,6 +224,21 @@ describe('app vazio', () => {
     expect(primeiroUso.getByText('Restaurar backup')).toBeTruthy();
   });
 
+  it('a Home avisa do backup só quando há o que perder', async () => {
+    const semBackup = await montar(<Inicio />, estadoInicial);
+    expect(semBackup.getByText('Nenhum backup ainda')).toBeTruthy();
+    expect(semBackup.getByText('Fazer backup')).toBeTruthy();
+
+    const emDia = await montar(<Inicio />, { ...estadoInicial, ultimoBackupEm: Date.now() });
+    expect(emDia.queryByText('Fazer backup')).toBeNull();
+
+    const vazio = await montar(<Inicio />, estadoVazio);
+    expect(vazio.queryByText('Fazer backup')).toBeNull();
+
+    const habitos = await montar(<Habitos />, estadoInicial);
+    expect(habitos.getByText('Nenhum backup feito ainda.')).toBeTruthy();
+  });
+
   it('a prévia de importação mostra o extrato, a conta e as transferências', async () => {
     const bytes = new Uint8Array(
       readFileSync(join(__dirname, '../../ingestao/__tests__/fixtures/nubank-cartao.ofx')),
