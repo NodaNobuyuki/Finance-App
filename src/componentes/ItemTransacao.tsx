@@ -14,15 +14,16 @@ const CHAVES = ['contas', 'categorias'] as const;
 export function ItemTransacao({
   tx,
   separador,
-  recategorizavel = false,
+  editavel = false,
 }: {
   tx: Transacao;
   separador: boolean;
   /**
-   * Tocar abre a troca de categoria. Só no Extrato: na Home a lista é resumo,
-   * e transformar cada linha em botão ali competiria com o registro rápido.
+   * Tocar abre a edição do lançamento — ou o detalhe do par, se for
+   * transferência. Só no Extrato: na Home a lista é resumo, e transformar cada
+   * linha em botão ali competiria com o registro rápido.
    */
-  recategorizavel?: boolean;
+  editavel?: boolean;
 }) {
   const estado = useRecorte(CHAVES);
   const despachar = useDespachar();
@@ -30,10 +31,6 @@ export function ItemTransacao({
   const cat = categoria(estado.categorias, tx.categoriaId);
   const cor = resolverCor(cat.cor, paleta);
   const nomeDaConta = estado.contas.find((c) => c.id === tx.contaId)?.nome ?? '';
-
-  // Transferência não se recategoriza: a categoria dela é o que a identifica
-  // como movimento entre contas, e trocá-la a transformaria em despesa.
-  const podeTrocar = recategorizavel && tx.transferenciaId === undefined;
 
   const conteudo = (
     <View
@@ -61,12 +58,14 @@ export function ItemTransacao({
     </View>
   );
 
-  if (!podeTrocar) return conteudo;
+  if (!editavel) return conteudo;
 
   return (
     <Toque
-      aoTocar={() => despachar({ tipo: 'ABRIR_RECATEGORIZAR', transacaoId: tx.id })}
-      rotuloAcessivel={`Mudar categoria de ${tx.descricao}`}
+      aoTocar={() => despachar({ tipo: 'ABRIR_LANCAMENTO', transacaoId: tx.id })}
+      rotuloAcessivel={
+        tx.transferenciaId === undefined ? `Editar ${tx.descricao}` : `Ver ${tx.descricao}`
+      }
     >
       {conteudo}
     </Toque>

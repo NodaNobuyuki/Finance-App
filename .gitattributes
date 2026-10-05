@@ -15,5 +15,9 @@
 *.jks binary
 *.keystore binary
 
+# Extrato de banco é fixture byte a byte: encoding e CRLF SÃO o teste.
+# Normalizar transformaria o arquivo cp1252 com CRLF num LF que nenhum banco manda.
+*.ofx binary
+
 # O arquivo do Claude Design é gerado; não conta como código nas estatísticas.
 design/** linguist-generated=true

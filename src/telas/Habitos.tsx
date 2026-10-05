@@ -12,6 +12,7 @@ import {
   semanasEmDia,
   transacoesDoMes,
 } from '../estado/derivados';
+import { useBackup } from '../dados/useBackup';
 import { useRecorte, useDespachar } from '../estado/store';
 import { comAlfa, resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
@@ -38,6 +39,7 @@ const LEMBRETES = [
 export function Habitos() {
   const estado = useRecorte(CHAVES);
   const despachar = useDespachar();
+  const backup = useBackup();
   const { t, paleta } = useTema();
 
   const s = semana(estado);
@@ -336,53 +338,61 @@ export function Habitos() {
             Seus dados
           </Txt>
           <Txt tamanho={12} cor={t.inkSoft} entrelinha={1.45} estilo={{ marginTop: -4 }}>
-            Tudo fica só neste aparelho. Nada é enviado para nenhum servidor.
+            Tudo fica só neste aparelho. Nada é enviado para nenhum servidor — por isso, guarde um
+            backup antes de trocar de celular.
           </Txt>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <BotaoDeDados rotulo="Exportar backup" tom="destaque" aoTocar={backup.exportar} />
+            <BotaoDeDados rotulo="Restaurar backup" tom="neutro" aoTocar={backup.restaurar} />
             {estado.transacoes.length === 0 ? (
-              <Toque
+              <BotaoDeDados
+                rotulo="Carregar dados de exemplo"
+                tom="neutro"
                 aoTocar={() => despachar({ tipo: 'CARREGAR_DEMO' })}
-                rotuloAcessivel="Carregar dados de exemplo"
-              >
-                <View
-                  style={{
-                    borderRadius: 999,
-                    paddingVertical: 9,
-                    paddingHorizontal: 15,
-                    borderWidth: 1,
-                    borderColor: t.lineInput,
-                  }}
-                >
-                  <Txt tamanho={12.5} peso={600} cor={t.inkMuted}>
-                    Carregar dados de exemplo
-                  </Txt>
-                </View>
-              </Toque>
+              />
             ) : (
               // Destrutivo, mas com undo no toast em vez de modal de
               // confirmação — a mesma regra de apagar um lançamento.
-              <Toque
+              <BotaoDeDados
+                rotulo="Apagar todos os dados"
+                tom="perigo"
                 aoTocar={() => despachar({ tipo: 'APAGAR_DADOS' })}
-                rotuloAcessivel="Apagar todos os dados"
-              >
-                <View
-                  style={{
-                    borderRadius: 999,
-                    paddingVertical: 9,
-                    paddingHorizontal: 15,
-                    borderWidth: 1,
-                    borderColor: t.down,
-                  }}
-                >
-                  <Txt tamanho={12.5} peso={600} cor={t.down}>
-                    Apagar todos os dados
-                  </Txt>
-                </View>
-              </Toque>
+              />
             )}
           </View>
         </View>
       </View>
     </View>
+  );
+}
+
+/** Pílula contornada da seção "Seus dados". */
+function BotaoDeDados({
+  rotulo,
+  tom,
+  aoTocar,
+}: {
+  rotulo: string;
+  tom: 'destaque' | 'neutro' | 'perigo';
+  aoTocar: () => void;
+}) {
+  const { t } = useTema();
+  const cor = tom === 'destaque' ? t.accent : tom === 'perigo' ? t.down : t.inkMuted;
+  return (
+    <Toque aoTocar={aoTocar} rotuloAcessivel={rotulo}>
+      <View
+        style={{
+          borderRadius: 999,
+          paddingVertical: 9,
+          paddingHorizontal: 15,
+          borderWidth: 1,
+          borderColor: tom === 'neutro' ? t.lineInput : cor,
+        }}
+      >
+        <Txt tamanho={12.5} peso={600} cor={cor}>
+          {rotulo}
+        </Txt>
+      </View>
+    </Toque>
   );
 }

@@ -16,6 +16,7 @@ import {
   transacoesFiltradas,
 } from '../estado/derivados';
 import { useRecorte, useDespachar } from '../estado/store';
+import { useImportarExtrato } from '../ingestao/useImportarExtrato';
 import { Transacao } from '../dominio/tipos';
 import { resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
@@ -68,6 +69,7 @@ function EntreLinhas() {
 export function Extrato() {
   const estado = useRecorte(CHAVES);
   const despachar = useDespachar();
+  const importar = useImportarExtrato();
   const { t, paleta } = useTema();
 
   // Memoizado por campo: com uma folha aberta por cima, cada tecla do teclado
@@ -118,6 +120,21 @@ export function Extrato() {
               >
                 <Txt tamanho={11} peso={600} cor={t.onHeroSoft}>
                   Categorias
+                </Txt>
+              </View>
+            </Toque>
+            <Toque aoTocar={importar} rotuloAcessivel="Importar extrato do banco">
+              <View
+                style={{
+                  borderWidth: 1,
+                  borderColor: t.heroLine,
+                  borderRadius: 999,
+                  paddingVertical: 4,
+                  paddingHorizontal: 10,
+                }}
+              >
+                <Txt tamanho={11} peso={600} cor={t.onHeroSoft}>
+                  Importar
                 </Txt>
               </View>
             </Toque>
@@ -229,7 +246,7 @@ export function Extrato() {
         <Vazio
           icone={icones.extrato}
           titulo="Seu extrato começa aqui"
-          texto="Cada lançamento vira histórico, e o histórico é o que mostra para onde seu dinheiro vai."
+          texto="Cada lançamento vira histórico, e o histórico é o que mostra para onde seu dinheiro vai. Dá para trazer o extrato do banco em OFX, pelo botão Importar."
           acao={{
             rotulo: 'Registrar o primeiro',
             aoTocar: () => despachar({ tipo: 'ABRIR_NOVA' }),
@@ -302,7 +319,7 @@ export function Extrato() {
       )}
       renderItem={({ item, index, section }) => (
         <View style={{ paddingHorizontal: 18 }}>
-          <ItemTransacao tx={item} separador={index < section.data.length - 1} recategorizavel />
+          <ItemTransacao tx={item} separador={index < section.data.length - 1} editavel />
         </View>
       )}
     />

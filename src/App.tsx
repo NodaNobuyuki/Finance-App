@@ -34,7 +34,8 @@ import { Simulador } from './telas/Simulador';
 import { CadastroCategoria } from './telas/folhas/CadastroCategoria';
 import { CadastroConta } from './telas/folhas/CadastroConta';
 import { CadastroMeta } from './telas/folhas/CadastroMeta';
-import { Recategorizar } from './telas/folhas/Recategorizar';
+import { DetalheTransferencia } from './telas/folhas/DetalheTransferencia';
+import { ImportarExtrato } from './telas/folhas/ImportarExtrato';
 import { MovimentoMeta } from './telas/folhas/MovimentoMeta';
 import { NovaTransacao } from './telas/folhas/NovaTransacao';
 import { Ritual } from './telas/folhas/Ritual';
@@ -91,8 +92,10 @@ function FolhaAtual() {
       return <CadastroMeta />;
     case 'categoria':
       return <CadastroCategoria />;
-    case 'recategorizar':
-      return <Recategorizar transacaoId={folha.transacaoId} />;
+    case 'detalheTransferencia':
+      return <DetalheTransferencia transferenciaId={folha.transferenciaId} />;
+    case 'importacao':
+      return <ImportarExtrato />;
     default:
       return null;
   }

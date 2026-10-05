@@ -1,5 +1,9 @@
 /** @jest-environment node */
-import { AGORA, inicioDaSemana } from '../../dominio/datas';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { AGORA, inicioDaSemana, somarDias } from '../../dominio/datas';
+import { adapterOFX } from '../../ingestao/adapters/ofx';
+import { decodificar } from '../../ingestao/texto';
 import { guardadoDaMeta } from '../../dominio/metas';
 import { saldoTotal } from '../../dominio/saldo';
 import { Acao, criarEstadoDemo, criarReducer, dependenciasDeTeste } from '../../estado/store';
@@ -99,6 +103,103 @@ describe('fechar e reabrir', () => {
     expect(new Set(par.map((t) => t.transferenciaId)).size).toBe(1);
     expect(par.reduce((a, t) => a + t.valorCentavos, 0)).toBe(0);
     expect(par.filter((t) => t.metaId === 'reserva')).toHaveLength(1);
+  });
+
+  it('o lançamento corrigido volta corrigido', async () => {
+    // Editar é UPDATE de uma linha que já está no disco — caminho que lançar
+    // um gasto novo nunca exercita.
+    const motor = criarMotorNode();
+    const alvo = criarEstadoDemo(AGORA).transacoes.find((t) => t.categoriaId === 'mercado')!;
+    const ontem = somarDias(AGORA, -1);
+    await sessao(motor, [
+      { tipo: 'ABRIR_LANCAMENTO', transacaoId: alvo.id },
+      { tipo: 'DEFINIR_DIGITOS', digitos: '4321' },
+      { tipo: 'RASCUNHO_DATA', dia: ontem },
+      { tipo: 'RASCUNHO_CATEGORIA', categoriaId: 'lazer' },
+      { tipo: 'SALVAR_TRANSACAO' },
+    ]);
+    const depois = await sessao(motor);
+
+    expect(depois.transacoes.find((t) => t.id === alvo.id)).toMatchObject({
+      valorCentavos: -4321,
+      ocorridoEm: ontem,
+      categoriaId: 'lazer',
+      criadoEm: alvo.criadoEm,
+    });
+  });
+
+  it('o lançamento apagado não volta', async () => {
+    const motor = criarMotorNode();
+    const inicial = criarEstadoDemo(AGORA);
+    const alvo = inicial.transacoes[0];
+    await sessao(motor, [{ tipo: 'APAGAR_TRANSACAO', transacaoId: alvo.id }]);
+    const depois = await sessao(motor);
+
+    expect(depois.transacoes.some((t) => t.id === alvo.id)).toBe(false);
+    expect(depois.transacoes).toHaveLength(inicial.transacoes.length - 1);
+  });
+
+  it('apagar um aporte tira as duas pontas do disco', async () => {
+    const motor = criarMotorNode();
+    const inicial = criarEstadoDemo(AGORA);
+    const guardado = await sessao(motor, [
+      { tipo: 'ABRIR_MOVIMENTO_META', metaId: 'reserva' },
+      { tipo: 'DEFINIR_DIGITOS', digitos: '25000' },
+      { tipo: 'CONFIRMAR_MOVIMENTO_META' },
+    ]);
+    const ponta = guardado.transacoes.find((t) => t.transferenciaId !== undefined)!;
+    await sessao(motor, [{ tipo: 'APAGAR_TRANSACAO', transacaoId: ponta.id }]);
+    const depois = await sessao(motor);
+
+    expect(depois.transacoes.some((t) => t.transferenciaId !== undefined)).toBe(false);
+    expect(saldoTotal(depois.contas, depois.transacoes)).toBe(
+      saldoTotal(inicial.contas, inicial.transacoes),
+    );
+  });
+
+  it('restaurar um backup substitui o que estava no disco', async () => {
+    // Diff por id contra um estado inteiro novo: o que não está no backup tem
+    // de SAIR do banco, senão reabrir o app traria de volta a mistura dos dois.
+    const motor = criarMotorNode();
+    const demo = recortePersistido(criarEstadoDemo(AGORA));
+    const dados = {
+      ...demo,
+      perfil: { nome: 'Outra pessoa' },
+      transacoes: demo.transacoes.slice(0, 3),
+      metas: [],
+      diasSemGasto: [],
+    };
+    await sessao(motor, [{ tipo: 'IMPORTAR_BACKUP', dados }]);
+    const depois = await sessao(motor);
+
+    const ids = (ts: { id: string }[]) => ts.map((t) => t.id).sort();
+    expect(depois.perfil.nome).toBe('Outra pessoa');
+    expect(ids(depois.transacoes)).toEqual(ids(dados.transacoes));
+    expect(depois.metas).toHaveLength(0);
+    expect(depois.diasSemGasto).toHaveLength(0);
+  });
+
+  it('extrato importado atravessa o fechar e reabrir — e não entra de novo', async () => {
+    // O FITID é o que segura a segunda importação. Se ele não sobrevivesse ao
+    // disco, reabrir o app e importar o mesmo arquivo dobraria tudo.
+    const motor = criarMotorNode();
+    const bytes = new Uint8Array(
+      readFileSync(join(__dirname, '../../ingestao/__tests__/fixtures/nubank-cartao.ofx')),
+    );
+    const extrato = adapterOFX.ler(decodificar(bytes));
+    const importar: Acao[] = [
+      { tipo: 'ABRIR_IMPORTACAO', extrato },
+      { tipo: 'CONFIRMAR_IMPORTACAO' },
+    ];
+
+    const importado = await sessao(motor, importar);
+    const reaberto = await sessao(motor);
+    expect(reaberto.transacoes).toHaveLength(importado.transacoes.length);
+    expect(reaberto.transacoes.filter((t) => t.origem === 'ofx')).toHaveLength(18);
+
+    const deNovo = await sessao(motor, importar);
+    expect(deNovo.transacoes).toHaveLength(importado.transacoes.length);
+    expect(deNovo.toast!.texto).toBe('Nada novo neste extrato');
   });
 
   it('a semana fechada continua fechada — e sabe qual era', async () => {

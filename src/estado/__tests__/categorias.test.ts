@@ -166,14 +166,22 @@ describe('banco anterior à v6', () => {
 });
 
 describe('recategorizar', () => {
+  /**
+   * Trocar a categoria é editar o lançamento. Era uma folha à parte, que só
+   * sabia fazer isso; virou um campo da edição, que também corrige valor, data
+   * e conta.
+   */
   const alvo = estadoInicial.transacoes.find((t) => t.categoriaId === 'mercado')!;
+  const recategorizar = (e: Estado, categoriaId: string) =>
+    aplicar(
+      e,
+      { tipo: 'ABRIR_LANCAMENTO', transacaoId: alvo.id },
+      { tipo: 'RASCUNHO_CATEGORIA', categoriaId },
+      { tipo: 'SALVAR_TRANSACAO' },
+    );
 
   it('troca a categoria do lançamento sem tocar no valor nem na data', () => {
-    const depois = aplicar(estadoInicial, {
-      tipo: 'RECATEGORIZAR',
-      transacaoId: alvo.id,
-      categoriaId: 'lazer',
-    });
+    const depois = recategorizar(estadoInicial, 'lazer');
     const tx = depois.transacoes.find((t) => t.id === alvo.id)!;
 
     expect(tx.categoriaId).toBe('lazer');
@@ -183,11 +191,7 @@ describe('recategorizar', () => {
   });
 
   it('desfazer volta para a categoria anterior', () => {
-    const depois = aplicar(estadoInicial, {
-      tipo: 'RECATEGORIZAR',
-      transacaoId: alvo.id,
-      categoriaId: 'lazer',
-    });
+    const depois = recategorizar(estadoInicial, 'lazer');
     const desfeito = aplicar(depois, depois.toast!.acao!.acao);
     expect(desfeito.transacoes.find((t) => t.id === alvo.id)!.categoriaId).toBe('mercado');
   });
@@ -198,24 +202,10 @@ describe('recategorizar', () => {
     const orfao = aplicar(estadoInicial, { tipo: 'APAGAR_CATEGORIA', categoriaId: 'mercado' });
     expect(categoria(orfao.categorias, alvo.categoriaId).nome).toBe('Sem categoria');
 
-    const salvo = aplicar(orfao, {
-      tipo: 'RECATEGORIZAR',
-      transacaoId: alvo.id,
-      categoriaId: 'lazer',
-    });
+    const salvo = recategorizar(orfao, 'lazer');
     expect(
       categoria(salvo.categorias, salvo.transacoes.find((t) => t.id === alvo.id)!.categoriaId).nome,
     ).toBe('Lazer');
-  });
-
-  it('lançamento inexistente não mexe em nada', () => {
-    expect(
-      aplicar(estadoInicial, {
-        tipo: 'RECATEGORIZAR',
-        transacaoId: 'nao-existe',
-        categoriaId: 'lazer',
-      }),
-    ).toBe(estadoInicial);
   });
 });
 
