@@ -216,7 +216,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = formatação + lint + tipos + 643 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = formatação + lint + tipos + 652 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
@@ -488,10 +488,11 @@ Quatro situações por linha:
 
 O toast conta **linhas do arquivo**, não linhas criadas: a pessoa reconhece "16 lançamentos" do extrato que baixou, e a ponta criada na outra conta aparece como "2 transferências".
 
+**A conta lembra de qual conta do banco vem o extrato.** `Conta.idNoBanco` (migration v10) guarda a `contaExterna` do adapter — instituição e `ACCTID`, porque número de conta sozinho repete entre bancos, e é o adapter quem sabe do que a identidade é feita. A confirmação grava o vínculo, mesmo quando nada novo entra, e a próxima importação abre nela; sem vínculo, a sugestão continua pelo tipo. Uma conta do banco aponta para uma conta do app só: `vincularConta()` tira o vínculo de onde estava, e por isso não há índice único — mover o vínculo na mesma gravação seria recusado. Quem tinha o app antes da v10 fica com NULL: o FITID não diz de qual conta do banco a linha veio.
+
 **Pendências abertas:**
 - A categoria aprendida casa texto exato: "Parcela 1/2" e "Parcela 2/2" não se reconhecem. Normalizar isso é saber o formato do banco — mora no adapter, quando doer
-- O app não lembra qual conta do banco (`ACCTID`) foi para qual conta do app; a sugestão é por tipo. Lembrar exige persistir o vínculo
-- Sem lembrete de backup: o app não sabe quando foi o último. Guardar a data exige migration — vale quando houver o que lembrar
+- Sem lembrete de backup: o app não sabe quando foi o último. A data cabe em `preferencias`, que é chave-valor — não precisa de migration
 - Sem retentativa ativa de gravação: o reenvio pega carona na próxima mudança. Um outbox resolve, se virar problema
 - Nenhuma tela lê do banco sob demanda — o estado inteiro é carregado no boot. Aguenta bem os primeiros anos; a saída é paginar por período no repositório
 

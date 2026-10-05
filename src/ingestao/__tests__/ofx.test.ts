@@ -22,7 +22,7 @@ describe('fatura de cartão do Nubank', () => {
   it('é reconhecida como cartão, com banco e conta', () => {
     expect(extrato.tipoDeConta).toBe('cartao');
     expect(extrato.banco).toBe('NU PAGAMENTOS S.A.');
-    expect(extrato.contaExterna).toBe('907a70c3-1012-4037-b64c-e4228c38fb29');
+    expect(extrato.contaExterna).toBe('260:907a70c3-1012-4037-b64c-e4228c38fb29');
     expect(extrato.inicio).toBe('2026-07-18');
     expect(extrato.fim).toBe('2026-08-18');
   });
@@ -90,7 +90,7 @@ describe('conta corrente do Nubank', () => {
 
   it('é reconhecida como conta', () => {
     expect(extrato.tipoDeConta).toBe('conta');
-    expect(extrato.contaExterna).toBe('000000000-0');
+    expect(extrato.contaExterna).toBe('260:000000000-0');
     expect(extrato.transacoes.map((t) => t.valorCentavos)).toEqual([123456, -123456]);
   });
 

@@ -179,6 +179,18 @@ describe.each(implementacoes)('repositório: %s', (_nome, criar) => {
     expect(Object.keys(lido!.progressoDesafios[0]).sort()).toEqual(['aceito', 'id', 'progresso']);
   });
 
+  it('a conta lembra de qual conta do banco vêm os extratos', async () => {
+    const estado = base();
+    const contas = estado.contas.map((c, i) => (i === 0 ? { ...c, idNoBanco: '260:abc' } : c));
+    await repo.salvar(null, { ...estado, contas });
+    const lido = await repo.carregar();
+
+    const porId = new Map(lido!.contas.map((c) => [c.id, c]));
+    expect(porId.get(contas[0].id)!.idNoBanco).toBe('260:abc');
+    // Conta sem vínculo não volta com `idNoBanco: null`.
+    expect('idNoBanco' in porId.get(contas[1].id)!).toBe(false);
+  });
+
   it('campo opcional ausente não volta como null', async () => {
     const semOpcionais = tx('t1', -100);
     await repo.salvar(null, { ...base(), transacoes: [semOpcionais] });

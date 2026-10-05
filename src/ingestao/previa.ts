@@ -146,12 +146,40 @@ export function montarPrevia(
 }
 
 /**
- * A conta de destino mais provável: fatura vai para cartão, extrato de conta
- * para conta corrente. É só o ponto de partida — a pessoa troca na prévia.
+ * A conta de destino mais provável: a que recebeu este extrato da última vez;
+ * sem histórico, fatura vai para cartão e extrato de conta para conta
+ * corrente. É só o ponto de partida — a pessoa troca na prévia.
  */
 export function contaSugerida(extrato: ExtratoLido, contas: Conta[]): string {
+  const lembrada = contaLembrada(extrato, contas);
+  if (lembrada) return lembrada.id;
   const tipo = extrato.tipoDeConta === 'cartao' ? 'cartao' : 'corrente';
   return (contas.find((c) => c.tipo === tipo) ?? contas[0])?.id ?? '';
+}
+
+/** A conta do app que recebeu este extrato da última vez, se ainda existir. */
+export function contaLembrada(extrato: ExtratoLido, contas: Conta[]): Conta | undefined {
+  const { contaExterna } = extrato;
+  return contaExterna === undefined ? undefined : contas.find((c) => c.idNoBanco === contaExterna);
+}
+
+/**
+ * Grava de qual conta do banco vem o extrato que acabou de entrar em `contaId`.
+ *
+ * Uma conta do banco aponta para uma conta do app só, então o vínculo sai de
+ * onde estava. Sem nada a mudar, devolve o mesmo array: a persistência compara
+ * por referência e não encosta no disco.
+ */
+export function vincularConta(contas: Conta[], contaId: string, extrato: ExtratoLido): Conta[] {
+  const { contaExterna } = extrato;
+  if (contaExterna === undefined) return contas;
+  if (contas.some((c) => c.id === contaId && c.idNoBanco === contaExterna)) return contas;
+  return contas.map((c) => {
+    if (c.id === contaId) return { ...c, idNoBanco: contaExterna };
+    if (c.idNoBanco !== contaExterna) return c;
+    const { idNoBanco: _solto, ...semVinculo } = c;
+    return semVinculo;
+  });
 }
 
 /**
