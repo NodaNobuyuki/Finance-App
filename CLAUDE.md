@@ -80,7 +80,7 @@ Isso evita o bug clássico de saldo dessincronizado. Se performance exigir, use 
 
 O mesmo vale para o guardado da meta: `opening_cents + SUM(transactions.amount_cents WHERE goal_id = ?)`. Guardar dinheiro é uma **transferência** — duas linhas com o mesmo `transfer_id`, e só a entrada com `goal_id`. Não existe tabela de aportes, e `current_cents` não é coluna. Quem soma gasto e ganho ignora tudo que tem `transfer_id`: dinheiro mudando de lugar não é receita nem despesa.
 
-**Dedupe:** `UNIQUE (account_id, external_id)` quando houver `external_id` (FITID do OFX). Para colisão manual × importado (mesma conta, valor idêntico, data ±2 dias), **não resolva automaticamente** — apresente ao usuário uma tela de "possíveis duplicatas" e deixe ele decidir.
+**Dedupe:** `UNIQUE (account_id, external_id)` quando houver `external_id` (FITID do OFX). Para colisão manual × importado (mesma conta, valor idêntico, data ±2 dias — ou o mesmo texto do banco com outro valor, ±5 dias), **não resolva automaticamente** — apresente ao usuário uma tela de "possíveis duplicatas" e deixe ele decidir.
 
 ---
 
@@ -216,7 +216,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = formatação + lint + tipos + 714 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = formatação + lint + tipos + 721 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
@@ -484,7 +484,7 @@ App só local sem backup é histórico inteiro perdido ao trocar de celular — 
 Quatro situações por linha:
 
 - **Já importada:** FITID que já está naquela conta (ou repetido no próprio arquivo). Não aparece; só conta. É o que impede importar o mesmo arquivo duas vezes — e sobrevive a reabrir o app, travado em `ciclo.test.ts`.
-- **Possível duplicata:** lançamento na mesma conta, mesmo valor, ±2 dias e **sem FITID** — linha com FITID é outro registro do banco, e duas compras iguais no mesmo dia são duas compras. O padrão é "é a mesma": a linha não entra e **o FITID passa à existente**, para a próxima importação do período não perguntar de novo. "São diferentes" importa. Nunca automático sem mostrar — é a regra do dedupe.
+- **Possível duplicata:** lançamento na mesma conta, mesmo valor, ±2 dias e **sem FITID** — linha com FITID é outro registro do banco, e duas compras iguais no mesmo dia são duas compras. O padrão é "é a mesma": a linha não entra e **o FITID passa à existente**, para a próxima importação do período não perguntar de novo. "São diferentes" importa. Nunca automático sem mostrar — é a regra do dedupe. Há um segundo critério, mais estreito, para **valor diferente**: o mesmo texto do banco (`chaveDeRecorrencia`), ±5 dias, numa linha sem FITID e sem `transferenciaId`. Texto idêntico ao do banco numa linha sem FITID só vem da recorrência, que lança a conta variável com o valor do mês passado — sem isso a conta de luz contava duas vezes. "É a mesma" fica com o **valor do banco**, a prévia diz isso antes, e o toast conta as corrigidas. O valor idêntico vem primeiro: com as duas candidatas, casa a de mesmo valor.
 - **Transferência:** pista do adapter (`natureza`), que a pessoa liga e desliga. Cria as duas pontas como a folha Transferir; se a outra conta já tem o lançamento oposto (±3 dias, sem `transferenciaId`), **ele vira a outra ponta** em vez de ganhar gêmea. A ponta criada nasce sem FITID — e é por isso que, quando o extrato da outra conta chegar, o boleto cai em "possível duplicata" dela. As duas ordens (fatura antes ou conta antes) terminam no mesmo par, com uma linha por lado.
 - **Nova:** com a categoria que a pessoa deu da última vez ao mesmo texto do banco e mesmo sinal (`categoriasAprendidas`); sem histórico, **sem categoria**. Chutar "Compras" esconderia o que falta decidir, e o desafio "categorizados" já conta essas linhas. O toast diz quantas ficaram assim.
 
@@ -515,7 +515,6 @@ O custo é o loop do produto: a tela Recorrentes mostra o comprometido do mês, 
 
 **Pendências da recorrência:**
 - Só despesa. Salário é o mais previsível de todos, mas o loop é sobre gasto; entra quando houver o que fazer com ele
-- Valor variável lançado com o valor do mês passado não casa com o OFX se a pessoa não ajustar — vira linha a mais
 - Vencimento pelo dia da última ocorrência: a do dia 31 que caiu em 28/02 passa a vencer dia 28 dali em diante
 
 ### O Extrato rola sozinho

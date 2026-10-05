@@ -961,6 +961,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         resumo.ligadas > 0
           ? `${resumo.ligadas} ${resumo.ligadas === 1 ? 'já existia' : 'já existiam'}`
           : '',
+        resumo.corrigidas > 0 ? `${resumo.corrigidas} com o valor corrigido` : '',
         resumo.semCategoria > 0 ? `${resumo.semCategoria} sem categoria` : '',
       ].filter(Boolean);
 

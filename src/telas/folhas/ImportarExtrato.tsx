@@ -190,9 +190,12 @@ function Linha({
 
       {linha.situacao === 'duplicata' ? (
         <View style={{ gap: 6 }}>
-          <Txt tamanho={11.5} cor={t.inkMuted}>
+          <Txt tamanho={11.5} cor={t.inkMuted} entrelinha={1.4}>
             Parece ser “{linha.existente.descricao}” de{' '}
-            {rotuloDataCurta(linha.existente.ocorridoEm)}.
+            {rotuloDataCurta(linha.existente.ocorridoEm)}
+            {linha.existente.valorCentavos !== bruta.valorCentavos
+              ? `, lançada com ${comSinal(linha.existente.valorCentavos)}. Se for a mesma, fica o valor do banco.`
+              : '.'}
           </Txt>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
             <Chip
