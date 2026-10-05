@@ -3,6 +3,7 @@ import {
   deDigitos,
   deTextoLivre,
   empilharDigitos,
+  fatiaEmReais,
   formatar,
   formatarRedondo,
   percentual,
@@ -102,5 +103,28 @@ describe('percentual', () => {
   it('protege contra divisão por zero', () => {
     expect(percentual(100, 0)).toBe(0);
     expect(percentual(5000, 10000)).toBe(50);
+  });
+});
+
+describe('fatiaEmReais', () => {
+  it('arredonda para o real inteiro — a sugestão é convite, não conta a conferir', () => {
+    // 10% de R$ 5.234,17 = R$ 523,417 → R$ 523
+    expect(fatiaEmReais(523417, 10)).toBe(52300);
+    // 15% de R$ 3.300,00 = R$ 495
+    expect(fatiaEmReais(330000, 15)).toBe(49500);
+    // 5% de R$ 1.010,00 = R$ 50,50 → R$ 51
+    expect(fatiaEmReais(101000, 5)).toBe(5100);
+  });
+
+  it('o resultado é sempre centavo inteiro', () => {
+    for (const valor of [1, 99, 12345, 680001, 999999]) {
+      expect(Number.isInteger(fatiaEmReais(valor, 7))).toBe(true);
+    }
+  });
+
+  it('nada vira nada', () => {
+    expect(fatiaEmReais(0, 10)).toBe(0);
+    expect(fatiaEmReais(-50000, 10)).toBe(0);
+    expect(fatiaEmReais(50000, 0)).toBe(0);
   });
 });

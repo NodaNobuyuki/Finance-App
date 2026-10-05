@@ -6,7 +6,7 @@ import { ItemTransacao } from '../componentes/ItemTransacao';
 import { useBackup } from '../dados/useBackup';
 import { Vazio } from '../componentes/Vazio';
 import { categoria, icones } from '../dominio/categorias';
-import { rotuloMes } from '../dominio/datas';
+import { DiaISO, rotuloMes } from '../dominio/datas';
 import { comSinal, formatar, formatarRedondo } from '../dominio/dinheiro';
 import { saldoDaConta } from '../dominio/saldo';
 import {
@@ -16,6 +16,8 @@ import {
   insights,
   lembreteDeBackup,
   orcamento,
+  PagueSePrimeiroAgora,
+  pagueSePrimeiroAgora,
   recorrencias,
   rotuloDoVencimento,
   resumoDoMes,
@@ -23,7 +25,8 @@ import {
   statusDoRegistro,
   transacoesDoMes,
 } from '../estado/derivados';
-import { useRecorte, useDespachar } from '../estado/store';
+import { PERCENTUAIS_PAGUE_SE_PRIMEIRO } from '../dominio/recorrencia';
+import { Acao, useRecorte, useDespachar } from '../estado/store';
 import { resolverCor } from '../tema/paletas';
 import { useTema } from '../tema/TemaContext';
 
@@ -43,6 +46,8 @@ const CHAVES = [
   'diasSemGasto',
   'ultimoBackupEm',
   'decisoesDeRecorrencia',
+  'metas',
+  'pagueSePrimeiro',
 ] as const;
 
 export function Inicio() {
@@ -62,6 +67,7 @@ export function Inicio() {
   const corOrcamento = corDoNivel(orc.nivel, t);
   const avisoDeBackup = lembreteDeBackup(estado);
   const rec = recorrencias(estado);
+  const pagarPrimeiro = pagueSePrimeiroAgora(estado);
 
   /** Um quadradinho da trilha da semana. */
   const celulaDoDia = (d: DiaDaSemana) => {
@@ -246,6 +252,17 @@ export function Inicio() {
 
       {/* ── Corpo ── */}
       <View style={{ paddingHorizontal: 22, paddingTop: 22, paddingBottom: 26, gap: 26 }}>
+        {/* Pague-se primeiro: o salário caiu, e é agora — antes do primeiro
+            gasto — que guardar custa menos. Por isso vem antes de tudo. */}
+        {pagarPrimeiro ? (
+          <CartaoPagueSePrimeiro
+            convite={pagarPrimeiro}
+            hoje={estado.hoje}
+            percentual={estado.pagueSePrimeiro.percentual}
+            despachar={despachar}
+          />
+        ) : null}
+
         {/* Insight rotativo */}
         <Toque
           aoTocar={() => despachar({ tipo: 'PROXIMO_INSIGHT', total: listaInsights.length })}
@@ -709,4 +726,135 @@ export function Inicio() {
       </View>
     </View>
   );
+}
+
+/**
+ * O convite de guardar quando a entrada recorrente cai — ou, antes disso, de
+ * lançá-la, que é o que falta para quem registra à mão.
+ *
+ * O percentual troca aqui mesmo, no momento da decisão: "este mês só 5%" é
+ * melhor que "agora não", e esconder a escolha numa tela de ajustes empurraria
+ * a pessoa para o não. A meta de destino mora em Recorrentes.
+ */
+function CartaoPagueSePrimeiro({
+  convite,
+  hoje,
+  percentual,
+  despachar,
+}: {
+  convite: PagueSePrimeiroAgora;
+  hoje: DiaISO;
+  percentual: number;
+  despachar: (a: Acao) => void;
+}) {
+  const { t } = useTema();
+  const { entrada } = convite;
+  const valorEntrada = `${entrada.valorFixo ? '' : '≈ '}${formatar(entrada.valorCentavos)}`;
+
+  const botao = (rotulo: string, aoTocar: () => void) => (
+    <Toque aoTocar={aoTocar} rotuloAcessivel={rotulo}>
+      <View
+        style={{
+          borderRadius: 12,
+          paddingVertical: 12,
+          alignItems: 'center',
+          backgroundColor: t.accent,
+        }}
+      >
+        <Txt tamanho={13} peso={600} cor={t.onAccent}>
+          {rotulo}
+        </Txt>
+      </View>
+    </Toque>
+  );
+
+  return (
+    <View
+      style={{
+        gap: 14,
+        borderRadius: 18,
+        paddingVertical: 15,
+        paddingHorizontal: 16,
+        backgroundColor: t.accentSoft,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Disco path={icones.metas} cor={t.onAccent} fundo={t.accent} icone={19} />
+        <View style={{ flex: 1, gap: 2 }}>
+          <Txt tamanho={10} peso={600} maiusculas espacamento={0.8} cor={t.accent}>
+            {convite.situacao === 'guardar'
+              ? `${entrada.descricao} caiu · ${formatar(entrada.valorCentavos)}`
+              : `Dia de ${entrada.descricao} · ${valorEntrada}`}
+          </Txt>
+          <Txt tamanho={13.5} peso={600}>
+            {convite.situacao === 'guardar'
+              ? 'Pague-se primeiro'
+              : 'Já caiu? Lance para guardar antes de gastar'}
+          </Txt>
+          <Txt tamanho={11.5} cor={t.inkSoft} entrelinha={1.4}>
+            {convite.situacao === 'lancar'
+              ? `${maiuscula(rotuloDoVencimento(entrada.proxima, hoje))}. Assim que lançar, o app sugere guardar ${percentual}% antes de gastar.`
+              : convite.meta
+                ? `Guarde ${convite.percentual}% em ${convite.meta.nome} antes do primeiro gasto — depois, o que sobra é o que dá para gastar.`
+                : `Guarde ${convite.percentual}% antes do primeiro gasto. Falta só uma meta para onde levar.`}
+          </Txt>
+        </View>
+      </View>
+
+      {convite.situacao === 'guardar' ? (
+        <>
+          <View style={{ flexDirection: 'row', gap: 7 }}>
+            {PERCENTUAIS_PAGUE_SE_PRIMEIRO.map((pct) => {
+              const ativo = pct === convite.percentual;
+              return (
+                <Toque
+                  key={pct}
+                  aoTocar={() => despachar({ tipo: 'PAGAR_PRIMEIRO_PERCENTUAL', percentual: pct })}
+                  rotuloAcessivel={`Guardar ${pct}%`}
+                  estilo={{ flex: 1 }}
+                >
+                  <View
+                    style={{
+                      borderRadius: 999,
+                      paddingVertical: 7,
+                      alignItems: 'center',
+                      borderWidth: 1,
+                      borderColor: ativo ? t.accent : t.lineInput,
+                      backgroundColor: ativo ? t.accent : t.surface,
+                    }}
+                  >
+                    <Txt tamanho={12.5} peso={600} numerico cor={ativo ? t.onAccent : t.inkMuted}>
+                      {pct}%
+                    </Txt>
+                  </View>
+                </Toque>
+              );
+            })}
+          </View>
+          {convite.meta
+            ? botao(`Guardar ${formatar(convite.valorCentavos)}`, () =>
+                despachar({ tipo: 'PAGAR_PRIMEIRO', chave: entrada.chave }),
+              )
+            : botao('Criar uma meta', () => despachar({ tipo: 'ABRIR_META' }))}
+          <Toque
+            aoTocar={() => despachar({ tipo: 'PULAR_PAGAR_PRIMEIRO', chave: entrada.chave })}
+            rotuloAcessivel="Agora não"
+            estilo={{ alignSelf: 'center' }}
+          >
+            <Txt tamanho={12.5} peso={600} cor={t.inkMuted}>
+              Agora não
+            </Txt>
+          </Toque>
+        </>
+      ) : (
+        botao('Já caiu — lançar', () =>
+          despachar({ tipo: 'LANCAR_RECORRENCIA', chave: entrada.chave }),
+        )
+      )}
+    </View>
+  );
+}
+
+function maiuscula(texto: string): string {
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
 }

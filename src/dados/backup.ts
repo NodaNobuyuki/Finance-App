@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { DiaRitualId, diasRitual } from '../dominio/datas';
 import { ErroDeDominio } from '../dominio/erros';
+import { PAGUE_SE_PRIMEIRO_PADRAO, PERCENTUAL_PAGUE_SE_PRIMEIRO } from '../dominio/recorrencia';
 import { paletas, paletaPadrao, Tokens } from '../tema/paletas';
 import { EstadoPersistido } from './persistido';
 
@@ -109,6 +110,19 @@ const dados = z.object({
   decisoesDeRecorrencia: z
     .array(z.object({ id, decisao: z.enum(['confirmada', 'ignorada']) }))
     .default([]),
+  // Ausente nos backups anteriores ao "pague-se primeiro": volta ao padrão, e
+  // nenhuma ocorrência resolvida — no pior caso o convite do mês reaparece.
+  pagueSePrimeiro: z
+    .object({
+      percentual: z
+        .number()
+        .int()
+        .min(PERCENTUAL_PAGUE_SE_PRIMEIRO.min)
+        .max(PERCENTUAL_PAGUE_SE_PRIMEIRO.max),
+      metaId: id.nullable(),
+      resolvidas: z.record(z.string(), dia),
+    })
+    .default(PAGUE_SE_PRIMEIRO_PADRAO),
   onboardingConcluido: z.boolean(),
   metaSemanal: z.number().int().min(1).max(7),
   ritualDiaFechamento: z.enum(diasRitual.map((d) => d.id) as [DiaRitualId, ...DiaRitualId[]]),

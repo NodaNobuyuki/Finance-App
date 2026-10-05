@@ -5,13 +5,16 @@ import { Vazio } from '../componentes/Vazio';
 import { icones } from '../dominio/categorias';
 import { DiaISO } from '../dominio/datas';
 import { formatar, formatarRedondo } from '../dominio/dinheiro';
-import { RecorrenciaVista, recorrencias, rotuloDoVencimento } from '../estado/derivados';
+import { metaEscolhida } from '../dominio/metas';
+import { PERCENTUAIS_PAGUE_SE_PRIMEIRO, Recorrencia } from '../dominio/recorrencia';
+import { recorrencias, rotuloDoVencimento } from '../estado/derivados';
 import { useDespachar, useRecorte } from '../estado/store';
 import { useImportarExtrato } from '../ingestao/useImportarExtrato';
 import { useTema } from '../tema/TemaContext';
+import { Pilulas } from './folhas/PilulasDeConta';
 
 /** O que esta tela lê do estado — e só isto a acorda. */
-const CHAVES = ['transacoes', 'hoje', 'decisoesDeRecorrencia'] as const;
+const CHAVES = ['transacoes', 'hoje', 'decisoesDeRecorrencia', 'metas', 'pagueSePrimeiro'] as const;
 
 /**
  * Gastos que se repetem todo mês.
@@ -26,7 +29,13 @@ export function Recorrentes() {
   const importar = useImportarExtrato();
   const { t } = useTema();
   const r = useMemo(() => recorrencias(estado), [estado]);
-  const vazio = r.confirmadas.length === 0 && r.sugeridas.length === 0;
+  const vazio =
+    r.confirmadas.length === 0 &&
+    r.sugeridas.length === 0 &&
+    r.entradasConfirmadas.length === 0 &&
+    r.entradasSugeridas.length === 0;
+  const decidir = (chave: string, decisao: 'confirmada' | 'ignorada') =>
+    despachar({ tipo: 'DECIDIR_RECORRENCIA', chave, decisao });
 
   return (
     <View>
@@ -128,6 +137,38 @@ export function Recorrentes() {
             ))}
           </View>
         ) : null}
+
+        {r.entradasSugeridas.length > 0 || r.entradasConfirmadas.length > 0 ? (
+          <View style={{ gap: 10 }}>
+            <Rotulo>Entradas que se repetem</Rotulo>
+            {r.entradasSugeridas.map((item) => (
+              <Cartao key={item.chave} item={item} hoje={estado.hoje}>
+                <Txt tamanho={11.5} cor={t.inkSoft} entrelinha={1.4}>
+                  Confirme e, quando cair, o app sugere guardar uma parte antes de gastar.
+                </Txt>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Botao
+                    rotulo="É recorrente"
+                    destaque
+                    aoTocar={() => decidir(item.chave, 'confirmada')}
+                  />
+                  <Botao rotulo="Não é" aoTocar={() => decidir(item.chave, 'ignorada')} />
+                </View>
+              </Cartao>
+            ))}
+            {r.entradasConfirmadas.map((item) => (
+              <Cartao key={item.chave} item={item} hoje={estado.hoje}>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Botao
+                    rotulo="Parar de acompanhar"
+                    aoTocar={() => decidir(item.chave, 'ignorada')}
+                  />
+                </View>
+              </Cartao>
+            ))}
+            {r.entradasConfirmadas.length > 0 ? <AjustesPagueSePrimeiro /> : null}
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -138,11 +179,13 @@ function Cartao({
   hoje,
   children,
 }: {
-  item: RecorrenciaVista;
+  /** `vencida` só existe na despesa: a entrada vencida é convite da Home, não alerta. */
+  item: Recorrencia & { vencida?: boolean };
   hoje: DiaISO;
   children: React.ReactNode;
 }) {
   const { t } = useTema();
+  const entrada = item.sentido === 'entrada';
   return (
     <View
       style={{
@@ -158,9 +201,9 @@ function Cartao({
         <Txt tamanho={14} peso={600} estilo={{ flex: 1 }} linhas={1}>
           {item.descricao}
         </Txt>
-        <Txt tamanho={14} peso={600} numerico cor={t.down}>
+        <Txt tamanho={14} peso={600} numerico cor={entrada ? t.up : t.down}>
           {item.valorFixo ? '' : '≈ '}
-          {formatar(-item.valorCentavos)}
+          {formatar(Math.abs(item.valorCentavos))}
         </Txt>
       </View>
       <Txt tamanho={11.5} cor={item.vencida ? t.accent : t.inkMuted}>
@@ -199,5 +242,62 @@ function Botao({
         </Txt>
       </View>
     </Toque>
+  );
+}
+
+/**
+ * Quanto guardar e para onde, quando a entrada cai. O percentual também troca
+ * no convite da Home; a meta só aqui, porque é escolha de uma vez e não do mês.
+ */
+function AjustesPagueSePrimeiro() {
+  const { metas, pagueSePrimeiro } = useRecorte(['metas', 'pagueSePrimeiro'] as const);
+  const despachar = useDespachar();
+  const { t } = useTema();
+  const meta = metaEscolhida(metas, pagueSePrimeiro.metaId);
+
+  return (
+    <View
+      style={{
+        gap: 16,
+        borderRadius: 18,
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        backgroundColor: t.accentSoft,
+      }}
+    >
+      <View style={{ gap: 4 }}>
+        <Txt tamanho={13.5} peso={600}>
+          Pague-se primeiro
+        </Txt>
+        <Txt tamanho={11.5} cor={t.inkSoft} entrelinha={1.4}>
+          Quando uma entrada confirmada cai, a Home sugere guardar uma parte antes do primeiro
+          gasto. O que sobra é o que dá para gastar.
+        </Txt>
+      </View>
+      <Pilulas
+        rotulo="QUANTO GUARDAR"
+        itens={PERCENTUAIS_PAGUE_SE_PRIMEIRO.map((p) => ({ id: String(p), nome: `${p}%` }))}
+        selecionado={String(pagueSePrimeiro.percentual)}
+        aoEscolher={(id) =>
+          despachar({ tipo: 'PAGAR_PRIMEIRO_PERCENTUAL', percentual: Number(id) })
+        }
+      />
+      {metas.length > 0 ? (
+        <Pilulas
+          rotulo="PARA QUAL META"
+          itens={metas}
+          selecionado={meta?.id ?? null}
+          aoEscolher={(metaId) => despachar({ tipo: 'PAGAR_PRIMEIRO_META', metaId })}
+        />
+      ) : (
+        <View style={{ alignItems: 'center' }}>
+          <Botao
+            rotulo="Criar uma meta"
+            destaque
+            aoTocar={() => despachar({ tipo: 'ABRIR_META' })}
+          />
+        </View>
+      )}
+    </View>
   );
 }

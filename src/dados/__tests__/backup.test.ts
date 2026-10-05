@@ -1,6 +1,7 @@
 import { AGORA } from '../../dominio/datas';
 import { mensagemParaOUsuario } from '../../dominio/erros';
 import { Transacao } from '../../dominio/tipos';
+import { PAGUE_SE_PRIMEIRO_PADRAO } from '../../dominio/recorrencia';
 import {
   Acao,
   criarEstadoDemo,
@@ -49,6 +50,11 @@ function completo(): EstadoPersistido {
     transacoes: [importada, ...guardado.transacoes],
     contas: guardado.contas.map((c) => (c.id === 'cartao' ? { ...c, idNoBanco: '260:abc' } : c)),
     decisoesDeRecorrencia: [{ id: 'streamingbr', decisao: 'confirmada' }],
+    pagueSePrimeiro: {
+      percentual: 15,
+      metaId: 'reserva',
+      resolvidas: { 'entrada:salário': '2026-09-05' },
+    },
   });
 }
 
@@ -92,6 +98,19 @@ describe('ida e volta', () => {
   it('backup de antes da recorrência ainda é lido, com tudo voltando a ser sugestão', () => {
     const texto = adulterado(({ decisoesDeRecorrencia: _, ...resto }) => resto);
     expect(lerBackup(texto).decisoesDeRecorrencia).toEqual([]);
+  });
+
+  it('backup de antes do pague-se primeiro volta ao padrão', () => {
+    const texto = adulterado(({ pagueSePrimeiro: _, ...resto }) => resto);
+    expect(lerBackup(texto).pagueSePrimeiro).toEqual(PAGUE_SE_PRIMEIRO_PADRAO);
+  });
+
+  it('percentual fora da faixa é recusado', () => {
+    const texto = adulterado((d) => ({
+      ...d,
+      pagueSePrimeiro: { ...d.pagueSePrimeiro, percentual: 80 },
+    }));
+    recusa(texto);
   });
 
   it('backup de antes do lembrete, sem o campo, ainda é lido', () => {

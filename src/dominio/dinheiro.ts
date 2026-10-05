@@ -130,3 +130,13 @@ export function percentual(parte: Centavos, todo: Centavos): number {
   if (todo === 0) return 0;
   return Math.round((parte / todo) * 100);
 }
+
+/**
+ * `percentual` inteiro de um valor, em reais redondos: "guarde R$ 520" e não
+ * "guarde R$ 517,43". A sugestão é um convite, e número quebrado parece conta
+ * a conferir. Só inteiro entra e sai — a divisão acontece uma vez, no fim.
+ */
+export function fatiaEmReais(valor: Centavos, percentual: number): Centavos {
+  if (valor <= 0 || percentual <= 0) return 0;
+  return Math.round((valor * percentual) / 10000) * 100;
+}

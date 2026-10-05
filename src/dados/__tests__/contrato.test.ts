@@ -198,6 +198,16 @@ describe.each(implementacoes)('repositório: %s', (_nome, criar) => {
     expect((await repo.carregar())!.decisoesDeRecorrencia).toEqual(sem.decisoesDeRecorrencia);
   });
 
+  it('o pague-se primeiro volta inteiro: percentual, meta e ocorrências resolvidas', async () => {
+    const pagueSePrimeiro = {
+      percentual: 15,
+      metaId: 'reserva',
+      resolvidas: { 'entrada:salário': '2026-09-05' },
+    };
+    await repo.salvar(null, { ...base(), pagueSePrimeiro });
+    expect((await repo.carregar())!.pagueSePrimeiro).toEqual(pagueSePrimeiro);
+  });
+
   it('o instante do último backup volta como número, e a ausência como null', async () => {
     await repo.salvar(null, { ...base(), ultimoBackupEm: 1_759_420_800_123 });
     expect((await repo.carregar())!.ultimoBackupEm).toBe(1_759_420_800_123);

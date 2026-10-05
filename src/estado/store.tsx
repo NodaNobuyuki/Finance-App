@@ -33,13 +33,19 @@ import {
 } from '../dominio/dinheiro';
 import { GerarId, idsSequenciais, uuidV7 } from '../dominio/ids';
 import { contaPadraoDeMeta, guardadoDaMeta, metaEscolhida } from '../dominio/metas';
-import { DecisaoRecorrencia, detectarRecorrencias } from '../dominio/recorrencia';
+import {
+  DecisaoRecorrencia,
+  PAGUE_SE_PRIMEIRO_PADRAO,
+  PagueSePrimeiro,
+  PERCENTUAL_PAGUE_SE_PRIMEIRO,
+  todasAsRecorrencias,
+} from '../dominio/recorrencia';
 import { Semente, semente, vazia } from '../dominio/seed';
 import { EstadoPersistido, hidratar } from '../dados/persistido';
 import { aplicarImportacao } from '../ingestao/aplicar';
 import { contaSugerida, Escolha, montarPrevia, vincularConta } from '../ingestao/previa';
 import { ExtratoLido } from '../ingestao/tipos';
-import { semanasEmDia } from './derivados';
+import { pagueSePrimeiroAgora, semanasEmDia } from './derivados';
 import { Conta, Meta, Perfil, ProgressoDesafio, Tela, Transacao } from '../dominio/tipos';
 import { CorRef, token } from '../tema/paletas';
 
@@ -241,6 +247,11 @@ export type Estado = {
    * ela vai para o disco — a divisão de definição × progresso do desafio.
    */
   decisoesDeRecorrencia: DecisaoRecorrencia[];
+  /**
+   * Quanto guardar quando o salário cai, para onde, e quais ocorrências a
+   * pessoa já resolveu. A entrada em si é derivada — ver `pagueSePrimeiroAgora`.
+   */
+  pagueSePrimeiro: PagueSePrimeiro;
 
   /** Já passou pelo primeiro uso. Persistido: só acontece uma vez. */
   onboardingConcluido: boolean;
@@ -361,6 +372,7 @@ function estadoDe(hoje: DiaISO, s: Semente, onboardingConcluido: boolean): Estad
     progressoDesafios: s.progressoDesafios,
     diasSemGasto: s.diasSemGasto,
     decisoesDeRecorrencia: [],
+    pagueSePrimeiro: PAGUE_SE_PRIMEIRO_PADRAO,
 
     onboardingConcluido,
     onboarding: ONBOARDING_VAZIO,
@@ -543,6 +555,22 @@ export type Acao =
     }
   /** Lança a recorrência confirmada que venceu. Só a chave: o resto o reducer deriva. */
   | { tipo: 'LANCAR_RECORRENCIA'; chave: string }
+  /**
+   * Guarda a fatia da entrada que caiu. Só a chave, pela lição do
+   * `SIM_GUARDAR`: valor, meta e conta o reducer deriva de novo.
+   */
+  | { tipo: 'PAGAR_PRIMEIRO'; chave: string }
+  /** "Agora não": resolve a ocorrência sem guardar. Volta no mês seguinte. */
+  | { tipo: 'PULAR_PAGAR_PRIMEIRO'; chave: string }
+  /** Desfaz o guardar ou o pular: tira o par, se houver, e reabre a ocorrência. */
+  | {
+      tipo: 'REABRIR_PAGAR_PRIMEIRO';
+      chave: string;
+      anterior: DiaISO | null;
+      transacaoIds: string[];
+    }
+  | { tipo: 'PAGAR_PRIMEIRO_PERCENTUAL'; percentual: number }
+  | { tipo: 'PAGAR_PRIMEIRO_META'; metaId: string }
   /** A folha de compartilhar recebeu o backup gerado em `emMs`. */
   | { tipo: 'BACKUP_EXPORTADO'; emMs: number }
   /** Troca todo o dado do usuário pelo de um backup já validado (`lerBackup`). */
@@ -780,6 +808,11 @@ function contaDoRascunho(e: Estado): string {
   return e.contas.some((c) => c.id === e.rascunho.contaId)
     ? e.rascunho.contaId
     : (e.contas[0]?.id ?? '');
+}
+
+/** Marca a ocorrência `dia` da entrada `chave` como resolvida. */
+function comResolvida(p: PagueSePrimeiro, chave: string, dia: DiaISO): PagueSePrimeiro {
+  return { ...p, resolvidas: { ...p.resolvidas, [chave]: dia } };
 }
 
 function ordenar(transacoes: Transacao[]): Transacao[] {
@@ -2097,7 +2130,7 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
       // Derivada de novo aqui, não recebida da tela: tela e reducer resolvendo
       // a recorrência por caminhos separados é divergência esperando aparecer
       // — a lição do `SIM_GUARDAR`.
-      const r = detectarRecorrencias(e.transacoes, e.hoje).find((x) => x.chave === a.chave);
+      const r = todasAsRecorrencias(e.transacoes, e.hoje).find((x) => x.chave === a.chave);
       const confirmada = e.decisoesDeRecorrencia.some(
         (x) => x.id === a.chave && x.decisao === 'confirmada',
       );
@@ -2127,12 +2160,37 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
         // lançamento na mesma recorrência, e o mês seguinte andar.
         descricaoOriginal: r.textoOriginal,
       };
-      const valor = formatar(-r.valorCentavos);
+      const valor = formatar(Math.abs(r.valorCentavos));
+      const transacoes = ordenar([tx, ...e.transacoes]);
+
+      // A entrada lançada abre o convite de guardar na hora: o toast diz isso,
+      // em vez de oferecer desfazer por cima do cartão que acabou de aparecer.
+      if (r.sentido === 'entrada') {
+        const convite = pagueSePrimeiroAgora({ ...e, transacoes });
+        return {
+          ...e,
+          seq,
+          transacoes,
+          toast: {
+            id: seq,
+            texto: `${r.descricao} lançado · ${valor}`,
+            sub:
+              convite?.situacao === 'guardar'
+                ? `Agora guarde ${formatar(convite.valorCentavos)} antes de gastar.`
+                : undefined,
+            acao: {
+              rotulo: 'Desfazer',
+              acao: { tipo: 'DESFAZER', transacaoIds: [tx.id], diasSemGasto: [] },
+            },
+            duracaoMs: 4200,
+          },
+        };
+      }
 
       return {
         ...e,
         seq,
-        transacoes: ordenar([tx, ...e.transacoes]),
+        transacoes,
         // Valor fixo é o certo; o variável é o do mês passado, e a pessoa
         // precisa de um caminho direto para corrigi-lo quando a conta chegar.
         toast: r.valorFixo
@@ -2155,6 +2213,117 @@ function aplicarAcao(d: Dependencias, e: Estado, a: Acao): Estado {
             },
       };
     }
+
+    case 'PAGAR_PRIMEIRO': {
+      const convite = pagueSePrimeiroAgora(e);
+      const seq = e.seq + 1;
+      if (convite?.situacao !== 'guardar' || convite.entrada.chave !== a.chave) {
+        return {
+          ...e,
+          seq,
+          toast: avisar(seq, 'Nada a guardar', 'Esta entrada já foi resolvida.'),
+        };
+      }
+      const { entrada, meta, valorCentavos } = convite;
+      if (!meta) {
+        return {
+          ...e,
+          seq,
+          toast: avisar(
+            seq,
+            'Nenhuma meta para guardar',
+            'Crie uma meta e esta fatia tem para onde ir.',
+          ),
+        };
+      }
+
+      // A fatia sai de onde a entrada caiu. Se é a mesma conta da meta, o par
+      // soma zero e o saldo não se mexe — o dinheiro só passou a ter dono.
+      const par = parDeTransferencia(d, {
+        contaOrigemId: convite.contaOrigemId,
+        contaDestinoId: meta.contaId,
+        valorCentavos,
+        ocorridoEm: e.hoje,
+        descricao: `Guardado em ${meta.nome}`,
+        meta: { id: meta.id, lado: 'destino' },
+      });
+      const anterior = e.pagueSePrimeiro.resolvidas[entrada.chave] ?? null;
+
+      return {
+        ...e,
+        seq,
+        transacoes: ordenar([...par, ...e.transacoes]),
+        pagueSePrimeiro: comResolvida(e.pagueSePrimeiro, entrada.chave, entrada.ultima),
+        toast: {
+          id: seq,
+          texto: `${formatar(valorCentavos)} guardados em ${meta.nome}`,
+          sub: `${convite.percentual}% de ${entrada.descricao}, antes de gastar.`,
+          acao: {
+            rotulo: 'Desfazer',
+            acao: {
+              tipo: 'REABRIR_PAGAR_PRIMEIRO',
+              chave: entrada.chave,
+              anterior,
+              transacaoIds: par.map((t) => t.id),
+            },
+          },
+          duracaoMs: 6000,
+        },
+      };
+    }
+
+    case 'PULAR_PAGAR_PRIMEIRO': {
+      const convite = pagueSePrimeiroAgora(e);
+      if (convite?.situacao !== 'guardar' || convite.entrada.chave !== a.chave) return e;
+      const { entrada } = convite;
+      const seq = e.seq + 1;
+      return {
+        ...e,
+        seq,
+        pagueSePrimeiro: comResolvida(e.pagueSePrimeiro, entrada.chave, entrada.ultima),
+        toast: {
+          ...avisar(seq, `Fica para o próximo ${entrada.descricao}`),
+          acao: {
+            rotulo: 'Desfazer',
+            acao: {
+              tipo: 'REABRIR_PAGAR_PRIMEIRO',
+              chave: entrada.chave,
+              anterior: e.pagueSePrimeiro.resolvidas[entrada.chave] ?? null,
+              transacaoIds: [],
+            },
+          },
+        },
+      };
+    }
+
+    case 'REABRIR_PAGAR_PRIMEIRO': {
+      const remover = new Set(a.transacaoIds);
+      const { [a.chave]: _, ...resto } = e.pagueSePrimeiro.resolvidas;
+      const seq = e.seq + 1;
+      return {
+        ...e,
+        seq,
+        transacoes:
+          remover.size > 0 ? e.transacoes.filter((t) => !remover.has(t.id)) : e.transacoes,
+        pagueSePrimeiro: {
+          ...e.pagueSePrimeiro,
+          resolvidas: a.anterior === null ? resto : { ...resto, [a.chave]: a.anterior },
+        },
+        toast: avisar(seq, 'Desfeito'),
+      };
+    }
+
+    case 'PAGAR_PRIMEIRO_PERCENTUAL': {
+      const { min, max } = PERCENTUAL_PAGUE_SE_PRIMEIRO;
+      if (!Number.isInteger(a.percentual) || a.percentual < min || a.percentual > max) return e;
+      if (a.percentual === e.pagueSePrimeiro.percentual) return e;
+      return { ...e, pagueSePrimeiro: { ...e.pagueSePrimeiro, percentual: a.percentual } };
+    }
+
+    case 'PAGAR_PRIMEIRO_META':
+      return a.metaId === e.pagueSePrimeiro.metaId
+        ? e
+        : { ...e, pagueSePrimeiro: { ...e.pagueSePrimeiro, metaId: a.metaId } };
 
     case 'BACKUP_EXPORTADO':
       return { ...e, ultimoBackupEm: a.emMs };
