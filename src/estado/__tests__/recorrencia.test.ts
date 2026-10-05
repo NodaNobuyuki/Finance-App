@@ -173,6 +173,20 @@ describe('lançar o que venceu', () => {
   });
 });
 
+describe('a demo', () => {
+  it('mostra os gastos fixos como sugestão — é o modo que existe para mostrar o app', () => {
+    const r = recorrencias(estadoInicial);
+    expect(r.sugeridas.map((x) => x.descricao).sort()).toEqual([
+      'Academia',
+      'Aluguel',
+      'Conta de luz',
+      'Curso de inglês',
+      'Netflix',
+    ]);
+    expect(r.sugeridas.find((x) => x.descricao === 'Conta de luz')!.valorFixo).toBe(false);
+  });
+});
+
 describe('o extrato do mês chegando depois', () => {
   it('reconhece o lançamento feito pela recorrência como a mesma compra', () => {
     const e = sessao()(confirmar('streamingbr'), {

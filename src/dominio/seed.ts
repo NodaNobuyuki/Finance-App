@@ -100,7 +100,41 @@ function transacoesDemo(hoje: DiaISO): Transacao[] {
     tx(4, 'Mercado Dia', 'mercado', -15820, 'carteira'),
     tx(4, 'Curso de inglês', 'educacao', -8990, 'cartao'),
     tx(4, 'Academia', 'saude', -11990, 'corrente'),
+
+    // Os dois meses anteriores dos gastos fixos — sem eles a demo não teria
+    // recorrência nenhuma para mostrar, e a tela Recorrentes abriria vazia
+    // justamente no modo que existe para mostrar o app. 30 dias de passo
+    // mantêm cada par dentro do "uma por mês"; a luz varia, como varia.
+    // O que eles movem no saldo é devolvido na abertura: ver `comAbertura`.
+    ...[30, 60].flatMap((mes) => [
+      tx(4 + mes, 'Salário do mês', 'salario', 680000, 'corrente'),
+      tx(3 + mes, 'Aluguel', 'casa', -185000, 'corrente'),
+      tx(3 + mes, 'Conta de luz', 'contas', mes === 30 ? -19840 : -22610, 'corrente'),
+      tx(3 + mes, 'Netflix', 'assinaturas', -4490, 'cartao'),
+      tx(4 + mes, 'Curso de inglês', 'educacao', -8990, 'cartao'),
+      tx(4 + mes, 'Academia', 'saude', -11990, 'corrente'),
+    ]),
   ];
+}
+
+/**
+ * Abertura de cada conta descontando o histórico anterior à semana da demo.
+ *
+ * Os saldos de hoje são os do protótipo, travados em `saldo.test.ts`. O
+ * histórico dos meses anteriores existe para a recorrência ter o que detectar,
+ * não para mexer neles: a abertura absorve o que ele soma, e o saldo derivado
+ * continua dando o mesmo número.
+ */
+function comAbertura(transacoes: Transacao[], hoje: DiaISO): Conta[] {
+  const corte = somarDias(hoje, -7);
+  return contas.map((c) => ({
+    ...c,
+    saldoInicialCentavos:
+      c.saldoInicialCentavos -
+      transacoes
+        .filter((t) => t.contaId === c.id && t.ocorridoEm < corte)
+        .reduce((soma, t) => soma + t.valorCentavos, 0),
+  }));
 }
 
 /**
@@ -228,7 +262,7 @@ export function semente(hoje: DiaISO): Semente {
   const transacoes = transacoesDemo(hoje);
   return {
     perfil: { nome: 'Marina' },
-    contas,
+    contas: comAbertura(transacoes, hoje),
     transacoes,
     metas: metasDemo(hoje),
     categorias: categoriasDemo(),

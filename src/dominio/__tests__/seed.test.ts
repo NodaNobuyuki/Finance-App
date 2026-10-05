@@ -18,9 +18,21 @@ const DIAS_VARIADOS = [
 ];
 
 describe('semente ancorada em AGORA', () => {
-  it('reproduz as datas do fixture original', () => {
-    const dias = semente(AGORA).transacoes.map((t) => t.ocorridoEm);
+  it('reproduz as datas do fixture original na semana da demo', () => {
+    const dias = semente(AGORA)
+      .transacoes.map((t) => t.ocorridoEm)
+      .filter((d) => d >= '2026-07-29');
     expect([...new Set(dias)]).toEqual(['2026-08-03', '2026-08-02', '2026-08-01']);
+  });
+
+  it('traz dois meses de gastos fixos antes dela, para a recorrência ter o que mostrar', () => {
+    const anteriores = semente(AGORA).transacoes.filter((t) => t.ocorridoEm < '2026-07-29');
+    expect([...new Set(anteriores.map((t) => t.ocorridoEm))].sort()).toEqual([
+      '2026-06-02',
+      '2026-06-03',
+      '2026-07-02',
+      '2026-07-03',
+    ]);
   });
 
   it('os dias sem gasto caem nas 5 semanas anteriores', () => {

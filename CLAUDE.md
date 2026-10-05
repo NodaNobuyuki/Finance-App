@@ -216,7 +216,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = formatação + lint + tipos + 712 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = formatação + lint + tipos + 714 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 
@@ -507,13 +507,16 @@ Não há tabela de regras, e é de propósito: regra gravada envelheceria no pri
 
 Quando o OFX daquele mês chega, o lançamento feito pela recorrência não tem FITID, então cai em "possível duplicata" — o mesmo caminho da ponta de transferência criada pela importação.
 
+**Recorrência não vira atalho de um toque.** `atalhosRapidos` pula o que `detectarRecorrencias` reconhece: aluguel e academia são os gastos que mais se repetem, e sem isso ganhavam o primeiro botão da Home — "Aluguel R$ 1.850" ao lado do café. O previsível é da recorrência; o atalho é para o gasto miúdo. O empate entre categorias também passou a se desfazer pelo menor valor, não pela ordem do array, que muda a cada registro.
+
+**A demo tem dois meses de gastos fixos** (salário, aluguel, luz, Netflix, curso, academia) antes da semana dela, para a tela Recorrentes ter o que mostrar no modo que existe para mostrar o app. `comAbertura()` em `seed.ts` desconta o que esse histórico soma da abertura de cada conta, e os saldos do protótipo travados em `saldo.test.ts` continuam os mesmos.
+
 O custo é o loop do produto: a tela Recorrentes mostra o comprometido do mês, o do ano e quanto viraria em 5 anos guardado todo mês no CDI (`acumuladoDeAportes`, arredondando mês a mês, centavo inteiro).
 
 **Pendências da recorrência:**
 - Só despesa. Salário é o mais previsível de todos, mas o loop é sobre gasto; entra quando houver o que fazer com ele
 - Valor variável lançado com o valor do mês passado não casa com o OFX se a pessoa não ajustar — vira linha a mais
 - Vencimento pelo dia da última ocorrência: a do dia 31 que caiu em 28/02 passa a vencer dia 28 dali em diante
-- A demo não tem histórico de meses anteriores (os saldos dela estão cravados no protótipo), então a tela abre vazia nela; para ver no aparelho, importe dois ou mais meses de OFX
 
 ### O Extrato rola sozinho
 
