@@ -550,17 +550,18 @@ Três ganchos, e **`useLoja` não existe mais** — de propósito, para ninguém
 
 **A regra é uma só: o SDK do projeto tem de ser o mesmo que a App Store publica no Expo Go**, porque o Expo Go roda um SDK por vez. Não é preferência por versão nova nem por versão velha — é o que decide se o app abre no iPhone, que hoje é o único aparelho de teste.
 
-Hoje: **SDK 57** (`expo ~57.0.20`, RN 0.86.3, React 19.2.3, TypeScript 6).
+Hoje: **SDK 58** (`expo ~58.0.21`, RN 0.88.1, React 19.3.0, Jest 30, TypeScript 6).
 
-O projeto ficou em 54 enquanto a loja publicava o Expo Go 54; quando o aparelho passou a trazer o Expo Go 57, o app parou de abrir com "the installed version of Expo Go is for SDK 57.0.0 / the project you opened uses SDK 54" e o SDK subiu junto. É esse o gatilho — o aparelho reclamando —, e a resposta é sempre acompanhar, nunca ficar atrás.
+O projeto ficou em 54 enquanto a loja publicava o Expo Go 54; quando o aparelho passou a trazer o Expo Go 57, o app parou de abrir com "the installed version of Expo Go is for SDK 57.0.0 / the project you opened uses SDK 54" e o SDK subiu junto. Em 30/10/2026 aconteceu de novo, 57 → 58. É esse o gatilho — o aparelho reclamando —, e a resposta é sempre acompanhar, nunca ficar atrás.
 
 O acoplamento acaba quando o projeto migrar para **development build** (EAS): aí o cliente é compilado por nós e o SDK volta a ser escolha livre. Isso vai acontecer de qualquer forma no item 2 da ordem de implementação — share sheet e `NotificationListenerService` são código nativo e **não rodam no Expo Go, em SDK nenhum**.
 
 ### A receita, e o que ela cobra
 
 ```
-npx expo install expo@^NN
-npx expo install --fix      # runtime, expo-*, jest-expo, typescript, @types/react
+rm -rf node_modules package-lock.json
+npm install expo@~NN.0.x    # npm, não `expo install`: sem node_modules ele não acha o SDK
+npx expo install --fix      # runtime, expo-*, jest-expo, jest, typescript, @types/react
 # manual — o Expo não vigia: @testing-library/react-native
 npm run verificar
 ```
