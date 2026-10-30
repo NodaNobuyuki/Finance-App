@@ -64,6 +64,51 @@ describe('importar uma fatura', () => {
     expect(importadas.map((t) => t.descricaoOriginal)).toContain('Cinema.Com - Parcela 1/2');
   });
 
+  it('FITID que o banco reaproveita não faz lançamento sumir como "já importado"', () => {
+    let trocados = 0;
+    const reaproveitado = adapterOFX.ler(
+      texto('nubank-cartao.ofx').replace(/<FITID>[^<]*<\/FITID>/g, (original) =>
+        trocados++ < 3 ? '<FITID>DOC-000123</FITID>' : original,
+      ),
+    );
+    expect(montarPrevia(reaproveitado, 'cartao', {}, estadoInicial).jaImportadas).toBe(0);
+
+    const depois = sessao().importar(reaproveitado);
+    expect(novas(estadoInicial, depois).filter((t) => t.contaId === 'cartao')).toHaveLength(16);
+  });
+
+  it('quem importou antes da correção não ganha a compra em dobro — e recupera o IOF', () => {
+    // Antes de o adapter separar o grupo, a compra entrou com o FITID cru e o
+    // IOF, com o mesmo FITID, foi descartado como "já importado".
+    const s = sessao();
+    const depois = s.importar(cartao);
+    const compra = depois.transacoes.find((t) => t.descricaoOriginal === 'Servico* Assinatura')!;
+    const fitidCru = cartao.transacoes.find((t) => t.idExterno === compra.idExterno)!.fitidDoBanco!;
+    const antigo: Estado = {
+      ...depois,
+      transacoes: depois.transacoes
+        .filter((t) => t.descricaoOriginal !== 'IOF de "Servico* Assinatura"')
+        .map((t) => (t.id === compra.id ? { ...t, idExterno: fitidCru } : t)),
+    };
+
+    const previa = montarPrevia(cartao, 'cartao', {}, antigo);
+    expect(previa.jaImportadas).toBe(15);
+    expect(previa.linhas.map((l) => l.bruta.descricaoOriginal)).toEqual([
+      'IOF de "Servico* Assinatura"',
+    ]);
+
+    const reimportado = sessao(antigo).importar(cartao);
+    const doCartao = reimportado.transacoes.filter(
+      (t) => t.contaId === 'cartao' && t.origem === 'ofx',
+    );
+    expect(doCartao).toHaveLength(16);
+    // A antiga passou a usar o id novo: a próxima importação casa direto.
+    expect(reimportado.transacoes.find((t) => t.id === compra.id)!.idExterno).toBe(
+      compra.idExterno,
+    );
+    expect(montarPrevia(cartao, 'cartao', {}, reimportado).jaImportadas).toBe(16);
+  });
+
   it('o pagamento da fatura vira transferência da conta corrente, não receita', () => {
     const depois = sessao().importar(cartao);
     const criadas = novas(estadoInicial, depois);

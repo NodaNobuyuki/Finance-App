@@ -54,6 +54,12 @@ export function aplicarImportacao(
   };
   const nome = (id: string) => e.contas.find((c) => c.id === id)?.nome ?? 'Conta';
 
+  // Gravadas com o FITID cru de um grupo que o adapter separou: o mesmo
+  // lançamento do banco, agora com o id que a próxima importação vai trazer.
+  for (const { transacao, idExterno } of previa.renomeadas) {
+    alteradas.set(transacao.id, { ...transacao, idExterno });
+  }
+
   for (const linha of previa.linhas) {
     const { bruta } = linha;
     if (!resumo.ultimoDia || bruta.ocorridoEm > resumo.ultimoDia) {

@@ -79,9 +79,21 @@ describe('fatura de cartão do Nubank', () => {
     expect(marcadas).toHaveLength(1);
   });
 
-  it('todo lançamento tem FITID próprio', () => {
+  it('todo lançamento sai com id próprio', () => {
     const ids = extrato.transacoes.map((t) => t.idExterno);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('a compra internacional e o IOF dela dividem o FITID — e entram os dois', () => {
+    // É assim no arquivo real: o IOF vem com o FITID da compra. Antes do
+    // `fitidsUnicos`, a prévia via o IOF como "já importado" e ele sumia.
+    const compra = extrato.transacoes.find((t) => t.descricaoOriginal === 'Servico* Assinatura')!;
+    const iof = extrato.transacoes.find(
+      (t) => t.descricaoOriginal === 'IOF de "Servico* Assinatura"',
+    )!;
+    expect(compra.fitidDoBanco).toBe(iof.fitidDoBanco);
+    expect(compra.idExterno).not.toBe(iof.idExterno);
+    expect(iof.valorCentavos).toBe(-317);
   });
 });
 
@@ -154,6 +166,58 @@ describe('arquivo sujo', () => {
     const doisIguais = semFitid.replace('<BANKTRANLIST>', `<BANKTRANLIST>\n${linha}\n${linha}`);
     const ids = adapterOFX.ler(doisIguais.replace(/<FITID>[^<]*<\/FITID>/g, '')).transacoes;
     expect(new Set(ids.map((t) => t.idExterno)).size).toBe(ids.length);
+  });
+
+  describe('FITID que o banco reaproveita', () => {
+    /** Os N primeiros lançamentos do arquivo passam a dividir o mesmo FITID. */
+    const comFitid = (texto: string, n: number, fitid = 'DOC-000123') => {
+      let trocados = 0;
+      return texto.replace(/<FITID>[^<]*<\/FITID>/g, (original) =>
+        trocados++ < n ? `<FITID>${fitid}</FITID>` : original,
+      );
+    };
+    const blocos = (texto: string) => texto.match(/<STMTTRN>[\s\S]*?<\/STMTTRN>/g)!;
+
+    it('lançamentos diferentes com o mesmo FITID entram todos, cada um com seu id', () => {
+      const extrato = adapterOFX.ler(comFitid(base, 3));
+      expect(extrato.transacoes).toHaveLength(16);
+      const ids = extrato.transacoes.map((t) => t.idExterno);
+      expect(new Set(ids).size).toBe(16);
+      expect(ids.slice(0, 3).every((id) => id.startsWith('DOC-000123#'))).toBe(true);
+    });
+
+    it('o id do grupo é estável entre duas leituras', () => {
+      const a = adapterOFX.ler(comFitid(base, 3)).transacoes.map((t) => t.idExterno);
+      const b = adapterOFX.ler(comFitid(base, 3)).transacoes.map((t) => t.idExterno);
+      expect(a).toEqual(b);
+    });
+
+    it('quem tem FITID único continua com ele — o dedupe entre exportações não muda', () => {
+      const original = adapterOFX.ler(base).transacoes.map((t) => t.idExterno);
+      const mexido = adapterOFX.ler(comFitid(base, 3)).transacoes.map((t) => t.idExterno);
+      expect(mexido.slice(3)).toEqual(original.slice(3));
+      // No original, só a compra internacional e o IOF dela, que dividem o FITID.
+      expect(original.filter((id) => id.includes('#'))).toHaveLength(2);
+    });
+
+    it('a mesma linha impressa duas vezes continua sendo uma só', () => {
+      const [primeiro] = blocos(base);
+      const duplicado = base.replace(primeiro, `${primeiro}\n${primeiro}`);
+      const ids = adapterOFX.ler(duplicado).transacoes.map((t) => t.idExterno);
+      expect(ids[0]).toBe(ids[1]);
+    });
+
+    it('dentro de um grupo que se contradiz, dois lançamentos iguais não colidem', () => {
+      // FITID reaproveitado E dois cafés iguais: com o identificador sem
+      // valor, só a ordem separa as duas compras.
+      const [primeiro] = blocos(base);
+      const texto = comFitid(base.replace(primeiro, `${primeiro}\n${primeiro}`), 3);
+      const ids = adapterOFX
+        .ler(texto)
+        .transacoes.slice(0, 3)
+        .map((t) => t.idExterno);
+      expect(new Set(ids).size).toBe(3);
+    });
   });
 
   it('entidades SGML viram o caractere', () => {
