@@ -12,6 +12,13 @@ import { Origem } from '../dominio/tipos';
 export type TransacaoBruta = {
   /** FITID do OFX; hash estável quando o banco não manda. Base do dedupe. */
   idExterno: string;
+  /**
+   * O FITID como o banco mandou, quando o adapter precisou trocá-lo — o banco
+   * o reaproveitou para lançamentos diferentes. A linha importada antes da
+   * troca está gravada com este, e é por ele que a prévia a reconhece em vez
+   * de importá-la de novo.
+   */
+  fitidDoBanco?: string;
   /** Inteiro, negativo = saída — já na convenção do app. */
   valorCentavos: Centavos;
   ocorridoEm: DiaISO;

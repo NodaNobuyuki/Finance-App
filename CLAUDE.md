@@ -126,6 +126,9 @@ interface RawTransaction {
 - Alguns bancos invertem a convenção de sinal em fatura de cartão. O Nubank não: compra negativa, `Pagamento recebido` positivo.
 - Valor sem float: `centavos()` lê `-19.90`, `-19,90` e `1.234,56`, e recusa o ambíguo (`0.123`, `12.345.6`) em vez de chutar — a linha é pulada e contada.
 - Sem FITID, o id é hash de data, valor, texto e ordem de aparição: estável entre exportações sobrepostas, e dois cafés iguais no mesmo dia não colidem.
+- **FITID reaproveitado — o Nubank faz:** a compra internacional e o `IOF de "…"` dela vêm com o **mesmo FITID**, e a prévia via o IOF como "já importado": ele sumia calado. A anonimização do fixture tinha sorteado um FITID por linha e apagado justamente isso; foi o diagnóstico rodado no arquivo real que achou. `fitidsUnicos()` no adapter troca, só no grupo que se contradiz, o id por FITID + conteúdo + ordem, e guarda o original em `fitidDoBanco`; quem tem FITID único fica com ele. A linha gravada com o FITID cru (importada antes da correção) é reconhecida pela prévia por `fitidDoBanco` + texto + valor e passa ao id novo (`Previa.renomeadas`) — sem isso a compra entraria em dobro, porque linha com FITID não é candidata a "possível duplicata". FITID repetido com conteúdo idêntico continua sendo uma linha só.
+- **Anonimizar não pode apagar estrutura:** FITID compartilhado, ordem e repetição são propriedade do banco, não dado pessoal. Ao trocar FITIDs, troque cada valor distinto por um mesmo substituto.
+- **Banco novo começa pelo diagnóstico:** `npm run diagnosticar-ofx -- arquivo.ofx` (`adapters/ofxDiagnostico.ts`) mostra a forma do arquivo — encoding declarado × bytes, FITID, `TRNTYPE`, formato de valor e data — e alerta saldo como lançamento, fatura não reconhecida, sinal invertido. Não imprime conta, valor, FITID nem descrição (o teste trava isso), então quem tem a conta roda e manda só o resultado. É o primeiro passo antes de pedir o arquivo para virar fixture.
 - `Pagamento recebido` na fatura e o pagamento saindo da conta são as **duas pontas de uma transferência**, não receita e despesa. Importados como linhas comuns, contariam o gasto duas vezes (compras no cartão + boleto da fatura).
 
 **Notificações Android**
@@ -216,7 +219,7 @@ src/telas/      uma tela por arquivo, folhas em telas/folhas/, primeiro uso em O
 src/tema/       paletas como tokens + provider
 ```
 
-Verificação: `npm run verificar` = formatação + lint + tipos + 721 testes + expo-doctor + bundle. Mesma bateria roda no CI.
+Verificação: `npm run verificar` = formatação + lint + tipos + 747 testes + expo-doctor + bundle. Mesma bateria roda no CI.
 
 ### Erros: domínio ≠ infra
 

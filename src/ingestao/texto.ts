@@ -16,6 +16,15 @@ export function decodificar(bytes: Uint8Array): string {
   return deUTF8(bytes, inicio) ?? deCP1252(bytes);
 }
 
+/** Qual caminho `decodificar` tomaria — para o diagnóstico, que compara com o cabeçalho. */
+export function encodingDetectado(
+  bytes: Uint8Array,
+): 'ascii' | 'utf-8' | 'utf-8 com BOM' | 'cp1252' {
+  if (temBOM(bytes)) return deUTF8(bytes, 3) === null ? 'cp1252' : 'utf-8 com BOM';
+  if (bytes.every((b) => b < 0x80)) return 'ascii';
+  return deUTF8(bytes, 0) === null ? 'cp1252' : 'utf-8';
+}
+
 function temBOM(b: Uint8Array): boolean {
   return b.length >= 3 && b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf;
 }
