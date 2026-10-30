@@ -52,6 +52,12 @@ export type Previa = {
   linhas: LinhaDaPrevia[];
   /** FITID que já está nesta conta: importar o mesmo arquivo duas vezes não duplica nada. */
   jaImportadas: number;
+  /**
+   * Das já importadas, as que estão gravadas com o FITID cru de um grupo que o
+   * adapter separou: passam a usar o id novo, para a próxima importação casar
+   * direto. Não aparecem na prévia — é a mesma linha do banco, sem decisão.
+   */
+  renomeadas: { transacao: Transacao; idExterno: string }[];
   ignoradas: number;
   /** Quantos lançamentos novos a confirmação cria. */
   aImportar: number;
@@ -94,11 +100,38 @@ export function montarPrevia(
   const usadas = new Set<string>();
 
   const linhas: LinhaDaPrevia[] = [];
+  const renomeadas: Previa['renomeadas'] = [];
   let jaImportadas = 0;
 
   for (const bruta of extrato.transacoes) {
-    // FITID repetido dentro do próprio arquivo também conta: o banco às vezes
-    // repete, e o índice `(conta_id, id_externo)` recusaria a segunda.
+    // Linha que o banco mandou com FITID reaproveitado e que já está gravada
+    // com o FITID cru: é a mesma, desde que o conteúdo bata. Sem isto, quem
+    // importou a fatura antes de o adapter separar o grupo ganharia a compra
+    // em dobro — a gravada não tem o id novo e, com FITID, não é candidata a
+    // "possível duplicata".
+    const gravada =
+      bruta.fitidDoBanco !== undefined && !jaNaConta.has(bruta.idExterno)
+        ? e.transacoes.find(
+            (t) =>
+              t.contaId === contaId &&
+              t.idExterno === bruta.fitidDoBanco &&
+              t.descricaoOriginal === bruta.descricaoOriginal &&
+              t.valorCentavos === bruta.valorCentavos &&
+              !usadas.has(t.id),
+          )
+        : undefined;
+    if (gravada) {
+      usadas.add(gravada.id);
+      renomeadas.push({ transacao: gravada, idExterno: bruta.idExterno });
+      jaNaConta.add(bruta.idExterno);
+      jaImportadas += 1;
+      continue;
+    }
+
+    // FITID repetido dentro do próprio arquivo também conta. Só chega aqui a
+    // linha idêntica impressa duas vezes — o adapter já separou o FITID que o
+    // banco reaproveita para lançamentos diferentes —, e o índice
+    // `(conta_id, id_externo)` recusaria a segunda.
     if (jaNaConta.has(bruta.idExterno)) {
       jaImportadas += 1;
       continue;
@@ -164,7 +197,7 @@ export function montarPrevia(
   }
 
   const aImportar = linhas.filter((l) => l.situacao !== 'duplicata' || !l.mesma).length;
-  return { linhas, jaImportadas, ignoradas: extrato.ignoradas, aImportar };
+  return { linhas, jaImportadas, renomeadas, ignoradas: extrato.ignoradas, aImportar };
 }
 
 /**

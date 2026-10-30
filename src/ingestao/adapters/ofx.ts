@@ -65,9 +65,56 @@ function lerOFX(texto: string): ExtratoLido {
     contaExterna: contaExterna(cabecalho),
     inicio: dia(cabecalho.get('DTSTART')) ?? undefined,
     fim: dia(cabecalho.get('DTEND')) ?? undefined,
-    transacoes,
+    transacoes: fitidsUnicos(transacoes),
     ignoradas,
   };
+}
+
+/**
+ * FITID que o banco repete para lançamentos DIFERENTES vira um id por conteúdo.
+ *
+ * O FITID deveria ser único por conta, e é nisso que o dedupe se apoia: a
+ * prévia trata a segunda linha com o mesmo FITID como "já importada". Com
+ * banco que reaproveita o identificador — número do documento, a própria data
+ * —, isso apagava um lançamento de verdade sem aviso.
+ *
+ * Só o grupo que se contradiz muda: quem tem FITID único continua com ele, e o
+ * dedupe entre exportações segue funcionando. Dentro do grupo o id é FITID +
+ * conteúdo + ordem, estável entre arquivos de períodos sobrepostos, e dois
+ * cafés iguais no mesmo dia não colidem. FITID repetido com conteúdo idêntico
+ * fica como está: aí é a mesma linha impressa duas vezes.
+ *
+ * O Nubank faz isso: a compra internacional e o "IOF de …" dela vêm com o
+ * mesmo FITID, e o IOF sumia da importação.
+ *
+ * A linha gravada com o FITID cru — importada antes desta troca, ou numa
+ * exportação que trouxe só uma linha do grupo — continua reconhecível:
+ * `fitidDoBanco` leva o original, e a prévia casa por ele e pelo conteúdo.
+ */
+function fitidsUnicos(transacoes: TransacaoBruta[]): TransacaoBruta[] {
+  const conteudos = new Map<string, Set<string>>();
+  for (const t of transacoes) {
+    const grupo = conteudos.get(t.idExterno) ?? new Set<string>();
+    grupo.add(conteudo(t));
+    conteudos.set(t.idExterno, grupo);
+  }
+
+  const repeticoes = new Map<string, number>();
+  return transacoes.map((t) => {
+    if (conteudos.get(t.idExterno)!.size === 1) return t;
+    const base = `${t.idExterno}|${conteudo(t)}`;
+    const n = repeticoes.get(base) ?? 0;
+    repeticoes.set(base, n + 1);
+    return {
+      ...t,
+      idExterno: `${t.idExterno}#${cyrb53(`${base}|${n}`).toString(16)}`,
+      fitidDoBanco: t.idExterno,
+    };
+  });
+}
+
+function conteudo(t: TransacaoBruta): string {
+  return `${t.ocorridoEm}|${t.valorCentavos}|${t.descricaoOriginal}`;
 }
 
 /**
@@ -141,7 +188,7 @@ function pagamentoDeFatura(
  * e a `<MEMO>x` sem fechamento. Tag de agregado não tem valor na mesma linha e
  * fica de fora.
  */
-function folhas(trecho: string): Map<string, string> {
+export function folhas(trecho: string): Map<string, string> {
   const campos = new Map<string, string>();
   for (const [, tag, bruto] of trecho.matchAll(/<([A-Za-z0-9.]+)>([^<\r\n]*)/g)) {
     const nome = tag.toUpperCase();
